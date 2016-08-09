@@ -1,0 +1,11 @@
+gradlew.bat
+
+.gradle/
+
+build/
+
+.idea/
+
+.DS_Store
+
+gradle.properties

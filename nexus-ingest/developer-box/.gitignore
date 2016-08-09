@@ -1,0 +1,7 @@
+logs/
+
+*.nc
+*.h5
+
+.DS_Store
+.vagrant

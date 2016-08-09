@@ -1,0 +1,26 @@
+.gradle/
+.idea/
+build/
+gradlew.bat
+
+.DS_Store
+*.log
+
+#Idea files
+.idea
+*.iml
+*.ipr
+*.iws
+
+.gradle
+
+build
+
+*.class
+
+# Package Files #
+*.war
+*.ear
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
