@@ -1,0 +1,2 @@
+# nexus
+NEXUS is an emerging data-intensive analysis framework developed with a new approach for handling science data that enables large-scale data analysis. It takes on a different approach in handling file-based observational temporal, geospatial artifacts by fully leveraging the elasticity of Cloud Computing environment. Rather than performing on-the-fly file I/Os, NEXUS stores tiled data in Cloud-scaled databases with high-performance spatial lookup service.  NEXUS is also packaged with a suite of science data analytic web services that are developed using Apache Spark.
