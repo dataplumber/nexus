@@ -342,11 +342,11 @@ class TimeSeriesCalculator(SparkAlg):
             tile_data_agg = np.ma.array([tile.data.flatten() \
                                              for tile in ds1_nexus_tiles \
                                              if (tile.times[0] == timeinseconds)])
-            if tile_data_agg.mask.all():
+            if (len(tile_data_agg) == 0) or tile_data_agg.mask.all():
                 data_min = 0.
                 data_max = 0.
                 daily_mean = 0.
-                data_count = 0.
+                data_count = 0
                 data_std = 0.
             else:
                 data_min = np.ma.min(tile_data_agg)
