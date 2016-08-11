@@ -32,6 +32,7 @@ class RequestParameters(object):
 class StandardNexusErrors:
     UNKNOWN = 1000
     NO_DATA = 1001
+    DATASET_MISSING = 1002
 
 
 class NexusProcessingException(Exception):
@@ -45,6 +46,10 @@ class NexusProcessingException(Exception):
 class NoDataException(NexusProcessingException):
     def __init__(self, reason="No data found for the selected timeframe"):
         NexusProcessingException.__init__(self, StandardNexusErrors.NO_DATA, reason, 400)
+
+class DatasetNotFoundException(NexusProcessingException):
+    def __init__(self, reason="Dataset not found"):
+         NexusProcessingException.__init__(self, StandardNexusErrors.DATASET_MISSING, reason, code=404)
 
 
 class StatsComputeOptions(object):
@@ -113,7 +118,7 @@ class NexusRequestObject(StatsComputeOptions):
         self.requestHandler = reqHandler
         StatsComputeOptions.__init__(self)
 
-    def get_argument(self, name, default):
+    def get_argument(self, name, default=None):
         return self.requestHandler.get_argument(name, default=default)
 
     def __validate_is_shortname(self, v):

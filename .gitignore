@@ -1,0 +1,15 @@
+*~
+*.pyc
+src/python/ingest/data
+src/python/ingest/xml
+*.log
+*.so
+analysis/build/
+analysis/*.c
+analysis/*.h
+.idea
+*.DS_Store
+*.idea
+*.pkl
+dist
+*.egg-info

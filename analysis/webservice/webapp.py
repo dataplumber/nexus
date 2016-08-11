@@ -24,6 +24,7 @@ class ContentTypes(object):
     JSON = "JSON"
     XML = "XML"
     PNG = "PNG"
+    NETCDF = "NETCDF"
 
 
 class BaseHandler(tornado.web.RequestHandler):
@@ -150,7 +151,18 @@ class ModularNexusHandlerWrapper(BaseHandler):
                 self.write(results.toImage())
             except AttributeError:
                 raise NexusProcessingException(reason="Unable to convert results to an Image.")
-
+        elif request.get_content_type() == ContentTypes.CSV:
+            self.set_header("Content-Type", "text/csv")
+            try:
+                self.write(results.toCSV())
+            except:
+                raise NexusProcessingException(reason="Unable to convert results to CSV.")
+        elif request.get_content_type() == ContentTypes.NETCDF:
+            self.set_header("Content-Type", "application/x-netcdf")
+            try:
+                self.write(results.toNetCDF())
+            except:
+                raise NexusProcessingException(reason="Unable to convert results to NetCDF.")
 
 if __name__ == "__main__":
     logging.basicConfig(
