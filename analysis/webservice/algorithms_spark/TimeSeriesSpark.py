@@ -13,6 +13,7 @@ from multiprocessing import Pool, Manager
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
+import itertools
 from webservice.SparkAlg import SparkAlg
 from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMETERS_SPEC
 from nexustiles.nexustiles import NexusTileService
@@ -105,8 +106,6 @@ class TimeSeriesHandlerImpl(NexusHandler):
             raise NoDataException(reason="No data found for selected timeframe")
 
         cwd = os.getcwd()
-        nexus_tiles_spark = [(min_lat, max_lat, min_lon, max_lon, ds, 
-                              day_in_secs, cwd) for day_in_secs in daysinrange]
 
         # Configure Spark
         sp_conf = SparkConf()
@@ -135,11 +134,20 @@ class TimeSeriesHandlerImpl(NexusHandler):
 
         #print sp_conf.getAll()
         sc = SparkContext(conf=sp_conf)
+
+        nexus_tiles_spark = [(min_lat, max_lat, min_lon, max_lon, ds, 
+                              list(daysinrange_part), cwd)
+                             for daysinrange_part
+                             in np.array_split(daysinrange, num_parts)]
+
+        #for tile in nexus_tiles_spark:
+        #    print tile
         
         # Launch Spark computations
         rdd = sc.parallelize(nexus_tiles_spark,num_parts)
         results = rdd.map(TimeSeriesCalculator.calc_average_on_day).collect()
         #
+        results = list(itertools.chain.from_iterable(results))
         results = sorted(results, key=lambda entry: entry["time"])
 
         #filt.applyAllFiltersOnField(results, 'mean', applySeasonal=applySeasonalFilter, applyLowPass=applyLowPass)
@@ -297,8 +305,10 @@ class TimeSeriesCalculator(SparkAlg):
     @staticmethod
     def calc_average_on_day(tile_in_spark):
         (min_lat, max_lat, min_lon, max_lon, dataset, 
-         timeinseconds, cwd) = tile_in_spark
+         timestamps, cwd) = tile_in_spark
         os.chdir(cwd)
+        start_time = timestamps[0]
+        end_time = timestamps[-1]
         tile_service = NexusTileService()
         #ds1_nexus_tiles = \
         #    tile_service.get_tiles_bounded_by_box_at_time(min_lat, max_lat, 
@@ -317,8 +327,8 @@ class TimeSeriesCalculator(SparkAlg):
                                                               min_lon, 
                                                               max_lon, 
                                                               dataset, 
-                                                              timeinseconds,
-                                                              timeinseconds)
+                                                              timestamps[0],
+                                                              timestamps[-1])
 
         # debug code
         #for tile in ds1_nexus_tiles:
@@ -327,31 +337,35 @@ class TimeSeriesCalculator(SparkAlg):
             #print 'tile mask shape: ', tile.data.mask.shape
             #print 'tile: ', tile.data
 
-        tile_data_agg = np.ma.array([tile.data.flatten() \
-                                         for tile in ds1_nexus_tiles])
-        if tile_data_agg.mask.all():
-            data_min = 0.
-            data_max = 0.
-            daily_mean = 0.
-            data_count = 0.
-            data_std = 0.
-        else:
-            data_min = np.ma.min(tile_data_agg)
-            data_max = np.ma.max(tile_data_agg)
-            daily_mean = np.ma.mean(tile_data_agg).item()
-            data_count = np.ma.count(tile_data_agg).item()
-            data_std = np.ma.std(tile_data_agg)
-
+        stats_arr = []
+        for timeinseconds in timestamps:
+            tile_data_agg = np.ma.array([tile.data.flatten() \
+                                             for tile in ds1_nexus_tiles \
+                                             if (tile.times[0] == timeinseconds)])
+            if tile_data_agg.mask.all():
+                data_min = 0.
+                data_max = 0.
+                daily_mean = 0.
+                data_count = 0.
+                data_std = 0.
+            else:
+                data_min = np.ma.min(tile_data_agg)
+                data_max = np.ma.max(tile_data_agg)
+                daily_mean = np.ma.mean(tile_data_agg).item()
+                data_count = np.ma.count(tile_data_agg).item()
+                data_std = np.ma.std(tile_data_agg)
+                
         # Return Stats by day
-        stat = {
-            'min': data_min,
-            'max': data_max,
-            'mean': daily_mean,
-            'cnt': data_count,
-            'std': data_std,
-            'time': int(timeinseconds)
-        }
-        return stat
+            stat = {
+                'min': data_min,
+                'max': data_max,
+                'mean': daily_mean,
+                'cnt': data_count,
+                'std': data_std,
+                'time': int(timeinseconds)
+                }
+            stats_arr.append(stat)
+        return stats_arr
 
 
 def pool_worker(work_queue, done_queue):
