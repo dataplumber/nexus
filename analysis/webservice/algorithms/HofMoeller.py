@@ -2,6 +2,7 @@
 Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
+import itertools
 from cStringIO import StringIO
 from datetime import datetime
 from multiprocessing.pool import ThreadPool
@@ -16,102 +17,55 @@ from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMET
 from webservice.webmodel import NexusProcessingException, NexusResults
 
 
-# TODO Need to update to use nexustiles
-
-def latitudeTimeHofMoellerStatsForChunk(chunk, minLat, maxLat, minLon, maxLon, t, masker=None):
-    timeMillis = (int(chunk.start.strftime("%s")) * 1000)
-
-    lats = []
-    lat = minLat
-    while lat < maxLat:
-        lon = minLon
-
-        ttl = 0
-        cnt = 0
-        max = -100000.0
-        min = 100000.0
-        std = 0
-        while lon < maxLon:
-            value = chunk.getValueForLatLon(lat, lon)
-            lm = chunk.getLandmaskForLatLon(lat, lon)
-            if lm == 1.0 and value != 32767.0 and not masker.isLatLonMasked(lat, lon):
-                ttl = ttl + value
-                cnt = cnt + 1
-                max = max if value < max else value
-                min = min if value > min else value
-            lon = lon + 1
-        if cnt > 0:
-            mean = ttl / cnt
-        else:
-            mean = 0
-            min = 0
-            max = 0
-            std = 0
-
-        latStats = {
-            'latitude': float(lat),
-            'cnt': float(cnt),
-            'avg': float(mean),
-            'max': float(max),
-            'min': float(min),
-            'std': float(std)
-        }
-        lats.append(latStats)
-        lat = lat + 1
-    timeAxis = {
-        'sequence': t,
-        'time': timeMillis,
-        'lats': lats
+def longitude_time_hofmoeller_stats(tile, index):
+    stat = {
+        'sequence': index,
+        'time': np.ma.min(tile.times),
+        'lons': []
     }
-    return timeAxis
 
+    points = list(tile.nexus_point_generator())
+    data = sorted(points, key=lambda p: p.longitude)
+    points_by_lon = itertools.groupby(data, key=lambda p: p.longitude)
 
-def longitudeTimeHofMoellerStatsForChunk(chunk, minLat, maxLat, minLon, maxLon, t, masker=None):
-    timeMillis = (int(chunk.start.strftime("%s")) * 1000)
-
-    lons = []
-    lon = minLon
-    while lon < maxLon:
-        lat = minLat
-
-        ttl = 0
-        cnt = 0
-        max = -100000.0
-        min = 100000.0
-        std = 0
-        while lat < maxLat:
-            value = chunk.getValueForLatLon(lat, lon)
-            lm = chunk.getLandmaskForLatLon(lat, lon)
-            if lm == 1.0 and value != 32767.0 and not masker.isLatLonMasked(lat, lon):
-                ttl = ttl + value
-                cnt = cnt + 1
-                max = max if value < max else value
-                min = min if value > min else value
-            lat = lat + 1
-        if cnt > 0:
-            mean = ttl / cnt
-        else:
-            mean = 0
-            min = 0
-            max = 0
-            std = 0
-
-        lonStats = {
+    for lon, points_at_lon in points_by_lon:
+        values_at_lon = np.array([point.data_val for point in points_at_lon])
+        stat['lons'].append({
             'longitude': float(lon),
-            'cnt': float(cnt),
-            'avg': float(mean),
-            'max': float(max),
-            'min': float(min),
-            'std': float(std)
-        }
-        lons.append(lonStats)
-        lon = lon + 1
-    timeAxis = {
-        'sequence': t,
-        'time': timeMillis,
-        'lons': lons
+            'cnt': len(values_at_lon),
+            'avg': np.mean(values_at_lon).item(),
+            'max': np.max(values_at_lon).item(),
+            'min': np.min(values_at_lon).item(),
+            'std': np.std(values_at_lon).item()
+        })
+
+    return stat
+
+
+def latitude_time_hofmoeller_stats(tile, index):
+    stat = {
+        'sequence': index,
+        'time': np.ma.min(tile.times),
+        'lats': []
     }
-    return timeAxis
+
+    points = list(tile.nexus_point_generator())
+    data = sorted(points, key=lambda p: p.latitude)
+    points_by_lat = itertools.groupby(data, key=lambda p: p.latitude)
+
+    for lat, points_at_lat in points_by_lat:
+        values_at_lat = np.array([point.data_val for point in points_at_lat])
+
+        stat['lats'].append({
+            'latitude': float(lat),
+            'cnt': len(values_at_lat),
+            'avg': np.mean(values_at_lat).item(),
+            'max': np.max(values_at_lat).item(),
+            'min': np.min(values_at_lat).item(),
+            'std': np.std(values_at_lat).item()
+        })
+
+    return stat
 
 
 class BaseHoffMoellerHandlerImpl(NexusHandler):
@@ -153,25 +107,18 @@ class LatitudeTimeHoffMoellerHandlerImpl(BaseHoffMoellerHandlerImpl):
         BaseHoffMoellerHandlerImpl.__init__(self)
 
     def calc(self, computeOptions, **args):
-        chunks, meta = self.getChunksForBox(computeOptions.get_min_lat(),
-                                            computeOptions.get_max_lat(),
-                                            computeOptions.get_min_lon(),
-                                            computeOptions.get_max_lon(),
-                                            computeOptions.get_dataset()[0],
-                                            startTime=computeOptions.get_start_time(),
-                                            endTime=computeOptions.get_end_time())
+        tiles = self._tile_service.get_tiles_bounded_by_box(computeOptions.get_min_lat(), computeOptions.get_max_lat(),
+                                                            computeOptions.get_min_lon(), computeOptions.get_max_lon(),
+                                                            computeOptions.get_dataset()[0],
+                                                            computeOptions.get_start_time(),
+                                                            computeOptions.get_end_time())
 
-        if len(chunks) == 0:
+        if len(tiles) == 0:
             raise NexusProcessingException.NoDataException(reason="No data found for selected timeframe")
 
-        masker = LandMaskChecker(self._landmask, computeOptions.get_mask_type())
-
-        # pool = mp.Pool(processes=8)
-        pool = ThreadPool(processes=8)
-        results = [pool.apply_async(latitudeTimeHofMoellerStatsForChunk,
-                                    args=(chunks[x], computeOptions.get_min_lat(), computeOptions.get_max_lat(),
-                                          computeOptions.get_min_lon(), computeOptions.get_max_lon(), x, masker)) for x
-                   in chunks]
+        maxprocesses = int(self.algorithm_config.get("multiprocessing", "maxprocesses"))
+        pool = ThreadPool(processes=maxprocesses)
+        results = [pool.apply_async(latitude_time_hofmoeller_stats, args=(tile, x)) for x, tile in enumerate(tiles)]
         pool.close()
         pool.join()
 
@@ -179,8 +126,9 @@ class LatitudeTimeHoffMoellerHandlerImpl(BaseHoffMoellerHandlerImpl):
         results = sorted(results, key=lambda entry: entry["time"])
 
         results = self.applyDeseasonToHofMoeller(results)
-        return HoffMoellerResults(results=results, meta=meta, computeOptions=computeOptions,
-                                  type=HoffMoellerResults.LATITUDE)
+
+        result = HoffMoellerResults(results=results, compute_options=computeOptions, type=HoffMoellerResults.LATITUDE)
+        return result
 
 
 @nexus_handler
@@ -195,24 +143,18 @@ class LongitudeTimeHoffMoellerHandlerImpl(BaseHoffMoellerHandlerImpl):
         BaseHoffMoellerHandlerImpl.__init__(self)
 
     def calc(self, computeOptions, **args):
-        chunks, meta = self.getChunksForBox(computeOptions.get_min_lat(),
-                                            computeOptions.get_max_lat(),
-                                            computeOptions.get_min_lon(),
-                                            computeOptions.get_max_lon(),
-                                            computeOptions.get_dataset()[0],
-                                            startTime=computeOptions.get_start_time(),
-                                            endTime=computeOptions.get_end_time())
+        tiles = self._tile_service.get_tiles_bounded_by_box(computeOptions.get_min_lat(), computeOptions.get_max_lat(),
+                                                            computeOptions.get_min_lon(), computeOptions.get_max_lon(),
+                                                            computeOptions.get_dataset()[0],
+                                                            computeOptions.get_start_time(),
+                                                            computeOptions.get_end_time())
 
-        if len(chunks) == 0:
+        if len(tiles) == 0:
             raise NexusProcessingException.NoDataException(reason="No data found for selected timeframe")
 
-        masker = LandMaskChecker(self._landmask, computeOptions.get_mask_type())
-        # pool = mp.Pool(processes=8)
-        pool = ThreadPool(processes=8)
-        results = [pool.apply_async(longitudeTimeHofMoellerStatsForChunk,
-                                    args=(chunks[x], computeOptions.get_min_lat(), computeOptions.get_max_lat(),
-                                          computeOptions.get_min_lon(), computeOptions.get_max_lon(), x, masker)) for x
-                   in chunks]
+        maxprocesses = int(self.algorithm_config.get("multiprocessing", "maxprocesses"))
+        pool = ThreadPool(processes=maxprocesses)
+        results = [pool.apply_async(longitude_time_hofmoeller_stats, args=(tile, x)) for x, tile in enumerate(tiles)]
         pool.close()
         pool.join()
 
@@ -221,17 +163,17 @@ class LongitudeTimeHoffMoellerHandlerImpl(BaseHoffMoellerHandlerImpl):
 
         results = self.applyDeseasonToHofMoeller(results, pivot="lons")
 
-        return HoffMoellerResults(results=results, meta=meta, computeOptions=computeOptions,
-                                  type=HoffMoellerResults.LONGITUDE)
+        result = HoffMoellerResults(results=results, compute_options=computeOptions, type=HoffMoellerResults.LONGITUDE)
+        return result
 
 
 class HoffMoellerResults(NexusResults):
     LATITUDE = 0
     LONGITUDE = 1
 
-    def __init__(self, results=None, meta=None, computeOptions=None, type=0):
-        NexusResults.__init__(self, results=results, meta=meta, stats=None, computeOptions=computeOptions)
-        self.__type = type
+    def __init__(self, results=None, meta=None, stats=None, compute_options=None, **args):
+        NexusResults.__init__(self, results=results, meta=meta, stats=stats, compute_options=compute_options)
+        self.__type = args['type']
 
     def createHoffmueller(self, data, coordSeries, timeSeries, coordName, title, interpolate='nearest'):
         cmap = cm.coolwarm
