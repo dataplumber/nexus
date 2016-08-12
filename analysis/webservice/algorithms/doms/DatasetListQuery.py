@@ -22,7 +22,28 @@ class DomsDatasetListQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
         BaseHandler.__init__(self)
 
 
-    def __getUrlForDataset(self, dataset):
+    def getFacetsForInsituSource(self, source):
+        url = source["url"]
+
+        params = {
+            "facet": "true",
+            "stats": "true",
+            "startIndex": 0,
+            "itemsPerPage": 0
+        }
+        try:
+            r = requests.get(url, params=params)
+            results = json.loads(r.text)
+
+            depths = None
+            if "stats_fields" in results and "depth" in results["stats_fields"]:
+                depths = results["stats_fields"]["depth"]
+            return depths, results["facets"]
+        except: # KMG: Don't eat the exception. Add better handling...
+            return None, None
+
+
+    def getMetadataUrlForDataset(self, dataset):
         datasetSpec = config.getEndpointByName(dataset)
         if datasetSpec is not None:
             return datasetSpec["metadataUrl"]
@@ -31,7 +52,7 @@ class DomsDatasetListQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
 
     def getMetadataForSource(self, dataset):
         try:
-            r = requests.get(self.__getUrlForDataset(dataset))
+            r = requests.get(self.getMetadataUrlForDataset(dataset))
             results = json.loads(r.text)
             return results
         except:
@@ -48,10 +69,13 @@ class DomsDatasetListQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
 
 
         for insitu in config.ENDPOINTS:
+            depths, facets = self.getFacetsForInsituSource(insitu)
             insituList.append({
                 "name" : insitu["name"],
                 "endpoint" : insitu["url"],
-                "metadata": self.getMetadataForSource(insitu["name"])
+                "metadata": self.getMetadataForSource(insitu["name"]),
+                "depths": depths,
+                "facets": facets
             })
 
 
