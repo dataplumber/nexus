@@ -67,6 +67,15 @@ class Tile(object):
                 point = NexusPoint(lat, lon, None, time, index, data_val)
                 yield point
 
+    def contains_point(self, lat, lon):
+        return (
+                   (self.bbox.min_lat < lat or np.isclose(self.bbox.min_lat, lat)) and
+                   (lat < self.bbox.max_lat or np.isclose(lat, self.bbox.max_lat))
+               ) and (
+                   (self.bbox.min_lon < lon or np.isclose(self.bbox.min_lon, lon)) and
+                   (lon < self.bbox.max_lon or np.isclose(lon, self.bbox.max_lon))
+               )
+
 
 def get_approximate_value_for_lat_lon(tile_list, lat, lon):
     """
@@ -77,15 +86,7 @@ def get_approximate_value_for_lat_lon(tile_list, lat, lon):
     """
 
     try:
-        tile = next(tile for tile in tile_list if
-                    (
-                        (tile.bbox.min_lat < lat or np.isclose(tile.bbox.min_lat, lat)) and
-                        (lat < tile.bbox.max_lat or np.isclose(lat, tile.bbox.max_lat))
-                    ) and
-                    (
-                        (tile.bbox.min_lon < lon or np.isclose(tile.bbox.min_lon, lon)) and
-                        (lon < tile.bbox.max_lon or np.isclose(lon, tile.bbox.max_lon))
-                    ))
+        tile = next(tile for tile in tile_list if tile.contains_point(lat, lon))
     except StopIteration:
         # lat or lon are out of bounds for these tiles, return nan
         return float('NaN')
