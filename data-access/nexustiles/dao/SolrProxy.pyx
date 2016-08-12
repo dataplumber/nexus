@@ -70,14 +70,14 @@ class SolrProxy(object):
 
         return [results[0]]
 
-    def find_days_in_range_asc(self, min_lat, max_lat, min_lon, max_lon, ds, start_time, end_time):
+    def find_days_in_range_asc(self, min_lat, max_lat, min_lon, max_lon, ds, start_time, end_time, **kwargs):
 
         search = 'dataset_s:%s' % ds
 
         search_start_s = datetime.utcfromtimestamp(start_time).strftime('%Y-%m-%dT%H:%M:%SZ')
         search_end_s = datetime.utcfromtimestamp(end_time).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-        params = {
+        additionalparams = {
             'fq': [
                 "geo:[%s,%s TO %s,%s]" % (min_lat, min_lon, max_lat, max_lon),
                 "{frange l=0}sub(tile_min_time_dt,tile_max_time_dt)",
@@ -91,7 +91,9 @@ class SolrProxy(object):
             'facet_limit': '-1'
         }
 
-        response = self.do_query_raw(*(search, None, None, False, None), **params)
+        self._merge_kwargs(additionalparams, **kwargs)
+
+        response = self.do_query_raw(*(search, None, None, False, None), **additionalparams)
 
         daysinrangeasc = sorted(
             [(datetime.strptime(a_date, '%Y-%m-%dT%H:%M:%SZ') - datetime.utcfromtimestamp(0)).total_seconds() for a_date
@@ -100,7 +102,7 @@ class SolrProxy(object):
         return daysinrangeasc
 
     def find_all_tiles_in_box_sorttimeasc(self, min_lat, max_lat, min_lon, max_lon, ds, start_time=0,
-                                          end_time=-1):
+                                          end_time=-1, **kwargs):
 
         search = 'dataset_s:%s' % ds
 
@@ -126,6 +128,8 @@ class SolrProxy(object):
                           )
             additionalparams['fq'].append(time_clause)
 
+        self._merge_kwargs(additionalparams, **kwargs)
+
         return self.do_query_all(
             *(search, None, None, False, 'tile_min_time_dt asc, tile_max_time_dt asc'),
             **additionalparams)
@@ -149,11 +153,7 @@ class SolrProxy(object):
             ]
         }
 
-        # If number of rows was specified use it, otherwise rely on default
-        try:
-            additionalparams['rows'] = kwargs['rows']
-        except KeyError:
-            pass
+        self._merge_kwargs(additionalparams, **kwargs)
 
         return self.do_query_all(*(search, None, None, False, None), **additionalparams)
 
@@ -176,13 +176,10 @@ class SolrProxy(object):
             ]
         }
 
-        # If number of rows was specified use it, otherwise rely on default
-        try:
-            additionalparams['rows'] = kwargs['rows']
-        except KeyError:
-            pass
+        self._merge_kwargs(additionalparams, **kwargs)
 
-        return self.do_query_all(*(search, "product(tile_avg_val_d, tile_count_i),*", None, False, None), **additionalparams)
+        return self.do_query_all(*(search, "product(tile_avg_val_d, tile_count_i),*", None, False, None),
+                                 **additionalparams)
 
     def find_all_boundary_tiles_at_time(self, min_lat, max_lat, min_lon, max_lon, ds, time, **kwargs):
         search = 'dataset_s:%s' % ds
@@ -197,18 +194,16 @@ class SolrProxy(object):
 
         additionalparams = {
             'fq': [
-                "geo:\"Intersects(MultiLineString((%s %s, %s %s),(%s %s, %s %s),(%s %s, %s %s),(%s %s, %s %s)))\"" % (min_lon, max_lat, max_lon, max_lat, min_lon, max_lat, min_lon, min_lat, max_lon, max_lat, max_lon, min_lat, min_lon, min_lat, max_lon, min_lat),
+                "geo:\"Intersects(MultiLineString((%s %s, %s %s),(%s %s, %s %s),(%s %s, %s %s),(%s %s, %s %s)))\"" % (
+                    min_lon, max_lat, max_lon, max_lat, min_lon, max_lat, min_lon, min_lat, max_lon, max_lat, max_lon,
+                    min_lat, min_lon, min_lat, max_lon, min_lat),
                 "-geo:\"Within(ENVELOPE(%s,%s,%s,%s))\"" % (min_lon, max_lon, max_lat, min_lat),
                 "tile_count_i:[1 TO *]",
                 time_clause
             ]
         }
 
-        # If number of rows was specified use it, otherwise rely on default
-        try:
-            additionalparams['rows'] = kwargs['rows']
-        except KeyError:
-            pass
+        self._merge_kwargs(additionalparams, **kwargs)
 
         return self.do_query_all(*(search, None, None, False, None), **additionalparams)
 
@@ -238,3 +233,26 @@ class SolrProxy(object):
         assert len(results) == response.numFound
 
         return results
+
+    @staticmethod
+    def _merge_kwargs(additionalparams, **kwargs):
+
+        try:
+            additionalparams['rows'] = kwargs['rows']
+        except KeyError:
+            pass
+
+        try:
+            additionalparams['start'] = kwargs['start']
+        except KeyError:
+            pass
+
+        try:
+            kwfq = kwargs['fq'] if isinstance(kwargs['fq'], list) else list(kwargs['fq'])
+        except KeyError:
+            kwfq = []
+
+        try:
+            additionalparams['fq'].extend(kwfq)
+        except KeyError:
+            additionalparams['fq'] = kwfq
