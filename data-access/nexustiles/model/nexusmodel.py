@@ -78,24 +78,33 @@ def get_approximate_value_for_lat_lon(tile_list, lat, lon):
 
     try:
         tile = next(tile for tile in tile_list if
-                    tile.bbox.min_lat <= lat <= tile.bbox.max_lat and tile.bbox.min_lon <= lon <= tile.bbox.max_lon)
+                    (
+                        (tile.bbox.min_lat < lat or np.isclose(tile.bbox.min_lat, lat)) and
+                        (lat < tile.bbox.max_lat or np.isclose(lat, tile.bbox.max_lat))
+                    ) and
+                    (
+                        (tile.bbox.min_lon < lon or np.isclose(tile.bbox.min_lon, lon)) and
+                        (lon < tile.bbox.max_lon or np.isclose(lon, tile.bbox.max_lon))
+                    ))
     except StopIteration:
         # lat or lon are out of bounds for these tiles, return nan
         return float('NaN')
 
-    lat_idx = np.ma.where(tile.latitudes == lat)
-    if len(lat_idx[0]) == 0:
-        try:
-            lat_idx = next(iter(np.ma.where((lat > tile.latitudes))))[-1]
-        except IndexError:
-            lat_idx = next(iter(np.ma.where((lat < tile.latitudes))))[0]
+    # Check latitude array for an exact match on the latitude being searched for
+    lat_idx = np.ma.where(np.isclose(tile.latitudes, lat))[0]
+    if len(lat_idx) == 0:
+        # No exact match but the lat being search for is between min and max. So break the lats into all values less
+        # than the lat being searched for, then take the last one in that list
+        lat_idx = next(iter(np.ma.where((lat > tile.latitudes))))[-1]
+    else:
+        lat_idx = lat_idx[0]
 
-    lon_idx = np.ma.where(tile.longitudes == lon)
-    if len(lon_idx[0]) == 0:
-        try:
-            lon_idx = next(iter(np.ma.where((lon > tile.longitudes))))[-1]
-        except IndexError:
-            lon_idx = next(iter(np.ma.where((lon < tile.longitudes))))[0]
+    # Repeat for longitude
+    lon_idx = np.ma.where(np.isclose(tile.longitudes, lon))[0]
+    if len(lon_idx) == 0:
+        lon_idx = next(iter(np.ma.where((lon > tile.longitudes))))[-1]
+    else:
+        lon_idx = lon_idx[0]
 
     data_val = tile.data[0][lat_idx][lon_idx]
 
