@@ -28,7 +28,6 @@ MISSIONS = [
     {"id": 4, "desc": "SPURS1"}
 ]
 
-
 def getDescById(list, id):
     for item in list:
         if item["id"] == id:
@@ -43,3 +42,13 @@ def getDeviceById(id):
 
 def getMissionById(id):
     return getDescById(MISSIONS, id)
+
+def getDescByListNameAndId(listName, id):
+    if listName.upper() == "PLATFORM":
+        return getPlatformById(id)
+    elif listName.upper() == "DEVICE":
+        return getDeviceById(id)
+    elif listName.upper() == "MISSION":
+        return getMissionById(id)
+    else:
+        raise Exception("Invalid list name specified ('%s')"%listName)

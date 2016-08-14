@@ -97,6 +97,9 @@ def get_approximate_value_for_lat_lon(tile_list, lat, lon):
         except IndexError:
             lon_idx = next(iter(np.ma.where((lon < tile.longitudes))))[0]
 
-    data_val = tile.data[0][lat_idx][lon_idx]
+    try:
+        data_val = tile.data[0][lat_idx][lon_idx]
+    except IndexError:
+        return None
 
     return data_val.item() if (data_val is not np.ma.masked) and data_val.size == 1 else float('Nan')

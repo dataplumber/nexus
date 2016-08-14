@@ -21,7 +21,7 @@ import requests
 import json
 from datetime import datetime
 import multiprocessing as mp
-
+import math
 
 @nexus_handler
 class CombinedDomsMatchupQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
@@ -224,7 +224,11 @@ class MatchupContext:
             #print chunks
             #ts = calendar.timegm(chunks.start.utctimetuple()) * 1000
             if abs((ts*1000) - searchTime) < timeDiff:
-                value = float(self.__getValueForLatLon(chunks, lat, lon))
+                value = self.__getValueForLatLon(chunks, lat, lon)
+                if isinstance(value, float) and (math.isnan(value) or value == np.nan):
+                    value = None
+                elif value is not None:
+                    value = float(value)
                 foundNode = {
                     "sea_water_temperature": value,
                     "time": ts,

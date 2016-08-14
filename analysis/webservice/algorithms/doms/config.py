@@ -18,7 +18,7 @@ ENDPOINTS = [
     },
     {
         "name": "icoads",
-        "url": "http://rda-db-icoads.ucar.edu:8890/ws/search/icoads",
+        "url": "http://rda-data.ucar.edu:8890/ws/search/icoads",
         "fetchParallel": True,
         "fetchThreads": 8,
         "itemsPerPage": 1000,

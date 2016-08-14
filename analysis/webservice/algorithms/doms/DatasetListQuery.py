@@ -8,6 +8,8 @@ import datafetch
 import config
 import requests
 import json
+import values
+import traceback
 
 @nexus_handler
 class DomsDatasetListQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
@@ -38,8 +40,15 @@ class DomsDatasetListQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
             depths = None
             if "stats_fields" in results and "depth" in results["stats_fields"]:
                 depths = results["stats_fields"]["depth"]
+
+            for facet in results["facets"]:
+                field = facet["field"]
+                for value in facet["values"]:
+                    value["value"] = values.getDescByListNameAndId(field, int(value["value"]))
+
             return depths, results["facets"]
         except: # KMG: Don't eat the exception. Add better handling...
+            traceback.print_exc()
             return None, None
 
 
