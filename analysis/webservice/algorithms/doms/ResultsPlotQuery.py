@@ -78,11 +78,15 @@ class DomsResultsPlotHandler(BaseDomsHandler.BaseDomsQueryHandler):
         for entry in data:
             for match in entry["matches"]:
                 if match["source"] == secondary:
-                    a = entry["sea_water_temperature"]
-                    b = match["sea_water_temperature"]
+                    if "sea_water_temperature" in entry and "sea_water_temperature" in match:
+                        a = entry["sea_water_temperature"]
+                        b = match["sea_water_temperature"]
+                        z.append(a - b)
+                    else:
+                        z.append(1.0)
                     lats.append(entry["y"])
                     lons.append(entry["x"])
-                    z.append(a - b)
+
 
         return DomsMapPlotQueryResults(lats=lats, lons=lons, z=z, primary=primary, secondary=secondary, args=params, details=stats, bounds=None, count=None, computeOptions=None, executionId=id)
 
@@ -103,8 +107,9 @@ class DomsResultsPlotHandler(BaseDomsHandler.BaseDomsQueryHandler):
         for entry in results:
             for match in entry["matches"]:
                 if match["source"] == secondary:
-                    x.append(entry["sea_water_temperature"])
-                    y.append(match["sea_water_temperature"])
+                    if "sea_water_temperature" in entry and "sea_water_temperature" in match:
+                        x.append(entry["sea_water_temperature"])
+                        y.append(match["sea_water_temperature"])
 
         return x, y
 
