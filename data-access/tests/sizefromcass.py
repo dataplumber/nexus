@@ -3,6 +3,9 @@ Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 
+import pyximport
+pyximport.install()
+
 import ConfigParser
 
 import pkg_resources
@@ -15,5 +18,5 @@ config.readfp(pkg_resources.resource_stream(__name__, "config/datastores.ini"), 
 
 cass = CassandraProxy(config)
 
-tiles = cass.fetch_nexus_tiles('aec174e2-64e4-3602-82a9-aa3f530007a9')
+tiles = cass.fetch_nexus_tiles('d9b5afe3-bd7f-3824-ad8a-d8d3b364689c')
 print len(tiles[0].tile_blob)

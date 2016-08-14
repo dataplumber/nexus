@@ -59,30 +59,49 @@ class NexusTileData(Model):
             longitude_data = np.ma.masked_invalid(from_shaped_array(swath_tile.longitude)).reshape(-1)
             time_data = np.ma.masked_invalid(from_shaped_array(swath_tile.time)).reshape(-1)
 
+            # Simplify the tile if the time dimension is the same value repeated
+            if np.all(time_data == np.min(time_data)):
+                time_data = np.array([np.min(time_data)])
+
             swath_tile_data = np.ma.masked_invalid(from_shaped_array(swath_tile.variable_data))
-            tile_data = np.ma.masked_all((len(time_data), len(latitude_data), len(longitude_data)))
 
-            row, col = np.indices(swath_tile_data.shape)
-
-            tile_data[np.diag_indices(len(time_data), 3)] = swath_tile_data[row.flat, col.flat]
-            tile_data.mask[np.diag_indices(len(time_data), 3)] = swath_tile_data.mask[row.flat, col.flat]
-
-            del swath_tile_data
+            tile_data = self._to_standard_index(swath_tile_data,
+                                                (len(time_data), len(latitude_data), len(longitude_data)))
 
             # Extract the meta data
             meta_data = {}
             for meta_data_obj in swath_tile.meta_data:
                 name = meta_data_obj.name
                 actual_meta_array = np.ma.masked_invalid(from_shaped_array(meta_data_obj.meta_data))
-                reshaped_meta_array = np.ma.masked_all((len(time_data), len(latitude_data), len(longitude_data)))
-                row, col = np.indices(actual_meta_array.shape)
-                reshaped_meta_array[np.diag_indices(len(time_data), 3)] = actual_meta_array[row.flat, col.flat]
-                reshaped_meta_array.mask[np.diag_indices(len(time_data), 3)] = actual_meta_array.mask[row.flat, col.flat]
+                reshaped_meta_array = self._to_standard_index(actual_meta_array, tile_data.shape)
                 meta_data[name] = reshaped_meta_array
 
             return latitude_data, longitude_data, time_data, tile_data, meta_data
         else:
             raise NotImplementedError("Only supports grid_tile and swath_tile")
+
+    @staticmethod
+    def _to_standard_index(data_array, desired_shape):
+
+        if desired_shape[0] == 1:
+            reshaped_array = np.ma.masked_all((desired_shape[1], desired_shape[2]))
+            row, col = np.indices(data_array.shape)
+
+            reshaped_array[np.diag_indices(desired_shape[1], len(reshaped_array.shape))] = data_array[
+                row.flat, col.flat]
+            reshaped_array.mask[np.diag_indices(desired_shape[1], len(reshaped_array.shape))] = data_array.mask[
+                row.flat, col.flat]
+            reshaped_array = reshaped_array[np.newaxis, :]
+        else:
+            reshaped_array = np.ma.masked_all(desired_shape)
+            row, col = np.indices(data_array.shape)
+
+            reshaped_array[np.diag_indices(desired_shape[1], len(reshaped_array.shape))] = data_array[
+                row.flat, col.flat]
+            reshaped_array.mask[np.diag_indices(desired_shape[1], len(reshaped_array.shape))] = data_array.mask[
+                row.flat, col.flat]
+
+        return reshaped_array
 
 
 class CassandraProxy(object):

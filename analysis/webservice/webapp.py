@@ -164,26 +164,29 @@ class ModularNexusHandlerWrapper(BaseHandler):
             except:
                 raise NexusProcessingException(reason="Unable to convert results to NetCDF.")
 
+
 if __name__ == "__main__":
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt="%Y-%m-%dT%H:%M:%S", stream=sys.stdout)
     log = logging.getLogger(__name__)
+
     webconfig = ConfigParser.ConfigParser()
     webconfig.read(["../config/web.ini", "config/web.ini"])
 
     algorithm_config = ConfigParser.ConfigParser()
     algorithm_config.read(["../config/algorithms.ini", "config/algorithms.ini"])
 
+    define("debug", default=False, help="run in debug mode")
+    define("port", default=webconfig.get("global", "server.socket_port"), help="run on the given port", type=int)
+    define("address", default=webconfig.get("global", "server.socket_host"), help="Bind to the given address")
+    parse_command_line()
+
     moduleDirs = webconfig.get("modules", "module_dirs").split(",")
     for moduleDir in moduleDirs:
         log.info("Loading modules from %s" % moduleDir)
         importlib.import_module(moduleDir)
-
-    define("port", default=webconfig.get("global", "server.socket_port"), help="run on the given port", type=int)
-    define("address", default=webconfig.get("global", "server.socket_host"), help="Bind to the given address")
-    define("debug", default=False, help="run in debug mode")
 
     staticDir = webconfig.get("static", "static_dir")
     staticEnabled = webconfig.get("static", "static_enabled") == "true"
@@ -203,13 +206,13 @@ if __name__ == "__main__":
 
     for clazzWrapper in NexusHandler.AVAILABLE_HANDLERS:
         handlers.append(
-            (clazzWrapper.path(), ModularNexusHandlerWrapper, dict(clazz=clazzWrapper, algorithm_config=algorithm_config)))
+            (clazzWrapper.path(), ModularNexusHandlerWrapper,
+             dict(clazz=clazzWrapper, algorithm_config=algorithm_config)))
 
     if staticEnabled:
         handlers.append(
             (r'/(.*)', tornado.web.StaticFileHandler, {'path': staticDir, "default_filename": "index.html"}))
 
-    parse_command_line()
     app = tornado.web.Application(
         handlers,
         default_host=options.address,
