@@ -170,6 +170,9 @@
    <field name="Spatial-Box" type="string" indexed="false" stored="true" multiValued="true" />
    <field name="Spatial-Polygon" type="string" indexed="false" stored="true" multiValued="true" />
 
+   <field name="NexusDataBeginningDateTime" type="tdate" indexed="true" stored="true" multiValued="false" />
+   <field name="NexusDataEndingDateTime" type="tdate" indexed="true" stored="true" multiValued="false" />
+
    <!-- Only remove the "id" field if you have a very good reason to. While not strictly
      required, it is highly recommended. A <uniqueKey> is present in almost all Solr 
      installations. See the <uniqueKey> declaration below where <uniqueKey> is set to "id".
