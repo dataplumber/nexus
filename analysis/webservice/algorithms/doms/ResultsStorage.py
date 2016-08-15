@@ -142,13 +142,22 @@ class ResultsStorage(AbstractResultsContainer):
                 )
         )
 
+        n = 0
         if "matches" in result:
             for match in result["matches"]:
                 self.__insertResult(id, result["id"], match, batch, insertStatement)
+                n += 1
+                if n >= 20:
+                    if primaryId is None:
+                        self.__commitBatch(batch)
+                    n = 0
 
         if primaryId is None:
-            self._session.execute(batch)
-            batch.clear()
+            self.__commitBatch(batch)
+
+    def __commitBatch(self, batch):
+        self._session.execute(batch)
+        batch.clear()
 
     def __buildDataMap(self, result):
         dataMap = {}

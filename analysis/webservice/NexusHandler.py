@@ -5,7 +5,7 @@ California Institute of Technology.  All rights reserved
 import logging
 import types
 from datetime import datetime
-
+import time
 from nexustiles.nexustiles import NexusTileService
 
 AVAILABLE_HANDLERS = []
@@ -190,6 +190,10 @@ class NexusHandler(CalcHandler):
         z = x.copy()
         z.update(y)
         return z
+
+    def _now(self):
+        millis = int(round(time.time() * 1000))
+        return millis
 
     def _mergeDataSeries(self, resultsData, dataNum, resultsMap):
 

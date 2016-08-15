@@ -5,7 +5,6 @@ from webservice.NexusHandler import DEFAULT_PARAMETERS_SPEC
 from webservice.webmodel import NexusResults, NexusProcessingException
 
 import json
-import time
 import config
 import numpy as np
 
@@ -20,10 +19,6 @@ class BaseDomsQueryHandler(BaseHandler):
             if s["name"] == source:
                 return s
         return None
-
-    def _now(self):
-        millis = int(round(time.time() * 1000))
-        return millis
 
     def _does_datasource_exist(self, ds):
         for endpoint in config.ENDPOINTS:
