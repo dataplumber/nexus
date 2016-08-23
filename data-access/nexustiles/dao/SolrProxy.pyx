@@ -80,7 +80,7 @@ class SolrProxy(object):
         additionalparams = {
             'fq': [
                 "geo:[%s,%s TO %s,%s]" % (min_lat, min_lon, max_lat, max_lon),
-                "{frange l=0}sub(tile_min_time_dt,tile_max_time_dt)",
+                "{!frange l=0 u=0}ms(tile_min_time_dt,tile_max_time_dt)",
                 "tile_count_i:[1 TO *]",
                 "tile_min_time_dt:[%s TO %s] " % (search_start_s, search_end_s)
             ],
