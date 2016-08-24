@@ -7,6 +7,8 @@ import multiprocessing as mp
 import geo
 import values
 from multiprocessing.pool import ThreadPool
+from webservice.webmodel import NexusResults, NexusProcessingException
+import traceback
 
 def __parseDatetime(dtString):
     dt = datetime.strptime(dtString, "%Y-%m-%dT%H:%M:%SZ")
@@ -85,6 +87,9 @@ def __doQuery(endpoint, startTime, endTime, bbox, depthTolerance=1000, itemsPerP
     resultsRaw = __fetchJson(endpoint["url"], params)
     boundsConstrainer = geo.BoundsConstrainer(north=-90, south=90, west=180, east=-180)
 
+    if resultsRaw["totalResults"] == 0 or len(resultsRaw["results"]) == 0: # Double-sanity check
+        return [], 0, startIndex, itemsPerPage, boundsConstrainer
+
     try:
         results = []
         for resultdict in resultsRaw["results"]:
@@ -96,7 +101,8 @@ def __doQuery(endpoint, startTime, endTime, bbox, depthTolerance=1000, itemsPerP
 
         if "stats_fields" in resultsRaw and len(resultsRaw["results"]) == 0:
             stats = resultsRaw["stats_fields"]
-            boundsConstrainer.testCoords(north=stats['lat']['max'], south=stats['lat']['min'], west=stats['lon']['min'], east=stats['lon']['max'])
+            if "lat" in stats and "lon" in stats:
+                boundsConstrainer.testCoords(north=stats['lat']['max'], south=stats['lat']['min'], west=stats['lon']['min'], east=stats['lon']['max'])
 
         if pageCallback is not None:
             pageCallback(results)
@@ -110,7 +116,9 @@ def __doQuery(endpoint, startTime, endTime, bbox, depthTolerance=1000, itemsPerP
             return [], int(resultsRaw["totalResults"]), int(resultsRaw["startIndex"]), int(resultsRaw["itemsPerPage"]), boundsConstrainer
     except:
         print "Invalid or missing JSON in response."
-        return [], 0, startIndex, itemsPerPage
+        traceback.print_exc()
+        raise NexusProcessingException(reason="Invalid or missing JSON in response.")
+        #return [], 0, startIndex, itemsPerPage, boundsConstrainer
 
 
 

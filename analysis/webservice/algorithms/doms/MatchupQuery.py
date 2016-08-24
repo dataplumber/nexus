@@ -84,6 +84,8 @@ class CombinedDomsMatchupQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
             raise Exception("Specified primary dataset not found using identifier '%s'"%primary)
 
         primaryData, bounds = self.fetchData([primarySpec], startTime, endTime, bbox, depthTolerance, platforms)
+
+
         primaryContext = MatchupContext(primaryData)
 
 
@@ -173,8 +175,10 @@ class MatchupContext:
             v = (u[0], u[1], 0.0)
             self.data.append(v)
 
-        self.tree = spatial.KDTree(self.data)
-
+        if len(self.data) > 0:
+            self.tree = spatial.KDTree(self.data)
+        else:
+            self.tree = None
 
     def getFinal(self, minMatchesToInclude):
 
@@ -195,19 +199,19 @@ class MatchupContext:
             r["matches"].extend(foundSatNodes)
 
     def processInSitu(self, records, xyTolerance, timeTolerance):
+        if self.tree is not None:
+            for s in records:
+                self.insituCount += 1
+                u = utm.from_latlon(s["y"], s["x"])
+                coords = np.array([u[0], u[1], 0])
+                ball = self.tree.query_ball_point(coords, xyTolerance)
 
-        for s in records:
-            self.insituCount += 1
-            u = utm.from_latlon(s["y"], s["x"])
-            coords = np.array([u[0], u[1], 0])
-            ball = self.tree.query_ball_point(coords, xyTolerance)
+                self.insituMatches += len(ball)
 
-            self.insituMatches += len(ball)
-
-            for i in ball:
-                match = self.primary[i]
-                if abs(match["time"] - s["time"]) <= (timeTolerance * 1000.0):
-                    match["matches"].append(s)
+                for i in ball:
+                    match = self.primary[i]
+                    if abs(match["time"] - s["time"]) <= (timeTolerance * 1000.0):
+                        match["matches"].append(s)
 
 
     def __getValueForLatLon(self, chunks, lat, lon):
