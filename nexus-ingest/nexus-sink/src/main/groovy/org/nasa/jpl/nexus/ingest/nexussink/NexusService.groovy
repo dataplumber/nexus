@@ -13,6 +13,8 @@ import org.nasa.jpl.nexus.ingest.wiretypes.NexusContent
 import org.nasa.jpl.nexus.ingest.wiretypes.NexusContent.GridTile
 import org.nasa.jpl.nexus.ingest.wiretypes.NexusContent.NexusTile
 import org.nasa.jpl.nexus.ingest.wiretypes.NexusContent.TileSummary
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.springframework.core.env.Environment
 import org.springframework.data.cassandra.core.CassandraOperations
 import org.springframework.data.solr.core.SolrOperations
@@ -28,6 +30,8 @@ class NexusService {
 
     @Resource
     private Environment environment;
+
+    private Logger log = LoggerFactory.getLogger(NexusService.class)
 
     private static final def iso = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm'Z'")
     static{
@@ -47,12 +51,32 @@ class NexusService {
 
     def saveToNexus(Collection<NexusTile> nexusTiles) {
 
+        nexusTiles = removeInvalid(nexusTiles)
+        if(nexusTiles.size() == 0){
+            return
+        }
+
         def solrdocs = nexusTiles.collect { nexusTile -> getSolrDocFromTileSummary(nexusTile.summary)}
         solr.saveDocuments(solrdocs, environment.getProperty("solrCommitWithin", Integer.class, 1000))
 
         def query = "insert into ${tableName} (tile_id, tile_blob) VALUES (?, ?)"
         cassandraTemplate.ingest(query, nexusTiles.collect{ nexusTile -> getCassandraRowFromTileData(nexusTile.tile)})
 
+    }
+
+    //This is a hack until we fix Solr indexing to handle tiles with a single value. The problem is that when there is
+    //only a single value, lat_min = lat_max and lon_min = lon_max and Solr can't parse a POLYGON which is only a
+    //single point (see how 'geo' is constructed below).
+    private removeInvalid(Collection<NexusTile> nexusTiles){
+
+        return nexusTiles.findResults { nexusTile ->
+            if(nexusTile.summary.stats.count==1){
+                log.warn("Tile ${nexusTile.summary.tileId} from ${nexusTile.summary.granule}[${nexusTile.summary.sectionSpec}] contains only 1 measurement. Skipping because the way Solr is being used can't handle this.")
+                return null
+            }else{
+                return nexusTile
+            }
+        }
     }
 
     def getSolrDocFromTileSummary(TileSummary summary) {
