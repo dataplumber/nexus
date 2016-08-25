@@ -123,6 +123,10 @@ class CassandraProxy(object):
         tile_ids = [uuid.UUID(str(tile_id)) for tile_id in tile_ids if
                     (isinstance(tile_id, str) or isinstance(tile_id, unicode))]
 
-        res = [NexusTileData.objects.filter(tile_id=tile_id)[0] for tile_id in tile_ids]
+        res = []
+        for tile_id in tile_ids:
+            filterResults = NexusTileData.objects.filter(tile_id=tile_id)
+            if len(filterResults) > 0:
+                res.append(filterResults[0])
 
         return res

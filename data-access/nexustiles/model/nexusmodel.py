@@ -77,7 +77,7 @@ class Tile(object):
                )
 
 
-def get_approximate_value_for_lat_lon(tile_list, lat, lon):
+def get_approximate_value_for_lat_lon(tile_list, lat, lon, arrayName=None):
     """
     This function pulls the value out of one of the tiles in tile_list that is the closest to the given
     lat, lon point.
@@ -108,7 +108,10 @@ def get_approximate_value_for_lat_lon(tile_list, lat, lon):
         lon_idx = lon_idx[0]
 
     try:
-        data_val = tile.data[0][lat_idx][lon_idx]
+        if arrayName is None or arrayName == "data":
+            data_val = tile.data[0][lat_idx][lon_idx]
+        else:
+            data_val = tile.meta_data[arrayName][lat_idx][lon_idx]
     except IndexError:
         return None
 
