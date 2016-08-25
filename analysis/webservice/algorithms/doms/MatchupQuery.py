@@ -231,6 +231,7 @@ class MatchupContext:
 
     def __buildSwathIndexes(self, chunk):
         latlons = []
+        utms = []
         indexes = []
         for i in range(0, len(chunk.latitudes)):
             _lat = chunk.latitudes[i]
@@ -247,21 +248,24 @@ class MatchupContext:
 
                 u = utm.from_latlon(_lat, _lon)
                 v = (u[0], u[1], 0.0)
-                latlons.append(v)
+                latlons.append((_lat, _lon))
+                utms.append(v)
                 indexes.append((i, j))
 
         tree = None
         if len(latlons) > 0:
-            tree = spatial.KDTree(latlons)
+            tree = spatial.KDTree(utms)
 
         chunk.swathIndexing = {
             "tree": tree,
+            "latlons": latlons,
             "indexes": indexes
         }
 
 
     def __getChunkIndexesForLatLon(self, chunk, lat, lon, xyTolerance):
         foundIndexes = []
+        foundLatLons = []
 
         if "swathIndexing" not in chunk.__dict__:
             self.__buildSwathIndexes(chunk)
@@ -269,12 +273,14 @@ class MatchupContext:
         tree = chunk.swathIndexing["tree"]
         if tree is not None:
             indexes = chunk.swathIndexing["indexes"]
+            latlons = chunk.swathIndexing["latlons"]
             u = utm.from_latlon(lat, lon)
             coords = np.array([u[0], u[1], 0])
             ball = tree.query_ball_point(coords, xyTolerance)
             for i in ball:
                 foundIndexes.append(indexes[i])
-        return foundIndexes
+                foundLatLons.append(latlons[i])
+        return foundIndexes, foundLatLons
 
 
     def __getChunkValueAtIndex(self, chunk, index, arrayName=None):
@@ -295,9 +301,12 @@ class MatchupContext:
             chunks = chunksByDay[ts]
             if abs((ts * 1000) - searchTime) < timeDiff:
                 for chunk in chunks:
-                    indexes = self.__getChunkIndexesForLatLon(chunk, lat, lon, xyTolerance)
+                    indexes, latlons = self.__getChunkIndexesForLatLon(chunk, lat, lon, xyTolerance)
 
-                    for index in indexes:
+                    #for index in indexes:
+                    for i in range(0, len(indexes)):
+                        index = indexes[i]
+                        latlon = latlons[i]
                         sst = None
                         sss = None
                         windSpeed = None
@@ -330,13 +339,11 @@ class MatchupContext:
                             "sea_water_salinity": sss,
                             "wind_speed": windSpeed,
                             "wind_direction": windDirection,
-                            "wind_uv": {
-                                "u": windU,
-                                "v": windV
-                            },
+                            "wind_u": windU,
+                            "wind_v": windV,
                             "time": ts,
-                            "x": lon,
-                            "y": lat,
+                            "x": self.__checkNumber(latlon[1]),
+                            "y": self.__checkNumber(latlon[0]),
                             "depth": 0,
                             "sea_water_temperature_depth": 0,
                             "source": source,
