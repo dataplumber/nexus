@@ -105,31 +105,36 @@ class NexusService {
 
     private determineGeo(def summary){
         //Solr cannot index a POLYGON where all corners are the same point or when there are only 2 distinct points (line).
-        def bbox = summary.bbox
+        //Solr is configured for a specific precision so we need to round to that precision before checking equality.
+        def geoPrecision = environment.getProperty("solrGeoPrecision", Integer.class, 3)
+        def latMin = summary.bbox.latMin.round(geoPrecision)
+        def latMax = summary.bbox.latMax.round(geoPrecision)
+        def lonMin = summary.bbox.lonMin.round(geoPrecision)
+        def lonMax = summary.bbox.lonMax.round(geoPrecision)
         def geo
         //If lat min = lat max and lon min = lon max, index the 'geo' bounding box as a POINT instead of a POLYGON
-        if(bbox.latMin == bbox.latMax && bbox.lonMin == bbox.lonMax){
-            geo = "POINT(${bbox.lonMin} ${bbox.latMin})"
+        if(latMin == latMax && lonMin == lonMax){
+            geo = "POINT(${lonMin} ${latMin})"
             log.debug("${summary.tileId}\t${summary.granule}[${summary.sectionSpec}] geo=$geo")
         }
         //If lat min = lat max but lon min != lon max, then we essentially have a line.
-        else if(bbox.latMin == bbox.latMax){
-            geo = "LINESTRING (${bbox.lonMin} ${bbox.latMin}, ${bbox.lonMax} ${bbox.latMin})"
+        else if(latMin == latMax){
+            geo = "LINESTRING (${lonMin} ${latMin}, ${lonMax} ${latMin})"
             log.debug("${summary.tileId}\t${summary.granule}[${summary.sectionSpec}] geo=$geo")
         }
         //Same if lon min = lon max but lat min != lat max
-        else if(bbox.lonMin == bbox.lonMax){
-            geo = "LINESTRING (${bbox.lonMin} ${bbox.latMin}, ${bbox.lonMin} ${bbox.latMax})"
+        else if(lonMin == lonMax){
+            geo = "LINESTRING (${lonMin} ${latMin}, ${lonMin} ${latMax})"
             log.debug("${summary.tileId}\t${summary.granule}[${summary.sectionSpec}] geo=$geo")
         }
         //All other cases should use POLYGON
         else{
             geo = "POLYGON((" +
-                    "${bbox.lonMin} ${bbox.latMin}, " +
-                    "${bbox.lonMax} ${bbox.latMin}, " +
-                    "${bbox.lonMax} ${bbox.latMax}, " +
-                    "${bbox.lonMin} ${bbox.latMax}, " +
-                    "${bbox.lonMin} ${bbox.latMin}))"
+                    "${lonMin} ${latMin}, " +
+                    "${lonMax} ${latMin}, " +
+                    "${lonMax} ${latMax}, " +
+                    "${lonMin} ${latMax}, " +
+                    "${lonMin} ${latMin}))"
         }
 
         return geo
