@@ -51,32 +51,12 @@ class NexusService {
 
     def saveToNexus(Collection<NexusTile> nexusTiles) {
 
-        nexusTiles = removeInvalid(nexusTiles)
-        if(nexusTiles.size() == 0){
-            return
-        }
-
         def solrdocs = nexusTiles.collect { nexusTile -> getSolrDocFromTileSummary(nexusTile.summary)}
         solr.saveDocuments(solrdocs, environment.getProperty("solrCommitWithin", Integer.class, 1000))
 
         def query = "insert into ${tableName} (tile_id, tile_blob) VALUES (?, ?)"
         cassandraTemplate.ingest(query, nexusTiles.collect{ nexusTile -> getCassandraRowFromTileData(nexusTile.tile)})
 
-    }
-
-    //This is a hack until we fix Solr indexing to handle tiles with a single value. The problem is that when there is
-    //only a single value, lat_min = lat_max and lon_min = lon_max and Solr can't parse a POLYGON which is only a
-    //single point (see how 'geo' is constructed below).
-    private removeInvalid(Collection<NexusTile> nexusTiles){
-
-        return nexusTiles.findResults { nexusTile ->
-            if(nexusTile.summary.stats.count==1){
-                log.warn("Tile ${nexusTile.summary.tileId} from ${nexusTile.summary.granule}[${nexusTile.summary.sectionSpec}] contains only 1 measurement. Skipping because the way Solr is being used can't handle this.")
-                return null
-            }else{
-                return nexusTile
-            }
-        }
     }
 
     def getSolrDocFromTileSummary(TileSummary summary) {
@@ -92,12 +72,7 @@ class NexusService {
         def minTime = iso.format(startCal.getTime())
         def maxTime = iso.format(endCal.getTime())
 
-        def geo = "POLYGON((" +
-                "${bbox.lonMin} ${bbox.latMin}, " +
-                "${bbox.lonMax} ${bbox.latMin}, " +
-                "${bbox.lonMax} ${bbox.latMax}, " +
-                "${bbox.lonMin} ${bbox.latMax}, " +
-                "${bbox.lonMin} ${bbox.latMin}))"
+        def geo = determineGeo(summary)
 
         def doc = [
                 "table_s"         : tableName,
@@ -126,6 +101,38 @@ class NexusService {
 
         def solrdoc = toSolrInputDocument(doc)
         return solrdoc
+    }
+
+    private determineGeo(def summary){
+        //Solr cannot index a POLYGON where all corners are the same point or when there are only 2 distinct points (line).
+        def bbox = summary.bbox
+        def geo
+        //If lat min = lat max and lon min = lon max, index the 'geo' bounding box as a POINT instead of a POLYGON
+        if(bbox.latMin == bbox.latMax && bbox.lonMin == bbox.lonMax){
+            geo = "POINT(${bbox.lonMin} ${bbox.latMin})"
+            log.debug("${summary.tileId}\t${summary.granule}[${summary.sectionSpec}] geo=$geo")
+        }
+        //If lat min = lat max but lon min != lon max, then we essentially have a line.
+        else if(bbox.latMin == bbox.latMax){
+            geo = "LINESTRING (${bbox.lonMin} ${bbox.latMin}, ${bbox.lonMax} ${bbox.latMin})"
+            log.debug("${summary.tileId}\t${summary.granule}[${summary.sectionSpec}] geo=$geo")
+        }
+        //Same if lon min = lon max but lat min != lat max
+        else if(bbox.lonMin == bbox.lonMax){
+            geo = "LINESTRING (${bbox.lonMin} ${bbox.latMin}, ${bbox.lonMin} ${bbox.latMax})"
+            log.debug("${summary.tileId}\t${summary.granule}[${summary.sectionSpec}] geo=$geo")
+        }
+        //All other cases should use POLYGON
+        else{
+            geo = "POLYGON((" +
+                    "${bbox.lonMin} ${bbox.latMin}, " +
+                    "${bbox.lonMax} ${bbox.latMin}, " +
+                    "${bbox.lonMax} ${bbox.latMax}, " +
+                    "${bbox.lonMin} ${bbox.latMax}, " +
+                    "${bbox.lonMin} ${bbox.latMin}))"
+        }
+
+        return geo
     }
 
     def toSolrInputDocument(Map<String, Object> doc) {
