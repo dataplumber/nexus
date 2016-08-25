@@ -312,9 +312,11 @@ class MatchupContext:
 
                         if "GHRSST" in source:
                             sst = value
-
-                        if "ASCATB" in source:
+                        elif "ASCATB" in source:
                             windU = value
+                        elif "SSS" in source: # SMAP
+                            sss = value
+
 
                         if len(chunks) > 0 and "wind_dir" in chunks[0].meta_data:
                             windDirection = self.__checkNumber(self.__getChunkValueAtIndex(chunk, index, "wind_dir"))
