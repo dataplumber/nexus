@@ -330,10 +330,8 @@ class MatchupContext:
                             "sea_water_salinity": sss,
                             "wind_speed": windSpeed,
                             "wind_direction": windDirection,
-                            "wind_uv": {
-                                "u": windU,
-                                "v": windV
-                            },
+                            "wind_u": windU,
+                            "wind_v": windV,
                             "time": ts,
                             "x": lon,
                             "y": lat,
