@@ -148,7 +148,7 @@ public class NexusSinkIntegrationTest {
                 .setGranule("test.nc")
                 .setSectionSpec("0:1,0:1")
                 .setStats(NexusContent.TileSummary.DataStats.newBuilder()
-                .setCount(1)
+                .setCount(10)
                 .setMax(50)
                 .setMin(50)
                 .setMean(50)
@@ -187,6 +187,84 @@ public class NexusSinkIntegrationTest {
 
 
         assertEqualsEventually 1, new Supplier<Integer>() {
+            @Override
+            Integer get() {
+                cassandraTemplate.query("select * from sea_surface_temp;").getAvailableWithoutFetching()
+            }
+        }
+
+        chain.destroy()
+
+    }
+
+    /**
+     * Test a Nexus sink module
+     */
+    @Test
+    public void testNexusSinkSingleCount() {
+
+        def streamName = "testNexusSink"
+
+        NexusContent.NexusTile tile = NexusContent.NexusTile.newBuilder()
+                .setTile(NexusContent.TileData.newBuilder()
+                .setTileId(UUID.randomUUID().toString())
+                .setGridTile(
+                NexusContent.GridTile.newBuilder()
+                        .build())
+                .build())
+                .setSummary(NexusContent.TileSummary.newBuilder()
+                .setTileId("1")
+                .setBbox(NexusContent.TileSummary.BBox.newBuilder()
+                .setLatMin(51)
+                .setLatMax(51)
+                .setLonMin(22)
+                .setLonMax(22)
+                .build())
+                .setDatasetName("test")
+                .setDatasetUuid("4")
+                .setDataVarName("sst")
+                .setGranule("test.nc")
+                .setSectionSpec("0:1,0:1")
+                .setStats(NexusContent.TileSummary.DataStats.newBuilder()
+                .setCount(1)
+                .setMax(50)
+                .setMin(50)
+                .setMean(50)
+                .setMaxTime(500000)
+                .setMinTime(500000)
+                .build())
+                .addGlobalAttributes(NexusContent.Attribute.newBuilder()
+                .setName("day_of_year_i")
+                .addValues("006")
+                .build())
+                .addGlobalAttributes(NexusContent.Attribute.newBuilder()
+                .setName("attr_multi_value_test")
+                .addValues("006")
+                .addValues("multi")
+                .build())
+                .build())
+                .build()
+
+
+        def processingChainUnderTest = "$MODULE_NAME --$PROPERTY_NAME_CASSANDRA_CONTACT_POINTS=$CONTACT --$PROPERTY_NAME_CASSANDRA_KEYSPACE=$CASSANDRA_KEYSPACE --$PROPERTY_NAME_CASSANDRA_PORT=$PORT --$PROPERTY_NAME_SOLR_SERVER_URL=$SOLR_URL --$PROPERTY_NAME_SOLR_COLLECTION=$SOLR_CORE"
+
+        SingleNodeProcessingChainProducer chain = chainProducer(application, streamName, processingChainUnderTest)
+        SolrClient solrClient = singleNodeIntegrationTestSupport.getModule(streamName, MODULE_NAME, 0).applicationContext.getBean("solrClient", SolrClient)
+
+        chain.sendPayload(tile)
+
+        assertEqualsEventually 0, new Supplier<Integer>() {
+            @Override
+            Integer get() {
+                solrClient.commit()
+                def q = solrClient.query(new ModifiableSolrParams().add("q", "*:*"))
+                println "query: $q"
+                return q.results.numFound
+            }
+        }
+
+
+        assertEqualsEventually 0, new Supplier<Integer>() {
             @Override
             Integer get() {
                 cassandraTemplate.query("select * from sea_surface_temp;").getAvailableWithoutFetching()
