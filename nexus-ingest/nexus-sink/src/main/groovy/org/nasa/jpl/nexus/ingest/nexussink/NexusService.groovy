@@ -52,6 +52,9 @@ class NexusService {
     def saveToNexus(Collection<NexusTile> nexusTiles) {
 
         nexusTiles = removeInvalid(nexusTiles)
+        if(nexusTiles.size() == 0){
+            return
+        }
 
         def solrdocs = nexusTiles.collect { nexusTile -> getSolrDocFromTileSummary(nexusTile.summary)}
         solr.saveDocuments(solrdocs, environment.getProperty("solrCommitWithin", Integer.class, 1000))
@@ -68,7 +71,7 @@ class NexusService {
 
         return nexusTiles.findResults { nexusTile ->
             if(nexusTile.summary.stats.count==1){
-                log.warn("Tile ${nexusTile.summary.tileId} from ${nexusTile.summary.granule} contains only 1 measurement. Skipping because the way Solr is being used can't handle this.")
+                log.warn("Tile ${nexusTile.summary.tileId} from ${nexusTile.summary.granule}[${nexusTile.summary.sectionSpec}] contains only 1 measurement. Skipping because the way Solr is being used can't handle this.")
                 return null
             }else{
                 return nexusTile
