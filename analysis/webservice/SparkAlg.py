@@ -134,10 +134,25 @@ class SparkAlg(NexusHandler):
     def _lon2ind(self,lon):
         return int((lon-self._minLonCent)/self._lonRes)
 
-    def _create_nc_file(self, a, fname, varname):
+    def _create_nc_file_time1d(self, a, fname, varname):
         print 'a=',a
         print 'shape a = ', a.shape
         sys.stdout.flush()
+        assert len(a.shape) == 1
+        time_dim = len(a)
+        rootgrp = Dataset(fname, "w", format="NETCDF4")
+        rootgrp.createDimension("time", time_dim)
+        rootgrp.createVariable(varname, "f4", dimensions=("time",))
+        rootgrp.createVariable("time", "f4", dimensions=("time",))
+        rootgrp.variables[varname][:] = [d['mean'] for d in a]
+        rootgrp.variables["time"][:] = [d['time'] for d in a]
+        rootgrp.close()
+
+    def _create_nc_file_latlon2d(self, a, fname, varname):
+        print 'a=',a
+        print 'shape a = ', a.shape
+        sys.stdout.flush()
+        assert len(a.shape) == 2
         lat_dim, lon_dim = a.shape
         rootgrp = Dataset(fname, "w", format="NETCDF4")
         rootgrp.createDimension("lat", lat_dim)
@@ -153,3 +168,5 @@ class SparkAlg(NexusHandler):
                                                   self._maxLonCent, lon_dim)
         rootgrp.close()
 
+    def _create_nc_file(self, a, fname, varname):
+        self._create_nc_file_latlon2d(a, fname, varname)

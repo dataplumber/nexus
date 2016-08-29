@@ -27,7 +27,7 @@ SENTINEL = 'STOP'
 
 
 @nexus_handler
-class TimeSeriesHandlerImpl(NexusHandler):
+class TimeSeriesHandlerImpl(SparkAlg):
     name = "Time Series Spark"
     path = "/timeSeriesSpark"
     description = "Computes a time series plot between one or more datasets given an arbitrary geographical area and time range"
@@ -105,6 +105,8 @@ class TimeSeriesHandlerImpl(NexusHandler):
         if len(daysinrange) == 0:
             raise NoDataException(reason="No data found for selected timeframe")
 
+        print 'Found %d days in range' % len(daysinrange)
+
         cwd = os.getcwd()
 
         # Configure Spark
@@ -117,14 +119,14 @@ class TimeSeriesHandlerImpl(NexusHandler):
         sp_conf.set("spark.executor.memory", "4g")
 
         #num_parts = 1
-        #num_parts = 16
+        num_parts = 16
         #num_parts = 32
         #num_parts = 64
-        num_parts = 128
+        #num_parts = 128
         #num_execs = 1
-        #num_execs = 16
+        num_execs = 16
         #num_execs = 32
-        num_execs = 64
+        #num_execs = 64
         cores_per_exec = 1
         sp_conf.setMaster("yarn-client")
         #sp_conf.setMaster("local[16]")
@@ -154,6 +156,7 @@ class TimeSeriesHandlerImpl(NexusHandler):
         #filt.applyAllFiltersOnField(results, 'max', applySeasonal=applySeasonalFilter, applyLowPass=applyLowPass)
         #filt.applyAllFiltersOnField(results, 'min', applySeasonal=applySeasonalFilter, applyLowPass=applyLowPass)
 
+        self._create_nc_file_time1d(np.array(results), 'ts.nc', 'mean')
         return results, {}
 
     def calculateComparisonStats(self, results, suffix=""):
