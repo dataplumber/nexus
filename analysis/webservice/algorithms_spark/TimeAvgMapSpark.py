@@ -119,6 +119,7 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
                                                self._maxLonCent)
         sys.stdout.flush()
         a = np.zeros((nlats, nlons),dtype=np.float64,order='C')
+        n = np.zeros((nlats, nlons),dtype=np.float64,order='C')
 
         nexus_tiles = self._find_global_tile_set()
         # print 'tiles:'
@@ -240,6 +241,7 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
                          tile_min_lon, tile_max_lon, y0, y1, x0, x1)
                     sys.stdout.flush()
                     a[y0:y1+1,x0:x1+1] = tile_data
+                    n[y0:y1+1,x0:x1+1] = tile_cnt
                 else:
                     print 'All pixels masked in tile lat %f-%f, lon %f-%f, map y %d-%d, map x %d-%d' % \
                         (tile_min_lat, tile_max_lat, 
@@ -249,7 +251,10 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
         # Store global map in a NetCDF file.
         self._create_nc_file(a, 'tam.nc', 'val')
 
-        return TimeAvgMapSparkResults(results=tile_stats, meta={}, computeOptions=computeOptions)
+        # Create dict for JSON response
+        results = [[{'avg': a[x,y], 'cnt': n[x,y]}
+                    for x in range(a.shape[0])] for y in range(a.shape[1])]
+        return TimeAvgMapSparkResults(results=results, meta={}, computeOptions=computeOptions)
 
 
 class TimeAvgMapSparkResults(NexusResults):
