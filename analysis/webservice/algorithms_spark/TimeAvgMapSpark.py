@@ -232,9 +232,9 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
                 tile_cnt = np.array([[tile_stats[y][x]['cnt'] for x in range(len(tile_stats[0]))] for y in range(len(tile_stats))])
                 tile_data.mask = ~(tile_cnt.astype(bool))
                 y0 = self._lat2ind(tile_min_lat)
-                y1 = self._lat2ind(tile_max_lat)
+                y1 = y0 + tile_data.shape[0] - 1
                 x0 = self._lon2ind(tile_min_lon)
-                x1 = self._lon2ind(tile_max_lon)
+                x1 = x0 + tile_data.shape[1] - 1
                 if np.any(np.logical_not(tile_data.mask)):
                     print 'writing tile lat %f-%f, lon %f-%f, map y %d-%d, map x %d-%d' % \
                         (tile_min_lat, tile_max_lat, 
