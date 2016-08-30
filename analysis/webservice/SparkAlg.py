@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+from time import time
 from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMETERS_SPEC
 from netCDF4 import Dataset
 
@@ -95,32 +96,86 @@ class SparkAlg(NexusHandler):
         
     @staticmethod
     def query_by_parts(tile_service, min_lat, max_lat, min_lon, max_lon, 
-                       dataset, start_time, end_time):
+                       dataset, start_time, end_time, part_dim=0):
+        nexus_max_tiles_per_query = 100
         print 'trying query: ',min_lat, max_lat, min_lon, max_lon, \
             dataset, start_time, end_time
         try:
-            ds1_nexus_tiles = \
-                tile_service.get_tiles_bounded_by_box(min_lat, max_lat, 
-                                                      min_lon, max_lon, 
-                                                      dataset, 
-                                                      start_time=start_time, 
-                                                      end_time=end_time)
+            solr_docs = \
+                tile_service.find_tiles_in_box(min_lat, max_lat, 
+                                               min_lon, max_lon, 
+                                               dataset, 
+                                               start_time=start_time, 
+                                               end_time=end_time,
+                                               fetch_data=False)
+            assert(len(solr_docs) <= nexus_max_tiles_per_query)
         except:
             print 'failed query: ',min_lat, max_lat, min_lon, max_lon, \
                 dataset, start_time, end_time
-            mid_lat = (min_lat + max_lat) / 2
-            ds1_nexus_tiles = SparkAlg.query_by_parts(tile_service, 
+            if part_dim == 0: 
+                # Partition by latitude.
+                mid_lat = (min_lat + max_lat) / 2
+                nexus_tiles = SparkAlg.query_by_parts(tile_service, 
                                                       min_lat, mid_lat, 
                                                       min_lon, max_lon, 
                                                       dataset, 
-                                                      start_time, end_time)
-            ds1_nexus_tiles.extend(SparkAlg.query_by_parts(tile_service, 
+                                                      start_time, end_time,
+                                                      part_dim = part_dim)
+                nexus_tiles.extend(SparkAlg.query_by_parts(tile_service, 
                                                            mid_lat, max_lat, 
                                                            min_lon, max_lon, 
                                                            dataset, 
                                                            start_time, 
-                                                           end_time))
-        return ds1_nexus_tiles
+                                                           end_time,
+                                                           part_dim = part_dim))
+            elif part_dim == 1: 
+                # Partition by longitude.
+                mid_lon = (min_lon + max_lon) / 2
+                nexus_tiles = SparkAlg.query_by_parts(tile_service, 
+                                                      min_lat, max_lat, 
+                                                      min_lon, mid_lon, 
+                                                      dataset, 
+                                                      start_time, end_time,
+                                                      part_dim = part_dim)
+                nexus_tiles.extend(SparkAlg.query_by_parts(tile_service, 
+                                                           min_lat, max_lat, 
+                                                           mid_lon, max_lon, 
+                                                           dataset, 
+                                                           start_time, 
+                                                           end_time,
+                                                           part_dim = part_dim))
+            elif part_dim == 2:
+                # Partition by time.
+                mid_time = (start_time + end_time) / 2
+                nexus_tiles = SparkAlg.query_by_parts(tile_service, 
+                                                      min_lat, max_lat, 
+                                                      min_lon, max_lon, 
+                                                      dataset, 
+                                                      start_time, mid_time,
+                                                      part_dim = part_dim)
+                nexus_tiles.extend(SparkAlg.query_by_parts(tile_service, 
+                                                           min_lat, max_lat, 
+                                                           min_lon, max_lon, 
+                                                           dataset, 
+                                                           mid_time, 
+                                                           end_time,
+                                                           part_dim = part_dim))
+        else:
+            # No exception, so query Cassandra for the tile data.
+            print 'Making NEXUS query to Cassandra for %d tiles...' % \
+                len(solr_docs)
+            t1 = time()
+            print 'NEXUS call start at time %f' % t1
+            sys.stdout.flush()
+            solr_tiles = tile_service._solr_docs_to_tiles(*solr_docs)
+            nexus_tiles = tile_service.fetch_data_for_tiles(*solr_tiles)
+            t2 = time()
+            print 'NEXUS call end at time %f' % t2
+            print 'Seconds in NEXUS call: ', t2-t1
+            sys.stdout.flush()
+
+        print 'Returning %d tiles' % len(nexus_tiles)
+        return list(nexus_tiles)
 
     @staticmethod
     def _prune_tiles(nexus_tiles):
