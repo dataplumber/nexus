@@ -46,17 +46,22 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
         #days_at_a_time = 1
         print 'days_at_a_time = ', days_at_a_time
         t_incr = 86400 * days_at_a_time
-        avg_tile = np.ma.array(np.zeros(tile_inbounds_shape,
-                                        dtype=np.float64))
-        cnt_tile = np.ma.array(np.zeros(tile_inbounds_shape,
-                                        dtype=np.uint32))
+        sum_tile = np.array(np.zeros(tile_inbounds_shape, dtype=np.float64))
+        cnt_tile = np.array(np.zeros(tile_inbounds_shape, dtype=np.uint32))
         t_start = startTime
         while t_start <= endTime:
             t_end = min(t_start+t_incr,endTime)
             t1 = time()
             print 'nexus call start at time %f' % t1
             sys.stdout.flush()
-            nexus_tiles = tile_service.get_tiles_bounded_by_box(min_lat, max_lat, min_lon, max_lon, ds=ds, start_time=t_start, end_time=t_end)
+            nexus_tiles = \
+                TimeAvgMapSparkHandlerImpl.query_by_parts(tile_service,
+                                                          min_lat, max_lat, 
+                                                          min_lon, max_lon, 
+                                                          ds, 
+                                                          t_start, 
+                                                          t_end,
+                                                          part_dim=2)
             t2 = time()
             print 'nexus call end at time %f' % t2
             print 'secs in nexus call: ', t2-t1
@@ -67,23 +72,21 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
             sys.stdout.flush()
             for tile in nexus_tiles:
                 tile.data.data[:,:] = np.nan_to_num(tile.data.data)
-                avg_tile.data[:,:] += tile.data[0,
-                                                min_y:max_y+1,
-                                                min_x:max_x+1]
-                cnt_tile.data[:,:] += (~tile.data.mask[0,
-                                                       min_y:max_y+1,
-                                                       min_x:max_x+1]).astype(np.uint8)
+                sum_tile += tile.data.data[0,min_y:max_y+1,min_x:max_x+1]
+                cnt_tile += (~tile.data.mask[0,
+                                             min_y:max_y+1,
+                                             min_x:max_x+1]).astype(np.uint8)
             t_start = t_end + 1
 
         #print 'cnt_tile = ', cnt_tile
-        cnt_tile.mask = ~(cnt_tile.data.astype(bool))
-        avg_tile.mask = cnt_tile.mask
-        avg_tile /= cnt_tile
-        stats_tile = [[{'avg': avg_tile.data[y,x], 'cnt': cnt_tile.data[y,x]} for x in range(tile_inbounds_shape[1])] for y in range(tile_inbounds_shape[0])]
+        #cnt_tile.mask = ~(cnt_tile.data.astype(bool))
+        #sum_tile.mask = cnt_tile.mask
+        #avg_tile = sum_tile / cnt_tile
+        #stats_tile = [[{'avg': avg_tile.data[y,x], 'cnt': cnt_tile.data[y,x]} for x in range(tile_inbounds_shape[1])] for y in range(tile_inbounds_shape[0])]
         print 'Finished tile', tile_bounds
         #print 'Tile avg = ', avg_tile
         sys.stdout.flush()
-        return (stats_tile,min_lat,max_lat,min_lon,max_lon)
+        return ((min_lat,max_lat,min_lon,max_lon),(sum_tile,cnt_tile))
 
     def calc(self, computeOptions, **args):
         """
@@ -148,13 +151,36 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
         for i in np.flipud(bad_tile_inds):
             del nexus_tiles_spark[i]
 
+        # Expand Spark map tuple array by duplicating each entry N times,
+        # where N is the number of ways we want the time dimension carved up.
+        num_time_parts = 18
+       #nexus_tiles_spark = list(itertools.chain.from_iterable(itertools.repeat(t, num_time_parts) for t in nexus_tiles_spark))
+        nexus_tiles_spark = np.repeat(nexus_tiles_spark, num_time_parts, axis=0)
+        print 'repeated len(nexus_tiles_spark) = ', len(nexus_tiles_spark)
+        
+        # Set the time boundaries for each of the Spark map tuples.
+        # Every Nth element in the array gets the same time bounds.
+        spark_part_times = np.linspace(self._startTime, self._endTime,
+                                       num_time_parts+1, dtype=np.int64)
+        
+        spark_part_time_ranges = \
+            np.repeat([[[spark_part_times[i], 
+                         spark_part_times[i+1]] for i in range(num_time_parts)]],
+                      len(nexus_tiles_spark) / num_time_parts, axis=0).reshape((len(nexus_tiles_spark), 2))
+        print 'spark_part_time_ranges=', spark_part_time_ranges
+        nexus_tiles_spark[:,1:3] = spark_part_time_ranges
+        print 'nexus_tiles_spark final = '
+        for i in range(len(nexus_tiles_spark)):
+            print nexus_tiles_spark[i]
+
         # Configure Spark
         sp_conf = SparkConf()
         sp_conf.setAppName("Spark Time Avg Map")
         sp_conf.set("spark.executorEnv.HOME",
                     os.path.join(os.getenv('HOME'), 'spark_exec_home'))
         sp_conf.set("spark.executorEnv.PYTHONPATH", cwd)
-        sp_conf.set("spark.executor.memoryOverhead", "4g")
+        #sp_conf.set("spark.yarn.executor.memoryOverhead", "4000")
+        sp_conf.set("spark.executor.memory", "4g")
 
         #num_parts = 1
         num_parts = 16
@@ -175,7 +201,21 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
         
         # Launch Spark computations
         rdd = sc.parallelize(nexus_tiles_spark,num_parts)
-        avg_tiles = rdd.map(self._map).collect()
+        sum_count_part = rdd.map(self._map)
+        sum_count = \
+            sum_count_part.combineByKey(lambda val: val,
+                                        lambda x,val: (x[0]+val[0], 
+                                                       x[1]+val[1]),
+                                        lambda x,y: (x[0]+y[0], x[1]+y[1]))
+        avg_tiles = \
+            sum_count.map(lambda (bounds, (sum_tile, cnt_tile)):
+                              (bounds, [[{'avg': (sum_tile[y,x]/cnt_tile[y,x]) 
+                                          if (cnt_tile[y,x] > 0) else 0., 
+                                          'cnt': cnt_tile[y,x]} 
+                                         for x in 
+                                         range(sum_tile.shape[1])] 
+                                        for y in 
+                                        range(sum_tile.shape[0])])).collect()
 
         #avg_tiles = map(self._map, nexus_tiles)
 
@@ -185,8 +225,8 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
         # with the time avg map data and lat-lon bounding box.
         for tile in avg_tiles:
             if tile is not None:
-                (tile_stats, tile_min_lat, tile_max_lat, 
-                 tile_min_lon, tile_max_lon) = tile
+                ((tile_min_lat, tile_max_lat, tile_min_lon, tile_max_lon),
+                 tile_stats) = tile
                 tile_data = np.ma.array([[tile_stats[y][x]['avg'] for x in range(len(tile_stats[0]))] for y in range(len(tile_stats))])
                 tile_cnt = np.array([[tile_stats[y][x]['cnt'] for x in range(len(tile_stats[0]))] for y in range(len(tile_stats))])
                 tile_data.mask = ~(tile_cnt.astype(bool))
