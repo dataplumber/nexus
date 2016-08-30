@@ -115,18 +115,18 @@ class TimeSeriesHandlerImpl(SparkAlg):
         sp_conf.set("spark.executorEnv.HOME",
                     os.path.join(os.getenv('HOME'), 'spark_exec_home'))
         sp_conf.set("spark.executorEnv.PYTHONPATH", cwd)
-        #sp_conf.set("spark.executor.memoryOverhead", "4g")
+        #sp_conf.set("spark.yarn.executor.memoryOverhead", "4000")
         sp_conf.set("spark.executor.memory", "4g")
 
         #num_parts = 1
-        num_parts = 16
+        #num_parts = 16
         #num_parts = 32
         #num_parts = 64
-        #num_parts = 128
+        num_parts = 128
         #num_execs = 1
-        num_execs = 16
+        #num_execs = 16
         #num_execs = 32
-        #num_execs = 64
+        num_execs = 64
         cores_per_exec = 1
         sp_conf.setMaster("yarn-client")
         #sp_conf.setMaster("local[16]")
@@ -318,20 +318,20 @@ class TimeSeriesCalculator(SparkAlg):
         #                                                  min_lon, max_lon, 
         #                                                  dataset, 
         #                                                  timeinseconds)
-        #ds1_nexus_tiles = \
-        #    tile_service.get_tiles_bounded_by_box(min_lat, max_lat, 
-        #                                          min_lon, max_lon, 
-        #                                          dataset, 
-        #                                          timeinseconds,
-        #                                          timeinseconds)
-        ds1_nexus_tiles = TimeSeriesCalculator.query_by_parts(tile_service, 
-                                                              min_lat, 
-                                                              max_lat, 
-                                                              min_lon, 
-                                                              max_lon, 
-                                                              dataset, 
-                                                              timestamps[0],
-                                                              timestamps[-1])
+        ds1_nexus_tiles = \
+            tile_service.get_tiles_bounded_by_box(min_lat, max_lat, 
+                                                  min_lon, max_lon, 
+                                                  dataset, 
+                                                  timestamps[0],
+                                                  timestamps[-1])
+        #ds1_nexus_tiles = TimeSeriesCalculator.query_by_parts(tile_service, 
+        #                                                      min_lat, 
+        #                                                      max_lat, 
+        #                                                      min_lon, 
+        #                                                      max_lon, 
+        #                                                      dataset, 
+        #                                                      timestamps[0],
+        #                                                      timestamps[-1])
 
         # debug code
         #for tile in ds1_nexus_tiles:
