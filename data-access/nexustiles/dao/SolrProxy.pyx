@@ -268,7 +268,7 @@ class SolrProxy(object):
 
     @staticmethod
     def _merge_kwargs(additionalparams, **kwargs):
-
+        # Only Solr-specific kwargs are parsed
         try:
             additionalparams['rows'] = kwargs['rows']
         except KeyError:
@@ -288,3 +288,13 @@ class SolrProxy(object):
             additionalparams['fq'].extend(kwfq)
         except KeyError:
             additionalparams['fq'] = kwfq
+
+        try:
+            kwfl = kwargs['fl'] if isinstance(kwargs['fl'], list) else list(kwargs['fl'])
+        except KeyError:
+            kwfl = []
+
+        try:
+            additionalparams['fl'].extend(kwfl)
+        except KeyError:
+            additionalparams['fl'] = kwfl
