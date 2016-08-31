@@ -24,7 +24,8 @@ setuptools.setup(
     install_requires=[
         'cassandra-driver',
         'solrpy==0.9.7',
-        'nexusproto'
+        'nexusproto',
+        'shapely'
     ],
 
     classifiers=[
