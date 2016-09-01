@@ -5,6 +5,7 @@ California Institute of Technology.  All rights reserved
 import re
 import json
 import numpy as np
+from shapely.geometry import Polygon
 from datetime import datetime
 from decimal import Decimal
 
@@ -121,6 +122,10 @@ class NexusRequestObject(StatsComputeOptions):
     def get_argument(self, name, default=None):
         return self.requestHandler.get_argument(name, default=default)
 
+    def get_list_int_arg(self, name, default=None):
+        arg = self.get_argument(name, default=default)
+        return arg.split(',')
+
     def __validate_is_shortname(self, v):
         if v is None or len(v) == 0:
             return False
@@ -174,6 +179,11 @@ class NexusRequestObject(StatsComputeOptions):
 
     def get_min_lon(self, default=Decimal(-180)):
         return self.get_decimal_arg("minLon", default)
+
+    def get_bounding_polygon(self):
+        west, south, east, north = self.get_argument("b").split(",")
+        polygon = Polygon([(west, south), (east, south), (east, north), (west, north), (west, south)])
+        return polygon
 
     def get_dataset(self):
         ds = self.get_argument(RequestParameters.DATASET, None)

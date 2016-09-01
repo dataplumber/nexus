@@ -33,25 +33,25 @@ class DailyDifferenceAverageImpl(NexusHandler):
             "type": "string",
             "description": "The second Dataset shortname to use in calculation"
         },
-        "minLat": {
-            "name": "Minimum Latitude",
-            "type": "float",
-            "description": "Minimum (Southern) bounding box Latitude"
-        },
-        "maxLat": {
-            "name": "Maximum Latitude",
-            "type": "float",
-            "description": "Maximum (Northern) bounding box Latitude"
-        },
         "minLon": {
             "name": "Minimum Longitude",
             "type": "float",
             "description": "Minimum (Western) bounding box Longitude"
         },
+        "minLat": {
+            "name": "Minimum Latitude",
+            "type": "float",
+            "description": "Minimum (Southern) bounding box Latitude"
+        },
         "maxLon": {
             "name": "Maximum Longitude",
             "type": "float",
             "description": "Maximum (Eastern) bounding box Longitude"
+        },
+        "maxLat": {
+            "name": "Maximum Latitude",
+            "type": "float",
+            "description": "Maximum (Northern) bounding box Latitude"
         },
         "startTime": {
             "name": "Start Time",

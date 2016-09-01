@@ -30,7 +30,8 @@ setuptools.setup(
         'pytz',
         'cython',
         'requests',
-        'utm'
+        'utm',
+        'shapely'
     ],
 
     classifiers=[
