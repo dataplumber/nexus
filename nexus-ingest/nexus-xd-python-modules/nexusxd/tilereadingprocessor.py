@@ -151,7 +151,8 @@ def read_grid_data(self, section_spec_dataset):
 
             if time is not None:
                 timevar = ds[time]
-                tile.time = to_seconds_from_epoch(timevar[0], timeunits=timevar.getncattr('units'))
+                # Note assumption is that index of time is start value in dimtoslice
+                tile.time = to_seconds_from_epoch(timevar[dimtoslice[time].start], timeunits=timevar.getncattr('units'))
 
             nexus_tile = new_nexus_tile(file_path, section_spec)
             nexus_tile.tile.grid_tile.CopyFrom(tile)
