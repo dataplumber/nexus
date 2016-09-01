@@ -9,7 +9,8 @@ import pickle
 import json
 
 import numpy as np
-from webservice.algorithms_spark.Matchup import DomsPoint, match_points
+from webservice.algorithms_spark.Matchup import DomsPoint, match_points, match_points_generator
+from itertools import groupby
 
 
 class TestMatch_Points(unittest.TestCase):
@@ -20,15 +21,14 @@ class TestMatch_Points(unittest.TestCase):
         primary_points = [primary]
         matchup_points = [matchup]
 
-        matches = match_points(primary_points, matchup_points, 0, 0)
+        matches = list(match_points_generator(primary_points, matchup_points, 0))
 
         self.assertEquals(1, len(matches))
 
-        p_match_point, list_of_matches = next(matches.iteritems())
+        p_match_point, match = matches[0]
 
         self.assertEqual(primary, p_match_point)
-        self.assertEquals(1, len(list_of_matches))
-        self.assertEqual(matchup, next(iter(list_of_matches)))
+        self.assertEqual(matchup, match)
 
     def test_one_point_match_within_tolerance_150km(self):
         primary = DomsPoint(longitude=1.0, latitude=2.0, time=1000, depth=5.0, data_id=1)
@@ -37,15 +37,14 @@ class TestMatch_Points(unittest.TestCase):
         primary_points = [primary]
         matchup_points = [matchup]
 
-        matches = match_points(primary_points, matchup_points, 150000, 0)  # tolerance 150 km
+        matches = list(match_points_generator(primary_points, matchup_points, 150000))  # tolerance 150 km
 
         self.assertEquals(1, len(matches))
 
-        p_match_point, list_of_matches = next(matches.iteritems())
+        p_match_point, match = matches[0]
 
         self.assertEqual(primary, p_match_point)
-        self.assertEquals(1, len(list_of_matches))
-        self.assertEqual(matchup, next(iter(list_of_matches)))
+        self.assertEqual(matchup, match)
 
     def test_one_point_match_within_tolerance_200m(self):
         primary = DomsPoint(longitude=1.0, latitude=2.0, time=1000, depth=5.0, data_id=1)
@@ -54,15 +53,14 @@ class TestMatch_Points(unittest.TestCase):
         primary_points = [primary]
         matchup_points = [matchup]
 
-        matches = match_points(primary_points, matchup_points, 200, 0)  # tolerance 200 m
+        matches = list(match_points_generator(primary_points, matchup_points, 200))  # tolerance 200 m
 
         self.assertEquals(1, len(matches))
 
-        p_match_point, list_of_matches = next(matches.iteritems())
+        p_match_point, match = matches[0]
 
         self.assertEqual(primary, p_match_point)
-        self.assertEquals(1, len(list_of_matches))
-        self.assertEqual(matchup, next(iter(list_of_matches)))
+        self.assertEqual(matchup, match)
 
     def test_one_point_not_match_tolerance_150km(self):
         primary = DomsPoint(longitude=1.0, latitude=2.0, time=1000, depth=5.0, data_id=1)
@@ -71,14 +69,9 @@ class TestMatch_Points(unittest.TestCase):
         primary_points = [primary]
         matchup_points = [matchup]
 
-        matches = match_points(primary_points, matchup_points, 150000, 0)  # tolerance 150 km
+        matches = list(match_points_generator(primary_points, matchup_points, 150000))  # tolerance 150 km
 
-        self.assertEquals(1, len(matches))
-
-        p_match_point, list_of_matches = next(matches.iteritems())
-
-        self.assertEqual(primary, p_match_point)
-        self.assertEquals(0, len(list_of_matches))
+        self.assertEquals(0, len(matches))
 
     def test_one_point_not_match_tolerance_100m(self):
         primary = DomsPoint(longitude=1.0, latitude=2.0, time=1000, depth=5.0, data_id=1)
@@ -87,14 +80,9 @@ class TestMatch_Points(unittest.TestCase):
         primary_points = [primary]
         matchup_points = [matchup]
 
-        matches = match_points(primary_points, matchup_points, 100, 0)  # tolerance 100 m
+        matches = list(match_points_generator(primary_points, matchup_points, 100))  # tolerance 100 m
 
-        self.assertEquals(1, len(matches))
-
-        p_match_point, list_of_matches = next(matches.iteritems())
-
-        self.assertEqual(primary, p_match_point)
-        self.assertEquals(0, len(list_of_matches))
+        self.assertEquals(0, len(matches))
 
     def test_multiple_point_match(self):
         primary = DomsPoint(longitude=1.0, latitude=2.0, time=1000, depth=5.0, data_id=1)
@@ -106,13 +94,14 @@ class TestMatch_Points(unittest.TestCase):
             DomsPoint(longitude=0.5, latitude=1.5, time=1000, depth=3.0, data_id=4)
         ]
 
-        matches = match_points(primary_points, matchup_points, 150000, 5.0)  # tolerance 150 km
+        matches = list(match_points_generator(primary_points, matchup_points, 150000))  # tolerance 150 km
 
-        self.assertEquals(1, len(matches))
+        self.assertEquals(3, len(matches))
 
-        p_match_point, list_of_matches = next(matches.iteritems())
+        self.assertSetEqual({primary}, {x[0] for x in matches})
 
-        self.assertEqual(primary, p_match_point)
+        list_of_matches = [x[1] for x in matches]
+
         self.assertEquals(3, len(list_of_matches))
         self.assertItemsEqual(matchup_points, list_of_matches)
 
@@ -128,29 +117,19 @@ class TestMatch_Points(unittest.TestCase):
             DomsPoint(longitude=0.5, latitude=1.5, time=1000, depth=3.0, data_id=5)
         ]
 
-        matches = match_points(primary_points, matchup_points, 150000, 5.0)  # tolerance 150 km
+        matches = list(match_points_generator(primary_points, matchup_points, 150000))  # tolerance 150 km
 
-        self.assertEquals(2, len(matches))
-        self.assertItemsEqual(primary_points, matches.keys())
+        self.assertEquals(5, len(matches))
 
-        p_match_points = list(matches.keys())
-        p_match_point, list_of_matches = p_match_points[0], matches[p_match_points[0]]
+        self.assertSetEqual({p for p in primary_points}, {x[0] for x in matches})
 
-        if p_match_point == primary_points[0]:
-            self.assertEquals(3, len(list_of_matches))
-            self.assertItemsEqual(matchup_points, list_of_matches)
-        elif p_match_point == primary_points[1]:
-            self.assertEquals(2, len(list_of_matches))
-            self.assertItemsEqual(matchup_points[1:], list_of_matches)
+        # First primary point matches all 3 secondary
+        self.assertEquals(3, [x[0] for x in matches].count(primary_points[0]))
+        self.assertItemsEqual(matchup_points, [x[1] for x in matches if x[0] == primary_points[0]])
 
-        p_match_point, list_of_matches = p_match_points[1], matches[p_match_points[1]]
-
-        if p_match_point == primary_points[0]:
-            self.assertEquals(3, len(list_of_matches))
-            self.assertItemsEqual(matchup_points, list_of_matches)
-        elif p_match_point == primary_points[1]:
-            self.assertEquals(2, len(list_of_matches))
-            self.assertItemsEqual(matchup_points[1:], list_of_matches)
+        # Second primary point matches only last 2 secondary
+        self.assertEquals(2, [x[0] for x in matches].count(primary_points[1]))
+        self.assertItemsEqual(matchup_points[1:], [x[1] for x in matches if x[0] == primary_points[1]])
 
     @unittest.skip("This test is just for timing, doesn't actually assert anything.")
     def test_time_many_primary_many_matchup(self):
@@ -175,7 +154,7 @@ class TestMatch_Points(unittest.TestCase):
 
         log.info("Starting matchup")
         log.info("Best of repeat(3, 2) matchups: %s seconds" % min(
-            timeit.repeat(lambda: match_points(primary_points, matchup_points, 1500), repeat=3, number=2)))
+            timeit.repeat(lambda: list(match_points_generator(primary_points, matchup_points, 1500)), repeat=3, number=2)))
 
 
 class TestDOMSPoint(unittest.TestCase):
@@ -193,5 +172,5 @@ class TestDOMSPoint(unittest.TestCase):
 "device": 3,
 "fileurl": "ftp://podaac-ftp.jpl.nasa.gov/allData/insitu/L2/spurs1/argo/argo-profiles-5903995.nc"
 }""")
-        point = DomsPoint.from_edge_point(edge_point)
+        point = DomsPoint.from_edge_point(edge_point, data_id=frozenset(edge_point.items()))
         self.assertIsNotNone(pickle.dumps(point))
