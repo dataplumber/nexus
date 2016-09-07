@@ -5,14 +5,15 @@ California Institute of Technology.  All rights reserved
 from math import fabs
 
 import numpy as np
-import utm
 import requests
-from scipy import spatial
-from shapely.geometry import Point
-from webservice.NexusHandler import NexusHandler, nexus_handler
+import utm
+from datetime import datetime
 from nexustiles.nexustiles import NexusTileService
 from pyspark import SparkContext, SparkConf
-from datetime import datetime
+from scipy import spatial
+from shapely import wkt
+from shapely.geometry import Point
+from webservice.NexusHandler import NexusHandler, nexus_handler
 
 
 # TODO Need to handle matchup of different parameters
@@ -30,9 +31,14 @@ class Matchup(NexusHandler):
             "description": "The Primary dataset used to find matches for"
         },
         "matchup": {
-            "name": "Matchup Datasets",
+            "name": "Match-Up Datasets",
             "type": "comma-delimited string",
             "description": "The Dataset(s) being searched for measurements that match the measurements in Primary"
+        },
+        "parameter": {
+            "name": "Match-Up Parameter",
+            "type": "string",
+            "description": "The parameter of interest used for the match up. One of 'sst', 'sss', 'wind'."
         },
         "startTime": {
             "name": "Start Time",
@@ -75,18 +81,12 @@ class Matchup(NexusHandler):
     def __init__(self):
         NexusHandler.__init__(self, skipCassandra=True)
 
-    def get_args(self, request):
-        min_lat, max_lat, min_lon, max_lon = request.get_min_lat(), request.get_max_lat(), request.get_min_lon(), request.get_max_lon()
-        dataset1 = request.get_argument("ds1", None)
-        dataset2 = request.get_argument("ds2", None)
-        start_time = request.get_start_time()
-        end_time = request.get_end_time()
-
     def calc(self, request, **args):
-        # Assume Satellite primary
+        # TODO Assuming Satellite primary
         bounding_polygon = request.get_bounding_polygon()
         primary_ds_name = request.get_argument('primary', None)
         matchup_ds_names = request.get_argument('matchup', None)
+        parameter_s = request.get_argument('parameter', 'sst')
         start_time = request.get_start_time()
         end_time = request.get_end_time()
         time_tolerance = request.get_int_arg('tt', default=0)
@@ -99,8 +99,8 @@ class Matchup(NexusHandler):
                                                             fetch_data=False)
 
         # Call spark_matchup
-        spark_matchup_driver(tile_ids, primary_ds_name, matchup_ds_names, time_tolerance,
-                             depth_tolerance, radius_tolerance, platforms)
+        spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name, matchup_ds_names, parameter_s,
+                             time_tolerance, depth_tolerance, radius_tolerance, platforms)
 
         pass
 
@@ -150,13 +150,35 @@ class DomsPoint(object):
         return is_depth_close and primary_point.contains(other_point.sh_point)
 
     @staticmethod
-    def from_nexus_point(nexus_point, source=None, data_id=None):
+    def from_nexus_point(nexus_point, tile=None, data_id=None, parameter='sst'):
         point = DomsPoint()
 
         if data_id is not None:
             point.data_id = data_id
         else:
             point.data_id = hash(nexus_point)
+
+        # TODO Not an ideal solution; but it works for now.
+        if parameter == 'sst':
+            point.sst = nexus_point.data_val
+        elif parameter == 'sss':
+            point.sss = nexus_point.data_val
+        elif parameter == 'wind':
+            point.wind_u = nexus_point.data_val
+            try:
+                point.wind_v = tile.meta_data['wind_v'][nexus_point.index]
+            except (KeyError, IndexError):
+                pass
+            try:
+                point.wind_direction = tile.meta_data['wind_direction'][nexus_point.index]
+            except (KeyError, IndexError):
+                pass
+            try:
+                point.wind_speed = tile.meta_data['wind_speed'][nexus_point.index]
+            except (KeyError, IndexError):
+                pass
+        else:
+            raise NotImplementedError('%s not supported. Only sst, sss, and wind parameters are supported.' % parameter)
 
         point.longitude = nexus_point.longitude
         point.latitude = nexus_point.latitude
@@ -171,9 +193,8 @@ class DomsPoint(object):
             # No depth associated with this measurement
             pass
 
-        point.sst = nexus_point.data_val
         point.sst_depth = 0
-        point.source = source
+        point.source = tile.dataset
         point.platform = 9
         point.device = 5
         return point
@@ -210,8 +231,10 @@ class DomsPoint(object):
         return point
 
 
-def spark_matchup_driver(tile_ids, primary_ds_name, matchup_ds_names, time_tolerance, depth_tolerance, radius_tolerance,
-                         platforms):
+def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_names, parameter, time_tolerance,
+                         depth_tolerance, radius_tolerance, platforms):
+    from functools import partial
+
     # Configure Spark
     sp_conf = SparkConf()
     sp_conf.setAppName("Spark Matchup")
@@ -220,35 +243,36 @@ def spark_matchup_driver(tile_ids, primary_ds_name, matchup_ds_names, time_toler
     sc = SparkContext(conf=sp_conf)
 
     # Broadcast parameters
-    global primary_b
-    global matchup_b
-    global tt_b
-    global dt_b
-    global rt_b
-    global platforms_b
     primary_b = sc.broadcast(primary_ds_name)
     matchup_b = sc.broadcast(matchup_ds_names)
     tt_b = sc.broadcast(time_tolerance)
     dt_b = sc.broadcast(depth_tolerance)
     rt_b = sc.broadcast(radius_tolerance)
     platforms_b = sc.broadcast(platforms)
+    bounding_wkt_b = sc.broadcast(bounding_wkt)
+    parameter_b = sc.broadcast(parameter)
 
     # Parallelize list of tile ids
     rdd = sc.parallelize(tile_ids)
 
     # Map Partitions ( list(tile_id) )
-    rdd = rdd.mapPartitions(map_matches, preservesPartitioning=True) \
+    rdd = rdd.mapPartitions(
+        partial(match_satellite_to_insitu, primary_b=primary_b, matchup_b=matchup_b, parameter_b=parameter_b, tt_b=tt_b,
+                dt_b=dt_b, rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b),
+        preservesPartitioning=True) \
         .combineByKey(lambda value: [value],  # Create 1 element list
                       lambda value_list, value: value_list + [value],  # Add 1 element to list
                       lambda value_list_a, value_list_b: value_list_a + value_list_b)  # Add two lists together
     return rdd.collectAsMap()
 
 
-def map_matches(tile_ids):
+def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b, dt_b, rt_b, platforms_b,
+                              bounding_wkt_b):
     from itertools import chain
     from datetime import datetime
     from pytz import UTC
     from Matchup import DomsPoint  # Must import DomsPoint or Spark complains
+    import json
 
     tile_service = NexusTileService()
     edge_session = requests.Session()
@@ -256,10 +280,16 @@ def map_matches(tile_ids):
     match_generators = []
     for tile_id in tile_ids:
         # Load tile
-        tile = tile_service.find_tile_by_id(tile_id)[0]
+        try:
+            tile = tile_service.mask_tiles_to_polygon(wkt.loads(bounding_wkt_b.value),
+                                                      tile_service.find_tile_by_id(tile_id))[0]
+        except IndexError:
+            # This should only happen if all measurements in a tile become masked after applying the bounding polygon
+            continue
 
         # Get tile bounding lat/lon and time, expand lat/lon and time by tolerance
         # TODO rt_b is in meters. Need to figure out how to increase lat/lon bbox by meters
+        easting, northing, zone_number, zone_letter = utm.from_latlon(tile.bbox.min_lat, tile.bbox.min_lon)
         matchup_min_lon = tile.bbox.min_lon  # - rt_b.value
         matchup_min_lat = tile.bbox.min_lat  # - rt_b.value
         matchup_max_lon = tile.bbox.max_lon  # + rt_b.value
@@ -277,15 +307,16 @@ def map_matches(tile_ids):
                   "bbox": ','.join(
                       [str(matchup_min_lon), str(matchup_min_lat), str(matchup_max_lon), str(matchup_max_lat)]),
                   "itemsPerPage": 1000, "startIndex": 0,
-                  "maxDepth": dt_b.value, "stats": "true"}
+                  "maxDepth": dt_b.value, "stats": "true",
+                  "platform": platforms_b.value.split(',')}
         edge_request = edge_session.get("http://127.0.0.1:8890/ws/search/spurs", params=params)
         edge_request.raise_for_status()
         edge_results = json.loads(edge_request.text)['results']
 
         # Convert tile measurements to DomsPoints
         nexus_points = {hash(p): p for p in tile.nexus_point_generator()}
-        nexus_doms_points = [DomsPoint.from_nexus_point(value, data_id=key, source=tile.dataset) for key, value in
-                             nexus_points.iteritems()]
+        nexus_doms_points = [DomsPoint.from_nexus_point(value, data_id=key, tile=tile, parameter=parameter_b.value) for
+                             key, value in nexus_points.iteritems()]
 
         # Convert edge points to DomsPoints
         edge_points = {hash(frozenset(p.items())): p for p in edge_results}
@@ -352,43 +383,3 @@ def match_points(primary_points, matchup_points, radius_tolerance):
                       i, primary_point in enumerate(primary_points)}
 
     return matched_points
-
-
-if __name__ == "__main__":
-    from shapely.wkt import loads
-    from datetime import datetime
-    import json
-
-    polygon = loads("POLYGON((-34.98 29.54, -30.1 29.54, -30.1 31.00, -34.98 31.00, -34.98 29.54))")
-    primary_ds = "JPL-L4_GHRSST-SSTfnd-MUR-GLOB-v02.0-fv04.1"
-    matchup_ds = "spurs"
-    start_time = 1350259200  # 2012-10-15T00:00:00Z
-    end_time = 1350345600  # 2012-10-16T00:00:00Z
-    time_tolerance = 86400
-    depth_tolerance = 5.0
-    radius_tolerance = 1500.0
-    platforms = "1,2,3,4,5,6,7,8,9"
-
-    tile_service = NexusTileService()
-    tile_ids = [tile['id'] for tile in
-                tile_service.find_tiles_in_polygon(polygon, primary_ds, start_time, end_time, fetch_data=False,
-                                                   fl='id')]
-    result = spark_matchup_driver(tile_ids, primary_ds, matchup_ds, time_tolerance, depth_tolerance, radius_tolerance,
-                                  platforms)
-    for k, v in result.iteritems():
-        print "primary: %s\n\tmatches:\n\t\t%s" % (
-            "lon: %s, lat: %s, time: %s, sst: %s" % (k.longitude, k.latitude, k.time, k.sst),
-            '\n\t\t'.join(
-                ["lon: %s, lat: %s, time: %s, sst: %s" % (i.longitude, i.latitude, i.time, i.sst) for i in v]))
-
-        # print tile_ids
-
-        # edge_session = requests.Session()
-        # params = {"startTime": datetime.utcfromtimestamp(start_time).strftime('%Y-%m-%dT%H:%M:%SZ'),
-        #           "endTime": datetime.utcfromtimestamp(end_time).strftime('%Y-%m-%dT%H:%M:%SZ'),
-        #           "bbox": ','.join([str(b) for b in polygon.bounds]), "itemsPerPage": 1000, "startIndex": 0,
-        #           "maxDepth": depth_tolerance, "stats": "true"}
-        # edge_request = edge_session.get("http://127.0.0.1:8890/ws/search/spurs", params=params)
-        # edge_request.raise_for_status()
-        # print edge_request.text
-        # print json.loads(edge_request.text)
