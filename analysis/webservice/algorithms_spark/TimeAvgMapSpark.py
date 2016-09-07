@@ -8,7 +8,6 @@ import os
 import math
 import numpy as np
 from time import time
-import itertools
 from webservice.SparkAlg import SparkAlg
 from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMETERS_SPEC
 from nexustiles.nexustiles import NexusTileService
@@ -41,7 +40,8 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
         print 'Started tile', tile_bounds
         sys.stdout.flush()
         tile_inbounds_shape = (max_y-min_y+1, max_x-min_x+1)
-        days_at_a_time = 90
+        #days_at_a_time = 90
+        days_at_a_time = 30
         #days_at_a_time = 7
         #days_at_a_time = 1
         print 'days_at_a_time = ', days_at_a_time
@@ -62,6 +62,12 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
                                                           t_start, 
                                                           t_end,
                                                           part_dim=2)
+            #nexus_tiles = \
+            #    tile_service.get_tiles_bounded_by_box(min_lat, max_lat, 
+            #                                          min_lon, max_lon, 
+            #                                          ds=ds, 
+            #                                          start_time=t_start, 
+            #                                          end_time=t_end)
             t2 = time()
             print 'nexus call end at time %f' % t2
             print 'secs in nexus call: ', t2-t1
@@ -69,7 +75,13 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
             TimeAvgMapSparkHandlerImpl._prune_tiles(nexus_tiles)
             print 't %d to %d - Got %d tiles' % (t_start, t_end, 
                                                  len(nexus_tiles))
+            #for nt in nexus_tiles:
+            #    print nt.granule
+            #    print nt.section_spec
+            #    print 'lat min/max:', np.ma.min(nt.latitudes), np.ma.max(nt.latitudes)
+            #    print 'lon min/max:', np.ma.min(nt.longitudes), np.ma.max(nt.longitudes)
             sys.stdout.flush()
+
             for tile in nexus_tiles:
                 tile.data.data[:,:] = np.nan_to_num(tile.data.data)
                 sum_tile += tile.data.data[0,min_y:max_y+1,min_x:max_x+1]
@@ -154,8 +166,8 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
 
         # Expand Spark map tuple array by duplicating each entry N times,
         # where N is the number of ways we want the time dimension carved up.
-        num_time_parts = 18
-       #nexus_tiles_spark = list(itertools.chain.from_iterable(itertools.repeat(t, num_time_parts) for t in nexus_tiles_spark))
+        num_time_parts = 72
+        #num_time_parts = 1
         nexus_tiles_spark = np.repeat(nexus_tiles_spark, num_time_parts, axis=0)
         print 'repeated len(nexus_tiles_spark) = ', len(nexus_tiles_spark)
         
@@ -184,12 +196,15 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
         sp_conf.set("spark.executor.memory", "4g")
 
         #num_parts = 1
-        num_parts = 16
+        #num_parts = 16
+        #num_parts = 21
         #num_parts = 64
         #num_parts = 128
+        num_parts = 1024
         #num_execs = 1
-        num_execs = 16
-        #num_execs = 64
+        #num_execs = 16
+        #num_execs = 42
+        num_execs = 64
         cores_per_exec = 1
         sp_conf.setMaster("yarn-client")
         #sp_conf.setMaster("local[16]")
@@ -217,8 +232,6 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
                                          range(sum_tile.shape[1])] 
                                         for y in 
                                         range(sum_tile.shape[0])])).collect()
-
-        #avg_tiles = map(self._map, nexus_tiles)
 
         # Combine subset results to produce global map.
         #
