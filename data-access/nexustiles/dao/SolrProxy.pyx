@@ -134,6 +134,38 @@ class SolrProxy(object):
             *(search, None, None, False, 'tile_min_time_dt asc, tile_max_time_dt asc'),
             **additionalparams)
 
+    def find_all_tiles_in_polygon_sorttimeasc(self, bounding_polygon, ds, start_time=0, end_time=-1, **kwargs):
+
+        search = 'dataset_s:%s' % ds
+
+        additionalparams = {
+            'fq': [
+                "{!field f=geo}Intersects(%s)" % bounding_polygon.wkt,
+                "tile_count_i:[1 TO *]"
+            ]
+        }
+
+        if 0 < start_time <= end_time:
+            search_start_s = datetime.utcfromtimestamp(start_time).strftime('%Y-%m-%dT%H:%M:%SZ')
+            search_end_s = datetime.utcfromtimestamp(end_time).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+            time_clause = "(" \
+                          "tile_min_time_dt:[%s TO %s] " \
+                          "OR tile_max_time_dt:[%s TO %s] " \
+                          "OR (tile_min_time_dt:[* TO %s] AND tile_max_time_dt:[%s TO *])" \
+                          ")" % (
+                              search_start_s, search_end_s,
+                              search_start_s, search_end_s,
+                              search_start_s, search_end_s
+                          )
+            additionalparams['fq'].append(time_clause)
+
+        self._merge_kwargs(additionalparams, **kwargs)
+
+        return self.do_query_all(
+            *(search, None, None, False, 'tile_min_time_dt asc, tile_max_time_dt asc'),
+            **additionalparams)
+
     def find_all_tiles_in_box_at_time(self, min_lat, max_lat, min_lon, max_lon, ds, time, **kwargs):
         search = 'dataset_s:%s' % ds
 
@@ -236,7 +268,7 @@ class SolrProxy(object):
 
     @staticmethod
     def _merge_kwargs(additionalparams, **kwargs):
-
+        # Only Solr-specific kwargs are parsed
         try:
             additionalparams['rows'] = kwargs['rows']
         except KeyError:
@@ -256,3 +288,13 @@ class SolrProxy(object):
             additionalparams['fq'].extend(kwfq)
         except KeyError:
             additionalparams['fq'] = kwfq
+
+        try:
+            kwfl = kwargs['fl'] if isinstance(kwargs['fl'], list) else list(kwargs['fl'])
+        except KeyError:
+            kwfl = []
+
+        try:
+            additionalparams['fl'].extend(kwfl)
+        except KeyError:
+            additionalparams['fl'] = kwfl

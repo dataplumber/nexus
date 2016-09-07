@@ -13,6 +13,7 @@ import numpy.ma as ma
 from dao.CassandraProxy import CassandraProxy
 from dao.SolrProxy import SolrProxy
 from model.nexusmodel import Tile, BBox, TileStats
+from shapely.geometry import Polygon
 
 
 def tile_data(default_fetch=True):
@@ -70,9 +71,14 @@ class NexusTileService(object):
 
     @tile_data()
     def find_tiles_in_box(self, min_lat, max_lat, min_lon, max_lon, ds=None, start_time=0, end_time=-1, **kwargs):
-        # Find chunks that fall in the given box in the Solr index
+        # Find tiles that fall in the given box in the Solr index
         return self._solr.find_all_tiles_in_box_sorttimeasc(min_lat, max_lat, min_lon, max_lon, ds, start_time,
                                                             end_time, **kwargs)
+
+    @tile_data()
+    def find_tiles_in_polygon(self, bounding_polygon, ds=None, start_time=0, end_time=-1, **kwargs):
+        # Find tiles that fall within the polygon in the Solr index
+        return self._solr.find_all_tiles_in_polygon_sorttimeasc(bounding_polygon, ds, start_time, end_time, **kwargs)
 
     @tile_data()
     def find_all_boundary_tiles_at_time(self, min_lat, max_lat, min_lon, max_lon, dataset, time, **kwargs):
@@ -116,6 +122,27 @@ class NexusTileService(object):
                         | ma.getmaskarray(tile.longitudes)[np.newaxis, np.newaxis, :]
 
             tile.data = ma.masked_where(data_mask, tile.data)
+
+        tiles[:] = [tile for tile in tiles if not tile.data.mask.all()]
+
+        return tiles
+
+    def mask_tiles_to_polygon(self, bounding_polygon, tiles):
+
+        min_lon, min_lat, max_lon, max_lat = bounding_polygon.bounds
+
+        for tile in tiles:
+            tile.latitudes = ma.masked_outside(tile.latitudes, min_lat, max_lat)
+            tile.longitudes = ma.masked_outside(tile.longitudes, min_lon, max_lon)
+
+            # Or together the masks of the individual arrays to create the new mask
+            data_mask = ma.getmaskarray(tile.times)[:, np.newaxis, np.newaxis] \
+                        | ma.getmaskarray(tile.latitudes)[np.newaxis, :, np.newaxis] \
+                        | ma.getmaskarray(tile.longitudes)[np.newaxis, np.newaxis, :]
+
+            tile.data = ma.masked_where(data_mask, tile.data)
+
+        tiles[:] = [tile for tile in tiles if not tile.data.mask.all()]
 
         return tiles
 
