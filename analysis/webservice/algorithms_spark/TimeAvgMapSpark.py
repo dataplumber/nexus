@@ -72,7 +72,6 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
             print 'nexus call end at time %f' % t2
             print 'secs in nexus call: ', t2-t1
             sys.stdout.flush()
-            TimeAvgMapSparkHandlerImpl._prune_tiles(nexus_tiles)
             print 't %d to %d - Got %d tiles' % (t_start, t_end, 
                                                  len(nexus_tiles))
             #for nt in nexus_tiles:
@@ -145,10 +144,7 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
         if len(nexus_tiles) == 0:
             raise NexusProcessingException.NoDataException(reason="No data found for selected timeframe")
 
-        print 'Initially found %d tiles' % len(nexus_tiles)
-        sys.stdout.flush()
-        self._prune_tiles(nexus_tiles)
-        print 'Pruned to %d tiles' % len(nexus_tiles)
+        print 'Found %d tiles' % len(nexus_tiles)
         sys.stdout.flush()
         #for tile in nexus_tiles:
         #    print 'lats: ', tile.latitudes.compressed()
