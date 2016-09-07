@@ -169,6 +169,9 @@ class SparkAlg(NexusHandler):
             sys.stdout.flush()
             solr_tiles = tile_service._solr_docs_to_tiles(*solr_docs)
             nexus_tiles = tile_service.fetch_data_for_tiles(*solr_tiles)
+            nexus_tiles = tile_service.mask_tiles_to_bbox(min_lat, max_lat,
+                                                          min_lon, max_lon,
+                                                          nexus_tiles)
             t2 = time()
             print 'NEXUS call end at time %f' % t2
             print 'Seconds in NEXUS call: ', t2-t1
