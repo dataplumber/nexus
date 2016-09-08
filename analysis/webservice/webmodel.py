@@ -181,7 +181,7 @@ class NexusRequestObject(StatsComputeOptions):
         return self.get_decimal_arg("minLon", default)
 
     def get_bounding_polygon(self):
-        west, south, east, north = self.get_argument("b").split(",")
+        west, south, east, north = [float(b) for b in self.get_argument("b").split(",")]
         polygon = Polygon([(west, south), (east, south), (east, north), (west, north), (west, south)])
         return polygon
 
