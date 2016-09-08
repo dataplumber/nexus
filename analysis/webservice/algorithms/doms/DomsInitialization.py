@@ -27,7 +27,7 @@ class DomsInitializer:
         cassHost = domsconfig.get("cassandra", "host")
         cassKeyspace = domsconfig.get("cassandra", "keyspace")
         cassDatacenter = domsconfig.get("cassandra", "local_datacenter")
-        cassVersion = domsconfig.get("cassandra", "protocol_version")
+        cassVersion = int(domsconfig.get("cassandra", "protocol_version"))
 
         log.info("Cassandra Host(s): %s" % (cassHost))
         log.info("Cassandra Keyspace: %s" % (cassKeyspace))

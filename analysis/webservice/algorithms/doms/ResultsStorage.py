@@ -26,7 +26,7 @@ class AbstractResultsContainer:
         cassHost = domsconfig.get("cassandra", "host")
         cassKeyspace = domsconfig.get("cassandra", "keyspace")
         cassDatacenter = domsconfig.get("cassandra", "local_datacenter")
-        cassVersion = domsconfig.get("cassandra", "protocol_version")
+        cassVersion = int(domsconfig.get("cassandra", "protocol_version"))
 
         dc_policy = DCAwareRoundRobinPolicy(cassDatacenter)
         token_policy = TokenAwarePolicy(dc_policy)
