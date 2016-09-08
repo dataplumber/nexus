@@ -283,10 +283,10 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
     for tile_id in tile_ids:
         # Load tile
         try:
-            time = datetime.now()
+            the_time = datetime.now()
             tile = tile_service.mask_tiles_to_polygon(wkt.loads(bounding_wkt_b.value),
                                                       tile_service.find_tile_by_id(tile_id))[0]
-            print "%s Time to load tile %s" % (str(datetime.now() - time), tile_id)
+            print "%s Time to load tile %s" % (str(datetime.now() - the_time), tile_id)
         except IndexError:
             # This should only happen if all measurements in a tile become masked after applying the bounding polygon
             continue
@@ -313,27 +313,27 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
                   "itemsPerPage": 1000, "startIndex": 0,
                   "maxDepth": dt_b.value, "stats": "true",
                   "platform": platforms_b.value.split(',')}
-        time = datetime.now()
+        the_time = datetime.now()
         edge_request = edge_session.get("http://127.0.0.1:8890/ws/search/spurs", params=params)
         edge_request.raise_for_status()
         edge_response = json.loads(edge_request.text)
-        print "%s Time to call edge for tile %s" % (str(datetime.now() - time), tile_id)
+        print "%s Time to call edge for tile %s" % (str(datetime.now() - the_time), tile_id)
         if edge_response['totalResults'] == 0:
             continue
         edge_results = edge_response['results']
 
         # Convert tile measurements to DomsPoints
-        time = datetime.now()
+        the_time = datetime.now()
         nexus_points = {hash(p): p for p in tile.nexus_point_generator()}
         nexus_doms_points = [DomsPoint.from_nexus_point(value, data_id=key, tile=tile, parameter=parameter_b.value) for
                              key, value in nexus_points.iteritems()]
-        print "%s Time to convert primary points for tile %s" % (str(datetime.now() - time), tile_id)
+        print "%s Time to convert primary points for tile %s" % (str(datetime.now() - the_time), tile_id)
 
         # Convert edge points to DomsPoints
-        time = datetime.now()
+        the_time = datetime.now()
         edge_points = {hash(frozenset(p.items())): p for p in edge_results}
         edge_doms_points = [DomsPoint.from_edge_point(value, data_id=key) for key, value in edge_points.iteritems()]
-        print "%s Time to convert match points for tile %s" % (str(datetime.now() - time), tile_id)
+        print "%s Time to convert match points for tile %s" % (str(datetime.now() - the_time), tile_id)
 
         # call match_points
         match_generators.append(match_points_generator(nexus_doms_points, edge_doms_points, rt_b.value))
@@ -351,23 +351,23 @@ def match_points_generator(primary_points, matchup_points, r_tol):
     import logging
     log = logging.getLogger(__name__)
     log.debug("Building primary tree")
-    time = datetime.now()
+    the_time = datetime.now()
     p_coords = np.array([(point.sh_point.coords.xy[0][0], point.sh_point.coords.xy[1][0]) for point in primary_points],
                         order='c')
     p_tree = spatial.cKDTree(p_coords, leafsize=30)
-    print "%s Time to build primary tree" % (str(datetime.now() - time))
+    print "%s Time to build primary tree" % (str(datetime.now() - the_time))
 
     log.debug("Building matchup tree")
-    time = datetime.now()
+    the_time = datetime.now()
     m_coords = np.array([(point.sh_point.coords.xy[0][0], point.sh_point.coords.xy[1][0]) for point in matchup_points],
                         order='c')
     m_tree = spatial.cKDTree(m_coords, leafsize=30)
-    print "%s Time to build matchup tree" % (str(datetime.now() - time))
+    print "%s Time to build matchup tree" % (str(datetime.now() - the_time))
 
     log.debug("Querying primary tree for all nearest neighbors")
-    time = datetime.now()
+    the_time = datetime.now()
     matched_indexes = p_tree.query_ball_tree(m_tree, r_tol)
-    print "%s Time to query primary tree" % (str(datetime.now() - time))
+    print "%s Time to query primary tree" % (str(datetime.now() - the_time))
 
     log.debug("Building match results")
     for i, point_matches in enumerate(matched_indexes):
