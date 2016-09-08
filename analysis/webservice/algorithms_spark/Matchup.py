@@ -250,28 +250,32 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
     sp_conf.setMaster("local[1]")
     sc = SparkContext(conf=sp_conf)
 
-    # Broadcast parameters
-    primary_b = sc.broadcast(primary_ds_name)
-    matchup_b = sc.broadcast(matchup_ds_names)
-    tt_b = sc.broadcast(time_tolerance)
-    dt_b = sc.broadcast(depth_tolerance)
-    rt_b = sc.broadcast(radius_tolerance)
-    platforms_b = sc.broadcast(platforms)
-    bounding_wkt_b = sc.broadcast(bounding_wkt)
-    parameter_b = sc.broadcast(parameter)
+    try:
+        # Broadcast parameters
+        primary_b = sc.broadcast(primary_ds_name)
+        matchup_b = sc.broadcast(matchup_ds_names)
+        tt_b = sc.broadcast(time_tolerance)
+        dt_b = sc.broadcast(depth_tolerance)
+        rt_b = sc.broadcast(radius_tolerance)
+        platforms_b = sc.broadcast(platforms)
+        bounding_wkt_b = sc.broadcast(bounding_wkt)
+        parameter_b = sc.broadcast(parameter)
 
-    # Parallelize list of tile ids
-    rdd = sc.parallelize(tile_ids)
+        # Parallelize list of tile ids
+        rdd = sc.parallelize(tile_ids)
 
-    # Map Partitions ( list(tile_id) )
-    rdd = rdd.mapPartitions(
-        partial(match_satellite_to_insitu, primary_b=primary_b, matchup_b=matchup_b, parameter_b=parameter_b, tt_b=tt_b,
-                dt_b=dt_b, rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b),
-        preservesPartitioning=True) \
-        .combineByKey(lambda value: [value],  # Create 1 element list
-                      lambda value_list, value: value_list + [value],  # Add 1 element to list
-                      lambda value_list_a, value_list_b: value_list_a + value_list_b)  # Add two lists together
-    return rdd.collectAsMap()
+        # Map Partitions ( list(tile_id) )
+        rdd = rdd.mapPartitions(
+            partial(match_satellite_to_insitu, primary_b=primary_b, matchup_b=matchup_b, parameter_b=parameter_b, tt_b=tt_b,
+                    dt_b=dt_b, rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b),
+            preservesPartitioning=True) \
+            .combineByKey(lambda value: [value],  # Create 1 element list
+                          lambda value_list, value: value_list + [value],  # Add 1 element to list
+                          lambda value_list_a, value_list_b: value_list_a + value_list_b)  # Add two lists together
+        result_as_map = rdd.collectAsMap()
+    finally:
+        sc.stop()
+    return result_as_map
 
 
 def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b, dt_b, rt_b, platforms_b,
