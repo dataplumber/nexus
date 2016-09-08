@@ -22,7 +22,7 @@ setuptools.setup(
     platforms='any',
     setup_requires=['cython'],
     install_requires=[
-        'cassandra-driver',
+        'cassandra-driver==3.5.0',
         'solrpy==0.9.7',
         'nexusproto',
         'shapely'
