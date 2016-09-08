@@ -18,7 +18,7 @@ setuptools.setup(
 
     packages=['webservice', 'webservice.algorithms', 'webservice.algorithms.doms', 'webservice.algorithms_spark'],
     package_data={'webservice': ['config/web.ini', 'config/algorithms.ini'],
-                  'webservice.algorithms.doms': ['webservice/algorithms/doms']},
+                  'webservice.algorithms.doms': ['domsconfig.ini']},
     data_files=[
         ('static', ['static/index.html'])
     ],
