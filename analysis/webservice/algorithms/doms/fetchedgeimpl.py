@@ -1,14 +1,13 @@
-import os
-import sys
-import requests
 import json
-from datetime import datetime
-import multiprocessing as mp
-import geo
-import values
-from multiprocessing.pool import ThreadPool
-from webservice.webmodel import NexusResults, NexusProcessingException
 import traceback
+from datetime import datetime
+from multiprocessing.pool import ThreadPool
+
+import geo
+import requests
+import values
+from webservice.webmodel import NexusProcessingException
+
 
 def __parseDatetime(dtString):
     dt = datetime.strptime(dtString, "%Y-%m-%dT%H:%M:%SZ")
