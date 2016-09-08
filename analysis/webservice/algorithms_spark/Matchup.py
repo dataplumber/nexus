@@ -250,6 +250,7 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
     sp_conf.setMaster("local[1]")
     sc = SparkContext(conf=sp_conf)
 
+    # TODO Better handling of the Spark context. Do we really need to create/shutdown on every request?
     try:
         # Broadcast parameters
         primary_b = sc.broadcast(primary_ds_name)
