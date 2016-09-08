@@ -95,14 +95,15 @@ class Matchup(NexusHandler):
         platforms = request.get_argument('platforms')
 
         # Get tile ids in box
-        tile_ids = self._tile_service.find_tiles_in_polygon(bounding_polygon, primary_ds_name, start_time, end_time,
-                                                            fetch_data=False)
+        tile_ids = [tile['id'] for tile in
+                    self._tile_service.find_tiles_in_polygon(bounding_polygon, primary_ds_name, start_time, end_time,
+                                                             fetch_data=False, fl='id')]
 
         # Call spark_matchup
-        spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name, matchup_ds_names, parameter_s,
-                             time_tolerance, depth_tolerance, radius_tolerance, platforms)
-
-        pass
+        spark_result = spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name, matchup_ds_names,
+                                            parameter_s, time_tolerance, depth_tolerance, radius_tolerance, platforms)
+        import json
+        return json.dumps(dict({str(k): str(v) for k, v in spark_result.iteritems()}))
 
 
 class DomsPoint(object):
@@ -311,7 +312,10 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
                   "platform": platforms_b.value.split(',')}
         edge_request = edge_session.get("http://127.0.0.1:8890/ws/search/spurs", params=params)
         edge_request.raise_for_status()
-        edge_results = json.loads(edge_request.text)['results']
+        edge_response = json.loads(edge_request.text)
+        if edge_response['totalResults'] == 0:
+            continue
+        edge_results = edge_response['results']
 
         # Convert tile measurements to DomsPoints
         nexus_points = {hash(p): p for p in tile.nexus_point_generator()}
