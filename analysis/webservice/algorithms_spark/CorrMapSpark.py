@@ -78,8 +78,6 @@ class CorrMapSparkHandlerImpl(SparkAlg):
             print 'nexus call end at time %f' % t2
             print 'secs in nexus call: ', t2-t1
             sys.stdout.flush()
-            CorrMapSparkHandlerImpl._prune_tiles(ds1tiles)
-            CorrMapSparkHandlerImpl._prune_tiles(ds2tiles)
             
             len1 = len(ds1tiles)
             len2 = len(ds2tiles)
@@ -186,10 +184,7 @@ class CorrMapSparkHandlerImpl(SparkAlg):
         if len(nexus_tiles) == 0:
             raise NexusProcessingException.NoDataException(reason="No data found for selected timeframe")
 
-        print 'Initially found %d tiles' % len(nexus_tiles)
-        sys.stdout.flush()
-        self._prune_tiles(nexus_tiles)
-        print 'Pruned to %d tiles' % len(nexus_tiles)
+        print 'Found %d tiles' % len(nexus_tiles)
         sys.stdout.flush()
         # Create array of tuples to pass to Spark map function
         nexus_tile_specs = [[self._find_tile_bounds(t), 
