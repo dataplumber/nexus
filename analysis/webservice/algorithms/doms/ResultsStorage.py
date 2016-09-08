@@ -31,9 +31,8 @@ class AbstractResultsContainer:
         dc_policy = DCAwareRoundRobinPolicy(cassDatacenter)
         token_policy = TokenAwarePolicy(dc_policy)
 
-        cluster = Cluster(
-            [host for host in cassHost.split(',')],
-            load_balancing_policy=token_policy)
+        cluster = Cluster([host for host in cassHost.split(',')], load_balancing_policy=token_policy,
+                          protocol_version=cassVersion)
 
         self._session = cluster.connect(cassKeyspace)
 
