@@ -8,6 +8,7 @@ import numpy as np
 import requests
 import utm
 from datetime import datetime
+from pytz import timezone
 from nexustiles.nexustiles import NexusTileService
 from pyspark import SparkContext, SparkConf
 from scipy import spatial
@@ -87,16 +88,22 @@ class Matchup(NexusHandler):
         primary_ds_name = request.get_argument('primary', None)
         matchup_ds_names = request.get_argument('matchup', None)
         parameter_s = request.get_argument('parameter', 'sst')
-        start_time = request.get_start_time()
-        end_time = request.get_end_time()
+        start_time = request.get_start_datetime()
+        end_time = request.get_end_datetime()
         time_tolerance = request.get_int_arg('tt', default=0)
         depth_tolerance = request.get_decimal_arg('dt', default=0.0)
         radius_tolerance = request.get_decimal_arg('rt', default=0)
         platforms = request.get_argument('platforms')
 
+        start_seconds_from_epoch = long(
+            (start_time - timezone('UTC').localize(datetime(1970, 1, 1))).total_seconds())
+        end_seconds_from_epoch = long(
+            (end_time - timezone('UTC').localize(datetime(1970, 1, 1))).total_seconds())
+
         # Get tile ids in box
         tile_ids = [tile['id'] for tile in
-                    self._tile_service.find_tiles_in_polygon(bounding_polygon, primary_ds_name, start_time, end_time,
+                    self._tile_service.find_tiles_in_polygon(bounding_polygon, primary_ds_name,
+                                                             start_seconds_from_epoch, end_seconds_from_epoch,
                                                              fetch_data=False, fl='id')]
 
         # Call spark_matchup

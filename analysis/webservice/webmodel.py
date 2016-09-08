@@ -8,6 +8,7 @@ import numpy as np
 from shapely.geometry import Polygon
 from datetime import datetime
 from decimal import Decimal
+from pytz import UTC
 
 
 class RequestParameters(object):
@@ -215,6 +216,14 @@ class NexusRequestObject(StatsComputeOptions):
 
     def get_end_time(self):
         return self.get_int_arg(RequestParameters.END_TIME, -1)
+
+    def get_start_datetime(self):
+        time_str = self.get_argument(RequestParameters.START_TIME)
+        return datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+
+    def get_end_datetime(self):
+        time_str = self.get_argument(RequestParameters.END_TIME)
+        return datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
 
     def get_start_row(self):
         return self.get_int_arg(RequestParameters.START_ROW, 0)
