@@ -3,28 +3,25 @@ Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 
-import logging
 import ConfigParser
-import uuid
-import nexusproto.NexusContent_pb2 as nexusproto
-from cassandra.cqlengine import columns
-from cassandra.cqlengine import connection
-from cassandra.cqlengine.models import Model
-from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
-from nexusproto.serialization import from_shaped_array
-from cassandra.cluster import Cluster
+import logging
 import string
+import uuid
+import pkg_resources
 from datetime import datetime
+
+from cassandra.cluster import Cluster
+from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
 from cassandra.query import BatchStatement
 
-class AbstractResultsContainer:
 
+class AbstractResultsContainer:
     def __init__(self):
         self._log = logging.getLogger(__name__)
         self._log.info("Creating DOMS Results Storage Instance")
 
-        domsconfig = ConfigParser.ConfigParser()
-        domsconfig.read("webservice/algorithms/doms/domsconfig.ini")
+        domsconfig = ConfigParser.RawConfigParser()
+        domsconfig.readfp(pkg_resources.resource_stream(__name__, "domsconfig.ini"), filename='domsconfig.ini')
 
         cassHost = domsconfig.get("cassandra", "host")
         cassKeyspace = domsconfig.get("cassandra", "keyspace")
@@ -35,8 +32,8 @@ class AbstractResultsContainer:
         token_policy = TokenAwarePolicy(dc_policy)
 
         cluster = Cluster(
-                [host for host in cassHost.split(',')],
-                load_balancing_policy=token_policy)
+            [host for host in cassHost.split(',')],
+            load_balancing_policy=token_policy)
 
         self._session = cluster.connect(cassKeyspace)
 
@@ -49,8 +46,8 @@ class AbstractResultsContainer:
         time = (dt - epoch).total_seconds() * 1000.0
         return int(time)
 
-class ResultsStorage(AbstractResultsContainer):
 
+class ResultsStorage(AbstractResultsContainer):
     def __init__(self):
         AbstractResultsContainer.__init__(self)
 
@@ -63,7 +60,6 @@ class ResultsStorage(AbstractResultsContainer):
         self.__insertResults(id, results)
         return id
 
-
     def __insertExecution(self, id, startTime, completeTime, userEmail):
         cql = "INSERT INTO doms_executions (id, time_started, time_completed, user_email) VALUES (%s, %s, %s, %s)"
         self._session.execute(cql, (id, startTime, completeTime, userEmail))
@@ -75,17 +71,16 @@ class ResultsStorage(AbstractResultsContainer):
                     (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         self._session.execute(cql, (id,
-                                     params["primary"],
-                                     string.join(params["matchup"], ","),
-                                     params["depthTolerance"],
-                                     int(params["timeTolerance"]),
-                                     params["radiusTolerance"],
-                                     self._parseDatetime(params["startTime"]),
-                                     self._parseDatetime(params["endTime"]),
-                                     params["platforms"],
-                                     params["bbox"]
-                                     ))
-
+                                    params["primary"],
+                                    string.join(params["matchup"], ","),
+                                    params["depthTolerance"],
+                                    int(params["timeTolerance"]),
+                                    params["radiusTolerance"],
+                                    self._parseDatetime(params["startTime"]),
+                                    self._parseDatetime(params["endTime"]),
+                                    params["platforms"],
+                                    params["bbox"]
+                                    ))
 
     def __insertStats(self, id, stats):
         cql = """
@@ -103,7 +98,6 @@ class ResultsStorage(AbstractResultsContainer):
             stats["timeToComplete"]
         ))
 
-
     def __insertResults(self, id, results):
 
         cql = """
@@ -115,32 +109,29 @@ class ResultsStorage(AbstractResultsContainer):
         insertStatement = self._session.prepare(cql)
         batch = BatchStatement()
 
-
         for result in results:
             self.__insertResult(id, None, result, batch, insertStatement)
-
-
 
         self._session.execute(batch)
 
     def __insertResult(self, id, primaryId, result, batch, insertStatement):
 
         dataMap = self.__buildDataMap(result)
-        batch.add(insertStatement,(
-                    self.generateExecutionId(),
-                    id,
-                    result["id"],
-                    primaryId,
-                    result["x"],
-                    result["y"],
-                    result["source"],
-                    int(result["time"]),
-                    result["platform"] if "platform" in result else None,
-                    result["device"] if "device" in result else None,
-                    dataMap,
-                    1 if primaryId is None else 0
-                )
+        batch.add(insertStatement, (
+            self.generateExecutionId(),
+            id,
+            result["id"],
+            primaryId,
+            result["x"],
+            result["y"],
+            result["source"],
+            int(result["time"]),
+            result["platform"] if "platform" in result else None,
+            result["device"] if "device" in result else None,
+            dataMap,
+            1 if primaryId is None else 0
         )
+                  )
 
         n = 0
         if "matches" in result:
@@ -163,15 +154,13 @@ class ResultsStorage(AbstractResultsContainer):
         dataMap = {}
         for name in result:
             value = result[name]
-            if name not in ["id", "x", "y", "source", "time", "platform", "device", "point", "matches"] and type(value) in [float, int]:
+            if name not in ["id", "x", "y", "source", "time", "platform", "device", "point", "matches"] and type(
+                    value) in [float, int]:
                 dataMap[name] = value
         return dataMap
 
 
-
-
 class ResultsRetrieval(AbstractResultsContainer):
-
     def __init__(self):
         AbstractResultsContainer.__init__(self)
 
@@ -180,7 +169,6 @@ class ResultsRetrieval(AbstractResultsContainer):
         stats = self.__retrieveStats(id)
         data = self.__retrieveData(id)
         return params, stats, data
-
 
     def __retrieveData(self, id):
         dataMap = self.__retrievePrimaryData(id)
@@ -238,12 +226,7 @@ class ResultsRetrieval(AbstractResultsContainer):
             }
             return stats
 
-        raise Exception("Execution not found with id '%s'"%id)
-
-
-
-
-
+        raise Exception("Execution not found with id '%s'" % id)
 
     def __retrieveParams(self, id):
         cql = "SELECT * FROM doms_params where execution_id = %s limit 1"
@@ -262,5 +245,4 @@ class ResultsRetrieval(AbstractResultsContainer):
             }
             return params
 
-        raise Exception("Execution not found with id '%s'"%id)
-
+        raise Exception("Execution not found with id '%s'" % id)

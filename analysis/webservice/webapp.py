@@ -3,6 +3,7 @@ Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 import ConfigParser
+import pkg_resources
 import json
 import logging
 import sys
@@ -172,11 +173,11 @@ if __name__ == "__main__":
         datefmt="%Y-%m-%dT%H:%M:%S", stream=sys.stdout)
     log = logging.getLogger(__name__)
 
-    webconfig = ConfigParser.ConfigParser()
-    webconfig.read(["../config/web.ini", "config/web.ini"])
+    webconfig = ConfigParser.RawConfigParser()
+    webconfig.readfp(pkg_resources.resource_stream(__name__, "config/web.ini"), filename='web.ini')
 
-    algorithm_config = ConfigParser.ConfigParser()
-    algorithm_config.read(["../config/algorithms.ini", "config/algorithms.ini"])
+    algorithm_config = ConfigParser.RawConfigParser()
+    algorithm_config.readfp(pkg_resources.resource_stream(__name__, "config/algorithms.ini"), filename='algorithms.ini')
 
     define("debug", default=False, help="run in debug mode")
     define("port", default=webconfig.get("global", "server.socket_port"), help="run on the given port", type=int)

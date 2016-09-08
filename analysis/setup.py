@@ -16,9 +16,10 @@ setuptools.setup(
     description="NEXUS API.",
     long_description=open('README.md').read(),
 
-    packages=['webservice', 'webservice.algorithms', 'webservice.algorithms_spark'],
+    packages=['webservice', 'webservice.algorithms', 'webservice.algorithms.doms', 'webservice.algorithms_spark'],
+    package_data={'webservice': ['config/web.ini', 'config/algorithms.ini'],
+                  'webservice.algorithms.doms': ['webservice/algorithms/doms']},
     data_files=[
-        ('config', ['config/web.ini', 'config/algorithms.ini']),
         ('static', ['static/index.html'])
     ],
     platforms='any',

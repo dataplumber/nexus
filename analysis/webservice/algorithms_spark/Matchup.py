@@ -271,7 +271,7 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
     from itertools import chain
     from datetime import datetime
     from pytz import UTC
-    from Matchup import DomsPoint  # Must import DomsPoint or Spark complains
+    from webservice.algorithms_spark.Matchup import DomsPoint  # Must import DomsPoint or Spark complains
     import json
 
     tile_service = NexusTileService()
