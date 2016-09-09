@@ -210,6 +210,14 @@ if __name__ == "__main__":
             (clazzWrapper.path(), ModularNexusHandlerWrapper,
              dict(clazz=clazzWrapper, algorithm_config=algorithm_config)))
 
+
+    class VersionHandler(tornado.web.RequestHandler):
+        def get(self):
+            self.write(pkg_resources.get_distribution("nexusanalysis").version)
+
+
+    handlers.append((r"/version", VersionHandler))
+
     if staticEnabled:
         handlers.append(
             (r'/(.*)', tornado.web.StaticFileHandler, {'path': staticDir, "default_filename": "index.html"}))
