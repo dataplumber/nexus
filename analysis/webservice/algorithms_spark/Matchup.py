@@ -16,6 +16,7 @@ from scipy import spatial
 from shapely import wkt
 from shapely.geometry import Point
 from webservice.NexusHandler import NexusHandler, nexus_handler
+from webservice.webmodel import NexusProcessingException
 from webservice.algorithms.doms import values as doms_values
 from webservice.algorithms.doms.BaseDomsHandler import DomsQueryResults
 from webservice.algorithms.doms.ResultsStorage import ResultsStorage
@@ -306,7 +307,11 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
     sp_conf = SparkConf()
     sp_conf.setAppName("Spark Matchup")
 
-    sc = SparkContext(conf=sp_conf)
+    try:
+        sc = SparkContext(conf=sp_conf)
+    except ValueError:
+        raise NexusProcessingException(reason="Only one spark_matchup can be run at time. Please try again later.",
+                                       code=503)
 
     # TODO Better handling of the Spark context. Do we really need to create/shutdown on every request?
     try:
