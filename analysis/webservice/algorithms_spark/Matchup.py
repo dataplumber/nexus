@@ -49,12 +49,12 @@ class Matchup(NexusHandler):
         },
         "startTime": {
             "name": "Start Time",
-            "type": "long",
+            "type": "string",
             "description": "Starting time in format YYYY-MM-DDTHH:mm:ssZ"
         },
         "endTime": {
             "name": "End Time",
-            "type": "long",
+            "type": "string",
             "description": "Ending time in format YYYY-MM-DDTHH:mm:ssZ"
         },
         "b": {
