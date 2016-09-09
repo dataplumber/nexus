@@ -49,12 +49,12 @@ class Matchup(NexusHandler):
         "startTime": {
             "name": "Start Time",
             "type": "long",
-            "description": "Starting time in milliseconds since midnight Jan. 1st, 1970 UTC"
+            "description": "Starting time in format YYYY-MM-DDTHH:mm:ssZ"
         },
         "endTime": {
             "name": "End Time",
             "type": "long",
-            "description": "Ending time in milliseconds since midnight Jan. 1st, 1970 UTC"
+            "description": "Ending time in format YYYY-MM-DDTHH:mm:ssZ"
         },
         "b": {
             "name": "Bounding box",
@@ -255,6 +255,8 @@ class DomsPoint(object):
 
         point.sst_depth = 0
         point.source = tile.dataset
+
+        # TODO device should change based on the satellite making the observations.
         point.platform = 9
         point.device = 5
         return point
