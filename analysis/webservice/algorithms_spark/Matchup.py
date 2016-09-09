@@ -270,8 +270,6 @@ class DomsPoint(object):
 
         point = DomsPoint()
 
-        point.data_id = unicode(edge_point['id'])
-
         try:
             x, y = wkt.loads(edge_point['point']).coords[0]
         except ReadingError:
@@ -296,6 +294,12 @@ class DomsPoint(object):
         point.platform = edge_point.get('platform')
         point.device = edge_point.get('device')
         point.file_url = edge_point.get('fileurl')
+
+        try:
+            point.data_id = unicode(edge_point['id'])
+        except KeyError:
+            point.data_id = "%s:%s:%s" % (point.time, point.longitude, point.latitude)
+
         return point
 
 
