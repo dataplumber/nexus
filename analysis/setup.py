@@ -4,7 +4,7 @@ California Institute of Technology.  All rights reserved
 """
 import setuptools
 
-__version__ = '0.1'
+__version__ = '1.2'
 
 setuptools.setup(
     name="nexusanalysis",
@@ -16,9 +16,10 @@ setuptools.setup(
     description="NEXUS API.",
     long_description=open('README.md').read(),
 
-    packages=['webservice', 'webservice.algorithms', 'webservice.algorithms_spark'],
+    packages=['webservice', 'webservice.algorithms', 'webservice.algorithms.doms', 'webservice.algorithms_spark'],
+    package_data={'webservice': ['config/web.ini', 'config/algorithms.ini'],
+                  'webservice.algorithms.doms': ['domsconfig.ini']},
     data_files=[
-        ('config', ['config/web.ini', 'config/algorithms.ini']),
         ('static', ['static/index.html'])
     ],
     platforms='any',
@@ -30,7 +31,8 @@ setuptools.setup(
         'pytz',
         'cython',
         'requests',
-        'utm'
+        'utm',
+        'shapely'
     ],
 
     classifiers=[

@@ -3,21 +3,17 @@ Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 
-from webservice.NexusHandler import NexusHandler, nexus_initializer
-from nexustiles.nexustiles import NexusTileService
-import logging
 import ConfigParser
-import nexusproto.NexusContent_pb2 as nexusproto
-from cassandra.cqlengine import columns
-from cassandra.cqlengine import connection
-from cassandra.cqlengine.models import Model
-from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
-from nexusproto.serialization import from_shaped_array
+import logging
+import pkg_resources
+
 from cassandra.cluster import Cluster
+from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
+from webservice.NexusHandler import nexus_initializer
+
 
 @nexus_initializer
 class DomsInitializer:
-
     def __init__(self):
         pass
 
@@ -25,36 +21,35 @@ class DomsInitializer:
         log = logging.getLogger(__name__)
         log.info("*** STARTING DOMS INITIALIZATION ***")
 
-        domsconfig = ConfigParser.ConfigParser()
-        domsconfig.read("webservice/algorithms/doms/domsconfig.ini")
+        domsconfig = ConfigParser.RawConfigParser()
+        domsconfig.readfp(pkg_resources.resource_stream(__name__, "domsconfig.ini"), filename='domsconfig.ini')
 
         cassHost = domsconfig.get("cassandra", "host")
         cassKeyspace = domsconfig.get("cassandra", "keyspace")
         cassDatacenter = domsconfig.get("cassandra", "local_datacenter")
-        cassVersion = domsconfig.get("cassandra", "protocol_version")
+        cassVersion = int(domsconfig.get("cassandra", "protocol_version"))
 
-        log.info("Cassandra Host(s): %s"%(cassHost))
-        log.info("Cassandra Keyspace: %s"%(cassKeyspace))
-        log.info("Cassandra Datacenter: %s"%(cassDatacenter))
-        log.info("Cassandra Protocol Version: %s"%(cassVersion))
+        log.info("Cassandra Host(s): %s" % (cassHost))
+        log.info("Cassandra Keyspace: %s" % (cassKeyspace))
+        log.info("Cassandra Datacenter: %s" % (cassDatacenter))
+        log.info("Cassandra Protocol Version: %s" % (cassVersion))
 
         dc_policy = DCAwareRoundRobinPolicy(cassDatacenter)
         token_policy = TokenAwarePolicy(dc_policy)
 
-        cluster = Cluster(
-                [host for host in cassHost.split(',')],
-                load_balancing_policy=token_policy)
+        cluster = Cluster([host for host in cassHost.split(',')], load_balancing_policy=token_policy,
+                          protocol_version=cassVersion)
 
         session = cluster.connect()
 
         self.createKeyspace(session, cassKeyspace)
         self.createTables(session)
 
-
     def createKeyspace(self, session, cassKeyspace):
         log = logging.getLogger(__name__)
-        log.info("Verifying DOMS keyspace '%s'"%cassKeyspace)
-        session.execute("CREATE KEYSPACE IF NOT EXISTS %s WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };"%cassKeyspace)
+        log.info("Verifying DOMS keyspace '%s'" % cassKeyspace)
+        session.execute(
+            "CREATE KEYSPACE IF NOT EXISTS %s WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };" % cassKeyspace)
         session.set_keyspace(cassKeyspace)
 
     def createTables(self, session):

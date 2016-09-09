@@ -5,8 +5,10 @@ California Institute of Technology.  All rights reserved
 import re
 import json
 import numpy as np
+from shapely.geometry import Polygon
 from datetime import datetime
 from decimal import Decimal
+from pytz import UTC
 
 
 class RequestParameters(object):
@@ -121,6 +123,10 @@ class NexusRequestObject(StatsComputeOptions):
     def get_argument(self, name, default=None):
         return self.requestHandler.get_argument(name, default=default)
 
+    def get_list_int_arg(self, name, default=None):
+        arg = self.get_argument(name, default=default)
+        return arg.split(',')
+
     def __validate_is_shortname(self, v):
         if v is None or len(v) == 0:
             return False
@@ -175,6 +181,11 @@ class NexusRequestObject(StatsComputeOptions):
     def get_min_lon(self, default=Decimal(-180)):
         return self.get_decimal_arg("minLon", default)
 
+    def get_bounding_polygon(self):
+        west, south, east, north = [float(b) for b in self.get_argument("b").split(",")]
+        polygon = Polygon([(west, south), (east, south), (east, north), (west, north), (west, south)])
+        return polygon
+
     def get_dataset(self):
         ds = self.get_argument(RequestParameters.DATASET, None)
         if ds is not None and not self.__validate_is_shortname(ds):
@@ -205,6 +216,14 @@ class NexusRequestObject(StatsComputeOptions):
 
     def get_end_time(self):
         return self.get_int_arg(RequestParameters.END_TIME, -1)
+
+    def get_start_datetime(self):
+        time_str = self.get_argument(RequestParameters.START_TIME)
+        return datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+
+    def get_end_datetime(self):
+        time_str = self.get_argument(RequestParameters.END_TIME)
+        return datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
 
     def get_start_row(self):
         return self.get_int_arg(RequestParameters.START_ROW, 0)
