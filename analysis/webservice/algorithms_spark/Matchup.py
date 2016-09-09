@@ -273,7 +273,10 @@ class DomsPoint(object):
         try:
             x, y = wkt.loads(edge_point['point']).coords[0]
         except ReadingError:
-            x, y = Point(*[float(c) for c in edge_point['point'].split(' ')]).coords[0]
+            try:
+                x, y = Point(*[float(c) for c in edge_point['point'].split(' ')]).coords[0]
+            except ValueError:
+                y, x = Point(*[float(c) for c in edge_point['point'].split(',')]).coords[0]
 
         point.longitude = x
         point.latitude = y
