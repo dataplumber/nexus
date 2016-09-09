@@ -196,7 +196,7 @@ class TestDOMSPoint(unittest.TestCase):
 "device": 3,
 "fileurl": "ftp://podaac-ftp.jpl.nasa.gov/allData/insitu/L2/spurs1/argo/argo-profiles-5903995.nc"
 }""")
-        point = DomsPoint.from_edge_point(edge_point, data_id=frozenset(edge_point.items()))
+        point = DomsPoint.from_edge_point(edge_point)
         self.assertIsNotNone(pickle.dumps(point))
 
 

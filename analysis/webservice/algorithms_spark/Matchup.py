@@ -2,22 +2,27 @@
 Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
-from math import fabs
+
+import time
+from datetime import datetime
 
 import numpy as np
 import requests
 import utm
-from datetime import datetime
-from pytz import timezone
 from nexustiles.nexustiles import NexusTileService
 from pyspark import SparkContext, SparkConf
+from pytz import timezone, UTC
 from scipy import spatial
 from shapely import wkt
 from shapely.geometry import Point
 from webservice.NexusHandler import NexusHandler, nexus_handler
+from webservice.algorithms.doms import values as doms_values
+from webservice.algorithms.doms.BaseDomsHandler import DomsQueryResults
+from webservice.algorithms.doms.ResultsStorage import ResultsStorage
+
+EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
 
 
-# TODO Need to handle matchup of different parameters
 # TODO Better handling of time tolerance and depth tolerance
 @nexus_handler
 class Matchup(NexusHandler):
@@ -83,6 +88,7 @@ class Matchup(NexusHandler):
         NexusHandler.__init__(self, skipCassandra=True)
 
     def calc(self, request, **args):
+        start = int(round(time.time() * 1000))
         # TODO Assuming Satellite primary
         bounding_polygon = request.get_bounding_polygon()
         primary_ds_name = request.get_argument('primary', None)
@@ -95,10 +101,8 @@ class Matchup(NexusHandler):
         radius_tolerance = request.get_decimal_arg('rt', default=0)
         platforms = request.get_argument('platforms')
 
-        start_seconds_from_epoch = long(
-            (start_time - timezone('UTC').localize(datetime(1970, 1, 1))).total_seconds())
-        end_seconds_from_epoch = long(
-            (end_time - timezone('UTC').localize(datetime(1970, 1, 1))).total_seconds())
+        start_seconds_from_epoch = long((start_time - EPOCH).total_seconds())
+        end_seconds_from_epoch = long((end_time - EPOCH).total_seconds())
 
         # Get tile ids in box
         tile_ids = [tile['id'] for tile in
@@ -109,8 +113,71 @@ class Matchup(NexusHandler):
         # Call spark_matchup
         spark_result = spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name, matchup_ds_names,
                                             parameter_s, time_tolerance, depth_tolerance, radius_tolerance, platforms)
-        import json
-        return json.dumps(dict({str(k): str(v) for k, v in spark_result.iteritems()}))
+
+        end = int(round(time.time() * 1000))
+
+        args = {
+            "primary": primary_ds_name,
+            "matchup": matchup_ds_names,
+            "startTime": start_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            "endTime": end_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            "bbox": request.get_argument('b'),
+            "timeTolerance": time_tolerance,
+            "depthTolerance": float(depth_tolerance),
+            "radiusTolerance": float(radius_tolerance),
+            "platforms": platforms
+        }
+
+        details = {
+            "timeToComplete": (end - start),
+            "numInSituRecords": 0,
+            "numInSituMatched": 0,
+            "numGriddedChecked": 0,
+            "numGriddedMatched": 0
+        }
+
+        matches = self.convert_to_matches(spark_result)
+
+        resultsStorage = ResultsStorage()
+        result_id = resultsStorage.insertResults(results=matches, params=args, stats=details, startTime=start,
+                                                 completeTime=end, userEmail="")
+
+        return DomsQueryResults(results=matches, args=args, details=details, bounds=None, count=None,
+                                computeOptions=None, executionId=result_id)
+
+    @classmethod
+    def convert_to_matches(cls, spark_result):
+        matches = []
+        for primary_domspoint, matched_domspoints in spark_result.iteritems():
+            p_matched = [cls.domspoint_to_dict(p_match) for p_match in matched_domspoints]
+
+            primary = cls.domspoint_to_dict(primary_domspoint)
+            primary['matches'] = list(p_matched)
+            matches.append(primary)
+        return matches
+
+    @staticmethod
+    def domspoint_to_dict(domspoint):
+        return {
+            "sea_water_temperature": domspoint.sst,
+            "sea_water_temperature_depth": domspoint.sst_depth,
+            "sea_water_salinity": domspoint.sss,
+            "sea_water_salinity_depth": domspoint.sss_depth,
+            "wind_speed": domspoint.wind_speed,
+            "wind_direction": domspoint.wind_direction,
+            "wind_u": domspoint.wind_u,
+            "wind_v": domspoint.wind_v,
+            "platform": doms_values.getPlatformById(domspoint.platform),
+            "device": doms_values.getDeviceById(domspoint.device),
+            "x": domspoint.longitude,
+            "y": domspoint.latitude,
+            "point": "Point(%s %s)" % (domspoint.longitude, domspoint.latitude),
+            "time": (datetime.strptime(domspoint.time, "%Y-%m-%dT%H:%M:%SZ").replace(
+                tzinfo=UTC) - EPOCH).total_seconds(),
+            "fileurl": domspoint.file_url,
+            "id": domspoint.data_id,
+            "source": domspoint.source,
+        }
 
 
 class DomsPoint(object):
@@ -145,51 +212,36 @@ class DomsPoint(object):
     def __repr__(self):
         return str(self.__dict__)
 
-    def is_close_to(self, other_point, xy_tolerance, depth_tolerance):
-
-        is_depth_close = True
-
-        if self.depth is not None and other_point.depth is not None and fabs(
-                        self.depth - other_point.depth) > depth_tolerance:
-            is_depth_close = False
-
-        primary_point = self.sh_point if xy_tolerance <= 0 else self.sh_point.buffer(xy_tolerance)
-
-        return is_depth_close and primary_point.contains(other_point.sh_point)
-
     @staticmethod
-    def from_nexus_point(nexus_point, tile=None, data_id=None, parameter='sst'):
+    def from_nexus_point(nexus_point, tile=None, parameter='sst'):
         point = DomsPoint()
 
-        if data_id is not None:
-            point.data_id = data_id
-        else:
-            point.data_id = hash(nexus_point)
+        point.data_id = "%s[%s]" % (tile.tile_id, nexus_point.index)
 
         # TODO Not an ideal solution; but it works for now.
         if parameter == 'sst':
-            point.sst = nexus_point.data_val
+            point.sst = nexus_point.data_val.item()
         elif parameter == 'sss':
-            point.sss = nexus_point.data_val
+            point.sss = nexus_point.data_val.item()
         elif parameter == 'wind':
-            point.wind_u = nexus_point.data_val
+            point.wind_u = nexus_point.data_val.item()
             try:
-                point.wind_v = tile.meta_data['wind_v'][nexus_point.index]
+                point.wind_v = tile.meta_data['wind_v'][nexus_point.index].item()
             except (KeyError, IndexError):
                 pass
             try:
-                point.wind_direction = tile.meta_data['wind_direction'][nexus_point.index]
+                point.wind_direction = tile.meta_data['wind_direction'][nexus_point.index].item()
             except (KeyError, IndexError):
                 pass
             try:
-                point.wind_speed = tile.meta_data['wind_speed'][nexus_point.index]
+                point.wind_speed = tile.meta_data['wind_speed'][nexus_point.index].item()
             except (KeyError, IndexError):
                 pass
         else:
             raise NotImplementedError('%s not supported. Only sst, sss, and wind parameters are supported.' % parameter)
 
-        point.longitude = nexus_point.longitude
-        point.latitude = nexus_point.latitude
+        point.longitude = nexus_point.longitude.item()
+        point.latitude = nexus_point.latitude.item()
         easting, northing, zone_number, zone_letter = utm.from_latlon(point.latitude, point.longitude)
         point.sh_point = Point(easting, northing)
 
@@ -208,15 +260,20 @@ class DomsPoint(object):
         return point
 
     @staticmethod
-    def from_edge_point(edge_point, data_id=None):
+    def from_edge_point(edge_point):
+        from shapely import wkt
+        from shapely.geos import ReadingError
+        from shapely.geometry import Point
+
         point = DomsPoint()
 
-        if data_id is not None:
-            point.data_id = data_id
-        else:
-            point.data_id = hash(edge_point)
+        point.data_id = unicode(edge_point['id'])
 
-        x, y = map(lambda coord: float(coord), edge_point['point'].split(' '))
+        try:
+            x, y = wkt.loads(edge_point['point']).coords[0]
+        except ReadingError:
+            x, y = Point(*[float(c) for c in edge_point['point'].split(' ')]).coords[0]
+
         point.longitude = x
         point.latitude = y
         easting, northing, zone_number, zone_letter = utm.from_latlon(point.latitude, point.longitude)
@@ -247,7 +304,6 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
     sp_conf = SparkConf()
     sp_conf.setAppName("Spark Matchup")
 
-    sp_conf.setMaster("local[1]")
     sc = SparkContext(conf=sp_conf)
 
     # TODO Better handling of the Spark context. Do we really need to create/shutdown on every request?
@@ -267,7 +323,8 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
 
         # Map Partitions ( list(tile_id) )
         rdd = rdd.mapPartitions(
-            partial(match_satellite_to_insitu, primary_b=primary_b, matchup_b=matchup_b, parameter_b=parameter_b, tt_b=tt_b,
+            partial(match_satellite_to_insitu, primary_b=primary_b, matchup_b=matchup_b, parameter_b=parameter_b,
+                    tt_b=tt_b,
                     dt_b=dt_b, rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b),
             preservesPartitioning=True) \
             .combineByKey(lambda value: [value],  # Create 1 element list
@@ -285,74 +342,111 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
     from datetime import datetime
     from pytz import UTC
     from webservice.algorithms_spark.Matchup import DomsPoint  # Must import DomsPoint or Spark complains
-    from webservice.algorithms.doms import fetchedgeimpl
-    import json
 
     tile_service = NexusTileService()
     edge_session = requests.Session()
 
     match_generators = []
-    for tile_id in tile_ids:
-        # Load tile
-        try:
+    with edge_session:
+        for tile_id in tile_ids:
+            # Load tile
+            try:
+                the_time = datetime.now()
+                tile = tile_service.mask_tiles_to_polygon(wkt.loads(bounding_wkt_b.value),
+                                                          tile_service.find_tile_by_id(tile_id))[0]
+                print "%s Time to load tile %s" % (str(datetime.now() - the_time), tile_id)
+            except IndexError:
+                # This should only happen if all measurements in a tile become masked after applying the bounding polygon
+                continue
+
+            # Get tile bounding lat/lon and time, expand lat/lon and time by tolerance
+            # TODO rt_b is in meters. Need to figure out how to increase lat/lon bbox by meters
+            easting, northing, zone_number, zone_letter = utm.from_latlon(tile.bbox.min_lat, tile.bbox.min_lon)
+            matchup_min_lon = tile.bbox.min_lon  # - rt_b.value
+            matchup_min_lat = tile.bbox.min_lat  # - rt_b.value
+            matchup_max_lon = tile.bbox.max_lon  # + rt_b.value
+            matchup_max_lat = tile.bbox.max_lat  # + rt_b.value
+
+            matchup_min_time = (tile.min_time - datetime.utcfromtimestamp(0).replace(
+                tzinfo=UTC)).total_seconds() - tt_b.value
+            matchup_max_time = (tile.max_time - datetime.utcfromtimestamp(0).replace(
+                tzinfo=UTC)).total_seconds() + tt_b.value
+
+            # Query edge for points
             the_time = datetime.now()
-            tile = tile_service.mask_tiles_to_polygon(wkt.loads(bounding_wkt_b.value),
-                                                      tile_service.find_tile_by_id(tile_id))[0]
-            print "%s Time to load tile %s" % (str(datetime.now() - the_time), tile_id)
-        except IndexError:
-            # This should only happen if all measurements in a tile become masked after applying the bounding polygon
-            continue
+            edge_results = []
+            for insitudata_name in matchup_b.value.split(','):
+                bbox = ','.join(
+                    [str(matchup_min_lon), str(matchup_min_lat), str(matchup_max_lon), str(matchup_max_lat)])
+                edge_response = query_edge(insitudata_name, matchup_min_time, matchup_max_time, bbox, dt_b.value,
+                                           platforms_b.value, session=edge_session)
+                if edge_response['totalResults'] == 0:
+                    continue
+                r = edge_response['results']
+                for p in r:
+                    p['source'] = insitudata_name
+                edge_results.extend(r)
+            print "%s Time to call edge for tile %s" % (str(datetime.now() - the_time), tile_id)
+            if len(edge_results) == 0:
+                continue
 
-        # Get tile bounding lat/lon and time, expand lat/lon and time by tolerance
-        # TODO rt_b is in meters. Need to figure out how to increase lat/lon bbox by meters
-        easting, northing, zone_number, zone_letter = utm.from_latlon(tile.bbox.min_lat, tile.bbox.min_lon)
-        matchup_min_lon = tile.bbox.min_lon  # - rt_b.value
-        matchup_min_lat = tile.bbox.min_lat  # - rt_b.value
-        matchup_max_lon = tile.bbox.max_lon  # + rt_b.value
-        matchup_max_lat = tile.bbox.max_lat  # + rt_b.value
+            # Convert tile measurements to DomsPoints
+            the_time = datetime.now()
+            nexus_doms_points = [DomsPoint.from_nexus_point(value, tile=tile, parameter=parameter_b.value)
+                                 for
+                                 value in tile.nexus_point_generator()]
+            print "%s Time to convert primary points for tile %s" % (str(datetime.now() - the_time), tile_id)
 
-        matchup_min_time = (tile.min_time - datetime.utcfromtimestamp(0).replace(
-            tzinfo=UTC)).total_seconds() - tt_b.value
-        matchup_max_time = (tile.max_time - datetime.utcfromtimestamp(0).replace(
-            tzinfo=UTC)).total_seconds() + tt_b.value
+            # Convert edge points to DomsPoints
+            the_time = datetime.now()
+            edge_doms_points = [DomsPoint.from_edge_point(value) for value in edge_results]
+            print "%s Time to convert match points for tile %s" % (str(datetime.now() - the_time), tile_id)
 
-        # Query edge for points
-        # TODO Encapsulate edge call? At minimum, pull config values out
-        params = {"startTime": datetime.utcfromtimestamp(matchup_min_time).strftime('%Y-%m-%dT%H:%M:%SZ'),
-                  "endTime": datetime.utcfromtimestamp(matchup_max_time).strftime('%Y-%m-%dT%H:%M:%SZ'),
-                  "bbox": ','.join(
-                      [str(matchup_min_lon), str(matchup_min_lat), str(matchup_max_lon), str(matchup_max_lat)]),
-                  "itemsPerPage": 1000, "startIndex": 0,
-                  "maxDepth": dt_b.value, "stats": "true",
-                  "platform": platforms_b.value.split(',')}
-        the_time = datetime.now()
-        edge_request = edge_session.get("http://127.0.0.1:8890/ws/search/spurs", params=params)
-        edge_request.raise_for_status()
-        edge_response = json.loads(edge_request.text)
-        print "%s Time to call edge for tile %s" % (str(datetime.now() - the_time), tile_id)
-        if edge_response['totalResults'] == 0:
-            continue
-        edge_results = edge_response['results']
-
-        # Convert tile measurements to DomsPoints
-        the_time = datetime.now()
-        nexus_points = {hash(p): p for p in tile.nexus_point_generator()}
-        nexus_doms_points = [DomsPoint.from_nexus_point(value, data_id=key, tile=tile, parameter=parameter_b.value) for
-                             key, value in nexus_points.iteritems()]
-        print "%s Time to convert primary points for tile %s" % (str(datetime.now() - the_time), tile_id)
-
-        # Convert edge points to DomsPoints
-        the_time = datetime.now()
-        edge_points = {hash(frozenset(p.items())): p for p in edge_results}
-        edge_doms_points = [DomsPoint.from_edge_point(value, data_id=key) for key, value in edge_points.iteritems()]
-        print "%s Time to convert match points for tile %s" % (str(datetime.now() - the_time), tile_id)
-
-        # call match_points
-        match_generators.append(match_points_generator(nexus_doms_points, edge_doms_points, rt_b.value))
-
-    edge_session.close()
+            # call match_points
+            match_generators.append(match_points_generator(nexus_doms_points, edge_doms_points, rt_b.value))
 
     return chain(*match_generators)
+
+
+def query_edge(dataset, startTime, endTime, bbox, maxDepth, platform, itemsPerPage=1000, startIndex=0, stats=True,
+               session=None):
+    import json
+    from webservice.algorithms.doms import config as edge_endpoints
+
+    try:
+        startTime = datetime.utcfromtimestamp(startTime).strftime('%Y-%m-%dT%H:%M:%SZ')
+    except TypeError:
+        # Assume we were passed a properly formatted string
+        pass
+
+    try:
+        endTime = datetime.utcfromtimestamp(endTime).strftime('%Y-%m-%dT%H:%M:%SZ')
+    except TypeError:
+        # Assume we were passed a properly formatted string
+        pass
+
+    try:
+        platform = platform.split(',')
+    except AttributeError:
+        # Assume we were passed a list
+        pass
+
+    params = {"startTime": startTime,
+              "endTime": endTime,
+              "bbox": bbox,
+              "maxDepth": maxDepth,
+              "platform": platform,
+              "itemsPerPage": itemsPerPage, "startIndex": startIndex, "stats": str(stats).lower()}
+
+    if session is not None:
+        edge_request = session.get(edge_endpoints.getEndpointByName(dataset)['url'], params=params)
+    else:
+        edge_request = requests.get(edge_endpoints.getEndpointByName(dataset)['url'], params=params)
+
+    edge_request.raise_for_status()
+    edge_response = json.loads(edge_request.text)
+
+    return edge_response
 
 
 # primary_points and matchup_points are both a list of DomsPoint

@@ -1,5 +1,3 @@
-
-
 PLATFORMS = [
     {"id": 1, "desc": "ship"},
     {"id": 2, "desc": "moored surface buoy"},
@@ -28,20 +26,25 @@ MISSIONS = [
     {"id": 4, "desc": "SPURS1"}
 ]
 
+
 def getDescById(list, id):
     for item in list:
         if item["id"] == id:
             return item["desc"]
     return id
 
+
 def getPlatformById(id):
     return getDescById(PLATFORMS, id)
+
 
 def getDeviceById(id):
     return getDescById(DEVICES, id)
 
+
 def getMissionById(id):
     return getDescById(MISSIONS, id)
+
 
 def getDescByListNameAndId(listName, id):
     if listName.upper() == "PLATFORM":
@@ -51,4 +54,4 @@ def getDescByListNameAndId(listName, id):
     elif listName.upper() == "MISSION":
         return getMissionById(id)
     else:
-        raise Exception("Invalid list name specified ('%s')"%listName)
+        raise Exception("Invalid list name specified ('%s')" % listName)

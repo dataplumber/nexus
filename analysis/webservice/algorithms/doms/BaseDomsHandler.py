@@ -34,6 +34,7 @@ class DomsEncoder(json.JSONEncoder):
 
     def default(self, obj):
         print 'MyEncoder.default() called'
+        print type(obj)
         if isinstance(obj, np.nan):
             return None  # hard code string for now
         else:
