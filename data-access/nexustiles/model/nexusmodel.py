@@ -58,7 +58,7 @@ class Tile(object):
                 point = NexusPoint(lat, lon, None, time, index, data_val)
                 yield point
         else:
-            for index in np.transpose(np.nonzero(self.data)):
+            for index in np.transpose(np.ma.nonzero(self.data)):
                 index = tuple(index)
                 time = self.times[index[0]]
                 lat = self.latitudes[index[1]]
@@ -66,6 +66,12 @@ class Tile(object):
                 data_val = self.data[index]
                 point = NexusPoint(lat, lon, None, time, index, data_val)
                 yield point
+
+    def get_indicies(self, include_nan=False):
+        if include_nan:
+            return list(np.ndindex(self.data.shape))
+        else:
+            return np.transpose(np.ma.nonzero(self.data)).tolist()
 
     def contains_point(self, lat, lon):
         return (
