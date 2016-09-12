@@ -9,7 +9,6 @@ from datetime import datetime
 import numpy as np
 import requests
 import utm
-from nexustiles.nexustiles import NexusTileService
 from pyspark import SparkContext, SparkConf
 from pytz import timezone, UTC
 from scipy import spatial
@@ -356,6 +355,10 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
     from datetime import datetime
     from pytz import UTC
     from webservice.algorithms_spark.Matchup import DomsPoint  # Must import DomsPoint or Spark complains
+    from shapely.geos import ReadingError
+    from shapely import wkt
+    from nexustiles.nexustiles import NexusTileService
+    from nexustiles.model.nexusmodel import NexusPoint
 
     tile_service = NexusTileService()
     edge_session = requests.Session()
@@ -406,18 +409,44 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
 
             # Convert tile measurements to DomsPoints
             the_time = datetime.now()
-            nexus_doms_points = [DomsPoint.from_nexus_point(value, tile=tile, parameter=parameter_b.value)
-                                 for
-                                 value in tile.nexus_point_generator()]
+            # Get list of indecies of valid values
+            valid_indices = tile.get_indicies()
+            primary_points = [utm.from_latlon(tile.latitudes[aslice[1]], tile.longitudes[aslice[2]])[0:2] for
+                              aslice in valid_indices]
+
             print "%s Time to convert primary points for tile %s" % (str(datetime.now() - the_time), tile_id)
 
             # Convert edge points to DomsPoints
             the_time = datetime.now()
-            edge_doms_points = [DomsPoint.from_edge_point(value) for value in edge_results]
+            matchup_points = []
+            for edge_point in edge_results:
+                try:
+                    x, y = wkt.loads(edge_point['point']).coords[0]
+                except ReadingError:
+                    try:
+                        x, y = Point(*[float(c) for c in edge_point['point'].split(' ')]).coords[0]
+                    except ValueError:
+                        y, x = Point(*[float(c) for c in edge_point['point'].split(',')]).coords[0]
+
+                matchup_points.append(utm.from_latlon(y, x)[0:2])
+
             print "%s Time to convert match points for tile %s" % (str(datetime.now() - the_time), tile_id)
 
             # call match_points
-            match_generators.append(match_points_generator(nexus_doms_points, edge_doms_points, rt_b.value))
+            def yield_doms_points():
+                matched_indexes = match_utm_points(primary_points, matchup_points, rt_b.value)
+                for i, point_matches in enumerate(matched_indexes):
+                    if len(point_matches) > 0:
+                        p_nexus_point = NexusPoint(tile.latitudes[valid_indices[i][1]],
+                                                   tile.longitudes[valid_indices[i][2]], None,
+                                                   tile.times[valid_indices[i][0]], valid_indices[i],
+                                                   tile.data[tuple(valid_indices[i])])
+                        p_doms_point = DomsPoint.from_nexus_point(p_nexus_point, tile=tile, parameter=parameter_b.value)
+                        for m_point_index in point_matches:
+                            m_doms_point = DomsPoint.from_edge_point(edge_results[m_point_index])
+                            yield p_doms_point, m_doms_point
+
+            match_generators.append(yield_doms_points())
 
     return chain(*match_generators)
 
@@ -464,9 +493,7 @@ def query_edge(dataset, startTime, endTime, bbox, maxDepth, platform, itemsPerPa
 
 
 # primary_points and matchup_points are both a list of DomsPoint
-# Result is a map of DomsPoint to list of DomsPoint
-#   map keys == primary_points
-#   map values == subset of matchup_points that match the primary_point key
+# Yields a tuple of Primary DomsPoint, Matchup DomsPoint. One tuple per match (primary point could be repeated)
 def match_points_generator(primary_points, matchup_points, r_tol):
     import logging
     log = logging.getLogger(__name__)
@@ -493,6 +520,32 @@ def match_points_generator(primary_points, matchup_points, r_tol):
     for i, point_matches in enumerate(matched_indexes):
         for m_point_index in point_matches:
             yield primary_points[i], matchup_points[m_point_index]
+
+
+# primary_points and matchup_points are both a list of (lon, lat) tuples. lon/lat should be in utm.
+# Returns a list of lists. Each index in the outer list corresponds to the index in the input primary_points list.
+#   Each inner list contains index values that correspond to the index in the input matchup_points list of points that
+#   match to the primary point.
+# There will be exactly one entry for every primary_point. But it could contain an empty list, signifying no matches.
+def match_utm_points(primary_points, matchup_points, r_tol):
+    import logging
+    log = logging.getLogger(__name__)
+    log.debug("Building primary tree")
+    the_time = datetime.now()
+    p_tree = spatial.cKDTree(primary_points, leafsize=30)
+    print "%s Time to build primary tree" % (str(datetime.now() - the_time))
+
+    log.debug("Building matchup tree")
+    the_time = datetime.now()
+    m_tree = spatial.cKDTree(matchup_points, leafsize=30)
+    print "%s Time to build matchup tree" % (str(datetime.now() - the_time))
+
+    log.debug("Querying primary tree for all nearest neighbors")
+    the_time = datetime.now()
+    matched_indexes = p_tree.query_ball_tree(m_tree, r_tol)
+    print "%s Time to query primary tree" % (str(datetime.now() - the_time))
+
+    return matched_indexes
 
 
 # primary_points and matchup_points are both a list of DomsPoint
