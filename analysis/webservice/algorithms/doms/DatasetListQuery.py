@@ -10,6 +10,7 @@ import requests
 import json
 import values
 import traceback
+from webmodel import cached
 
 @nexus_handler
 class DomsDatasetListQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
@@ -67,9 +68,10 @@ class DomsDatasetListQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
         except:
             return None
 
+    @cached(ttl=(60 * 60 * 1000))  # 1 hour cached
     def calc(self, computeOptions, **args):
 
-        satellitesList = self._tile_service.get_dataseries_list()
+        satellitesList = self._tile_service.get_dataseries_list(simple=True)
 
         insituList = []
 

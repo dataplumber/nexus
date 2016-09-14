@@ -16,6 +16,7 @@ from tornado.options import define, options, parse_command_line
 
 from webmodel import NexusRequestObject, NexusResults, NexusProcessingException
 from webservice import NexusHandler
+import traceback
 
 matplotlib.use('Agg')
 
@@ -163,6 +164,7 @@ class ModularNexusHandlerWrapper(BaseHandler):
             try:
                 self.write(results.toNetCDF())
             except:
+                traceback.print_exc(file=sys.stdout)
                 raise NexusProcessingException(reason="Unable to convert results to NetCDF.")
 
 

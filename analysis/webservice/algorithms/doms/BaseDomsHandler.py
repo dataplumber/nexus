@@ -8,6 +8,17 @@ import json
 import config
 import numpy as np
 
+try:
+    from osgeo import gdal
+    from osgeo.gdalnumeric import *
+except ImportError:
+    import gdal
+    from gdalnumeric import *
+from netCDF4 import Dataset
+from os import listdir
+from os.path import isfile, join
+import tempfile
+
 class BaseDomsQueryHandler(BaseHandler):
 
     def __init__(self):
@@ -58,4 +69,11 @@ class DomsQueryResults(NexusResults):
         pass
 
     def toNetCDF(self):
-        pass
+        t = tempfile.mkstemp(prefix="doms_")
+        print "Temp File: ", t
+        #dataset = Dataset(t.name, "w", format="NETCDF4")
+
+        #dataset.close()
+        print "Hello!!"
+        return self.toJson()
+        #return "HI"
