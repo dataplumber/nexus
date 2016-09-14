@@ -4,7 +4,7 @@ California Institute of Technology.  All rights reserved
 """
 import setuptools
 
-__version__ = '1.2'
+__version__ = '1.21'
 
 setuptools.setup(
     name="nexusanalysis",
