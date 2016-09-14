@@ -2,7 +2,7 @@ from webservice.NexusHandler import NexusHandler as BaseHandler
 from webservice.webmodel import StatsComputeOptions
 from webservice.NexusHandler import nexus_handler
 from webservice.NexusHandler import DEFAULT_PARAMETERS_SPEC
-from webservice.webmodel import NexusResults, NexusProcessingException, DatasetNotFoundException
+from webservice.webmodel import NexusResults, NexusProcessingException, DatasetNotFoundException, cached
 import BaseDomsHandler
 import datafetch
 import config
@@ -10,7 +10,6 @@ import requests
 import json
 import values
 import traceback
-from webmodel import cached
 
 @nexus_handler
 class DomsDatasetListQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):

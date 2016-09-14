@@ -4,7 +4,7 @@ California Institute of Technology.  All rights reserved
 """
 from webservice.NexusHandler import NexusHandler
 from webservice.NexusHandler import nexus_handler
-from webmodel import cached
+from webservice.webmodel import cached
 
 
 @nexus_handler
