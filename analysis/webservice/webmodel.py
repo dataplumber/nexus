@@ -8,7 +8,9 @@ import numpy as np
 from shapely.geometry import Polygon
 from datetime import datetime
 from decimal import Decimal
-from pytz import UTC
+from pytz import UTC, timezone
+
+EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
 
 
 class RequestParameters(object):
@@ -49,9 +51,10 @@ class NoDataException(NexusProcessingException):
     def __init__(self, reason="No data found for the selected timeframe"):
         NexusProcessingException.__init__(self, StandardNexusErrors.NO_DATA, reason, 400)
 
+
 class DatasetNotFoundException(NexusProcessingException):
     def __init__(self, reason="Dataset not found"):
-         NexusProcessingException.__init__(self, StandardNexusErrors.DATASET_MISSING, reason, code=404)
+        NexusProcessingException.__init__(self, StandardNexusErrors.DATASET_MISSING, reason, code=404)
 
 
 class StatsComputeOptions(object):
@@ -219,11 +222,19 @@ class NexusRequestObject(StatsComputeOptions):
 
     def get_start_datetime(self):
         time_str = self.get_argument(RequestParameters.START_TIME)
-        return datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        try:
+            dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        except ValueError:
+            dt = datetime.utcfromtimestamp(int(time_str)).replace(tzinfo=UTC)
+        return dt
 
     def get_end_datetime(self):
         time_str = self.get_argument(RequestParameters.END_TIME)
-        return datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        try:
+            dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        except ValueError:
+            dt = datetime.utcfromtimestamp(int(time_str)).replace(tzinfo=UTC)
+        return dt
 
     def get_start_row(self):
         return self.get_int_arg(RequestParameters.START_ROW, 0)
