@@ -146,6 +146,7 @@ class ModularNexusHandlerWrapper(BaseHandler):
             try:
                 self.write(results.toJson())
             except AttributeError:
+                traceback.print_exc(file=sys.stdout)
                 self.write(json.dumps(results, indent=4))
         elif request.get_content_type() == ContentTypes.PNG:
             self.set_header("Content-Type", "image/png")
