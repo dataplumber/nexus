@@ -136,6 +136,8 @@ class SolrProxy(object):
 
     def find_all_tiles_in_polygon_sorttimeasc(self, bounding_polygon, ds, start_time=0, end_time=-1, **kwargs):
 
+        print "Called find_all_tiles_in_polygon_sorttimeasc with params: %s, %s, %s, %s, %s" % (bounding_polygon, ds, start_time, end_time, kwargs)
+
         search = 'dataset_s:%s' % ds
 
         additionalparams = {
@@ -247,11 +249,29 @@ class SolrProxy(object):
 
     def do_query_raw(self, *args, **params):
 
+        # fl only works when passed as the second argument to solrcon.select
+        try:
+            fl = params['fl']
+            del(params['fl'])
+        except KeyError:
+            fl = None
+
+        args = (args[0],) + (fl,) + (args[2:])
+
         response = self.solrcon.select(*args, **params)
 
         return response
 
     def do_query_all(self, *args, **params):
+
+        # fl only works when passed as the second argument to solrcon.select
+        try:
+            fl = params['fl']
+            del(params['fl'])
+        except KeyError:
+            fl = None
+
+        args = (args[0],) + (fl,) + (args[2:])
 
         results = []
         response = self.solrcon.select(*args, **params)
@@ -290,7 +310,7 @@ class SolrProxy(object):
             additionalparams['fq'] = kwfq
 
         try:
-            kwfl = kwargs['fl'] if isinstance(kwargs['fl'], list) else list(kwargs['fl'])
+            kwfl = kwargs['fl'] if isinstance(kwargs['fl'], list) else [kwargs['fl']]
         except KeyError:
             kwfl = []
 
