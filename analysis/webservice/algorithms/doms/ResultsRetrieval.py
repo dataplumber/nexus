@@ -24,7 +24,6 @@ import multiprocessing as mp
 
 
 
-
 @nexus_handler
 class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
 
@@ -47,3 +46,4 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         params, stats, data = retrieval.retrieveResults(id)
 
         return BaseDomsHandler.DomsQueryResults(results=data, args=params, details=stats, bounds=None, count=None, computeOptions=None, executionId=id)
+

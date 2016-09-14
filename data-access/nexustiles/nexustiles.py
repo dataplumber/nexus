@@ -47,8 +47,11 @@ class NexusTileService(object):
         if not skipSolr:
             self._solr = SolrProxy(self._config)
 
-    def get_dataseries_list(self):
-        return self._solr.get_data_series_list()
+    def get_dataseries_list(self, simple=False):
+        if simple:
+            return self._solr.get_data_series_list_simple()
+        else:
+            return self._solr.get_data_series_list()
 
     @tile_data()
     def find_tile_by_id(self, tile_id, **kwargs):
