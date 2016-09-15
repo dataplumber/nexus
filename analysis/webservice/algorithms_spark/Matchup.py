@@ -313,8 +313,8 @@ class DomsPoint(object):
 
         point.time = edge_point['time']
 
-        point.wind_u = edge_point.get('wind_u')
-        point.wind_v = edge_point.get('wind_v')
+        point.wind_u = edge_point.get('eastward_wind')
+        point.wind_v = edge_point.get('northward_wind')
         point.wind_direction = edge_point.get('wind_direction')
         point.wind_speed = edge_point.get('wind_speed')
         point.sst = edge_point.get('sea_water_temperature')
