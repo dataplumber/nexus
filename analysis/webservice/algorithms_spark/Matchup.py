@@ -4,6 +4,7 @@ California Institute of Technology.  All rights reserved
 """
 
 import time
+import threading
 from datetime import datetime
 
 import numpy as np
@@ -134,13 +135,16 @@ class Matchup(NexusHandler):
         tile_ids = [tile['id'] for tile in
                     self._tile_service.find_tiles_in_polygon(bounding_polygon, primary_ds_name,
                                                              start_seconds_from_epoch, end_seconds_from_epoch,
-                                                             fetch_data=False, fl='id')]
+                                                             fetch_data=False, fl='id',
+                                                             sort=['tile_min_time_dt asc', 'tile_min_lon asc',
+                                                                   'tile_min_lat asc'], rows=5000)]
 
         self.log.debug("Calling Spark Driver")
         # Call spark_matchup
-        spark_result = spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name, matchup_ds_names,
-                                            parameter_s, time_tolerance, depth_tolerance, radius_tolerance, platforms)
-
+        spark_result = spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name,
+                                            matchup_ds_names,
+                                            parameter_s, time_tolerance, depth_tolerance, radius_tolerance,
+                                            platforms)
         end = int(round(time.time() * 1000))
 
         self.log.debug("Building and saving results")
@@ -348,7 +352,7 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
                                        code=503)
 
     # TODO Better handling of the Spark context. Do we really need to create/shutdown on every request?
-    try:
+    with sc:
         # Broadcast parameters
         primary_b = sc.broadcast(primary_ds_name)
         matchup_b = sc.broadcast(matchup_ds_names)
@@ -372,9 +376,22 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
                           lambda value_list, value: value_list + [value],  # Add 1 element to list
                           lambda value_list_a, value_list_b: value_list_a + value_list_b)  # Add two lists together
         result_as_map = rdd.collectAsMap()
-    finally:
-        sc.stop()
+
     return result_as_map
+
+
+def spark_matchup_driver_2(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_names, parameter, time_tolerance,
+                           depth_tolerance, radius_tolerance, platforms):
+    # Query for count of insitu points in search domain from each matchup source
+    # Parallelize range from 0 to in situ count step size = page size
+    # Map int from range -> (cKDTree of edge points, list of edge points in tree)
+    # Cache rdd
+
+    # Query for tile ids in search domain
+    # parallelize tile ids
+    # map tile id -> (cKDTree of tile, tile)
+
+    pass
 
 
 def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b, dt_b, rt_b, platforms_b,
