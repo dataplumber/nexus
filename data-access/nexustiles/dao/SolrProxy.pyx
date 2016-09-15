@@ -154,8 +154,6 @@ class SolrProxy(object):
 
     def find_all_tiles_in_polygon_sorttimeasc(self, bounding_polygon, ds, start_time=0, end_time=-1, **kwargs):
 
-        print "Called find_all_tiles_in_polygon_sorttimeasc with params: %s, %s, %s, %s, %s" % (bounding_polygon, ds, start_time, end_time, kwargs)
-
         search = 'dataset_s:%s' % ds
 
         additionalparams = {
