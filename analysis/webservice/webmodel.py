@@ -8,10 +8,12 @@ import numpy as np
 from shapely.geometry import Polygon
 from datetime import datetime
 from decimal import Decimal
+import time
+import inspect
+import hashlib
 from pytz import UTC, timezone
 
 EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
-
 
 class RequestParameters(object):
     SEASONAL_CYCLE_FILTER = "seasonalFilter"
@@ -372,3 +374,44 @@ class CustomEncoder(json.JSONEncoder):
             return str(np.NaN)
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)
+
+
+__CACHE = {}
+
+def cached(ttl=60000):
+
+    def _hash_function_signature(func):
+        hash_object = hashlib.md5(str(inspect.getargspec(func)))
+        return hash_object.hexdigest()
+
+    def _now():
+        return int(round(time.time() * 1000))
+
+    def _expired(t):
+        if t is None or _now() - t > ttl:
+            return True
+        else:
+            return False
+
+    def _cached_decorator(func):
+
+        def func_wrapper(self, computeOptions, **args):
+            hash = _hash_function_signature(func)
+            force = computeOptions.get_boolean_arg("nocached", default=False)
+
+            if force or hash not in __CACHE or (hash in __CACHE and _expired(__CACHE[hash]["time"])):
+                result = func(self, computeOptions, **args)
+                __CACHE[hash] = {
+                    "time": _now(),
+                    "result": result
+                }
+
+            return __CACHE[hash]["result"]
+        return func_wrapper
+
+    return _cached_decorator
+
+
+
+
+

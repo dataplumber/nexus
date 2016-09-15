@@ -9,6 +9,7 @@ from datetime import datetime
 import numpy as np
 import requests
 import utm
+import logging
 from pyspark import SparkContext, SparkConf
 from pytz import timezone, UTC
 from scipy import spatial
@@ -86,36 +87,63 @@ class Matchup(NexusHandler):
 
     def __init__(self):
         NexusHandler.__init__(self, skipCassandra=True)
+        self.log = logging.getLogger(__name__)
 
     def calc(self, request, **args):
         start = int(round(time.time() * 1000))
         # TODO Assuming Satellite primary
-        bounding_polygon = request.get_bounding_polygon()
+        # Parse input arguments
+        self.log.debug("Parsing arguments")
+        try:
+            bounding_polygon = request.get_bounding_polygon()
+        except:
+            raise NexusProcessingException(
+                reason="'b' argument is required. Must be comma-delimited float formatted as Minimum (Western) Longitude, Minimum (Southern) Latitude, Maximum (Eastern) Longitude, Maximum (Northern) Latitude",
+                code=400)
         primary_ds_name = request.get_argument('primary', None)
+        if primary_ds_name is None:
+            raise NexusProcessingException(reason="'primary' argument is required", code=400)
         matchup_ds_names = request.get_argument('matchup', None)
+        if matchup_ds_names is None:
+            raise NexusProcessingException(reason="'matchup' argument is required", code=400)
         parameter_s = request.get_argument('parameter', 'sst')
-        start_time = request.get_start_datetime()
-        end_time = request.get_end_datetime()
-        time_tolerance = request.get_int_arg('tt', default=0)
-        depth_tolerance = request.get_decimal_arg('dt', default=0.0)
-        radius_tolerance = request.get_decimal_arg('rt', default=0)
-        platforms = request.get_argument('platforms')
+        try:
+            start_time = request.get_start_datetime()
+        except:
+            raise NexusProcessingException(
+                reason="'startTime' argument is required. Can be int value seconds from epoch or string format YYYY-MM-DDTHH:mm:ssZ",
+                code=400)
+        try:
+            end_time = request.get_end_datetime()
+        except:
+            raise NexusProcessingException(
+                reason="'endTime' argument is required. Can be int value seconds from epoch or string format YYYY-MM-DDTHH:mm:ssZ",
+                code=400)
+        time_tolerance = request.get_int_arg('tt', default=86400)
+        depth_tolerance = request.get_decimal_arg('dt', default=5.0)
+        radius_tolerance = request.get_decimal_arg('rt', default=1000.0)
+        platforms = request.get_argument('platforms', None)
+        if platforms is None:
+            raise NexusProcessingException(reason="'platforms' argument is required", code=400)
 
         start_seconds_from_epoch = long((start_time - EPOCH).total_seconds())
         end_seconds_from_epoch = long((end_time - EPOCH).total_seconds())
 
+        self.log.debug("Querying for tiles in search domain")
         # Get tile ids in box
         tile_ids = [tile['id'] for tile in
                     self._tile_service.find_tiles_in_polygon(bounding_polygon, primary_ds_name,
                                                              start_seconds_from_epoch, end_seconds_from_epoch,
                                                              fetch_data=False, fl='id')]
 
+        self.log.debug("Calling Spark Driver")
         # Call spark_matchup
         spark_result = spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name, matchup_ds_names,
                                             parameter_s, time_tolerance, depth_tolerance, radius_tolerance, platforms)
 
         end = int(round(time.time() * 1000))
 
+        self.log.debug("Building and saving results")
         args = {
             "primary": primary_ds_name,
             "matchup": matchup_ds_names,
@@ -284,8 +312,8 @@ class DomsPoint(object):
 
         point.time = edge_point['time']
 
-        point.wind_u = edge_point.get('wind_u')
-        point.wind_v = edge_point.get('wind_v')
+        point.wind_u = edge_point.get('eastward_wind')
+        point.wind_v = edge_point.get('northward_wind')
         point.wind_direction = edge_point.get('wind_direction')
         point.wind_speed = edge_point.get('wind_speed')
         point.sst = edge_point.get('sea_water_temperature')

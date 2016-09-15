@@ -52,6 +52,24 @@ class SolrProxy(object):
         l = sorted(l, key=lambda entry: entry["title"])
         return l
 
+
+    def get_data_series_list_simple(self):
+        search = "*:*"
+        params = {
+            "facet": "true",
+            "facet.field": "dataset_s"
+        }
+
+        response = self.do_query_raw(*(search, None, None, False, None), **params)
+        l = []
+        for g in response.facet_counts["facet_fields"]["dataset_s"]:
+            l.append({
+                "shortName":g,
+                "title": g
+            })
+        l = sorted(l, key=lambda entry: entry["title"])
+        return l
+
     def find_tile_by_bbox_and_most_recent_day_of_year(self, min_lat, max_lat, min_lon, max_lon, ds, day_of_year):
 
         search = 'dataset_s:%s' % ds
@@ -247,11 +265,29 @@ class SolrProxy(object):
 
     def do_query_raw(self, *args, **params):
 
+        # fl only works when passed as the second argument to solrcon.select
+        try:
+            fl = params['fl']
+            del(params['fl'])
+        except KeyError:
+            fl = None
+
+        args = (args[0],) + (fl,) + (args[2:])
+
         response = self.solrcon.select(*args, **params)
 
         return response
 
     def do_query_all(self, *args, **params):
+
+        # fl only works when passed as the second argument to solrcon.select
+        try:
+            fl = params['fl']
+            del(params['fl'])
+        except KeyError:
+            fl = None
+
+        args = (args[0],) + (fl,) + (args[2:])
 
         results = []
         response = self.solrcon.select(*args, **params)
@@ -290,7 +326,7 @@ class SolrProxy(object):
             additionalparams['fq'] = kwfq
 
         try:
-            kwfl = kwargs['fl'] if isinstance(kwargs['fl'], list) else list(kwargs['fl'])
+            kwfl = kwargs['fl'] if isinstance(kwargs['fl'], list) else [kwargs['fl']]
         except KeyError:
             kwfl = []
 

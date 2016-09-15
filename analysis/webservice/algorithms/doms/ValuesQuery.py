@@ -5,6 +5,10 @@ from webservice.NexusHandler import DEFAULT_PARAMETERS_SPEC
 from webservice.webmodel import NexusResults, NexusProcessingException
 import BaseDomsHandler
 import datafetch
+from pytz import timezone, UTC
+from datetime import datetime
+
+EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
 
 @nexus_handler
 class DomsValuesQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
@@ -21,8 +25,8 @@ class DomsValuesQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
     def calc(self, computeOptions, **args):
 
         source = computeOptions.get_argument("source", None)
-        startTime = computeOptions.get_argument("s", None)
-        endTime = computeOptions.get_argument("e", None)
+        startTime = computeOptions.get_start_datetime()
+        endTime = computeOptions.get_end_datetime()
         bbox = computeOptions.get_argument("b", None)
         timeTolerance = computeOptions.get_float_arg("tt")
         depthTolerance = computeOptions.get_float_arg("dt")
@@ -33,7 +37,7 @@ class DomsValuesQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
         if source1 is None:
             raise Exception("Source '%s' not found"%source)
 
-        values, bounds = datafetch.getValues(source1, startTime, endTime, bbox, depthTolerance, platforms, placeholders=True)
+        values, bounds = datafetch.getValues(source1, startTime.strftime('%Y-%m-%dT%H:%M:%SZ'), endTime.strftime('%Y-%m-%dT%H:%M:%SZ'), bbox, depthTolerance, platforms, placeholders=True)
         count = len(values)
 
         args = {

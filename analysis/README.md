@@ -17,7 +17,7 @@ Python module that exposes NEXUS analytical capabilities via a HTTP webservice.
 2. Install conda dependencies
 
     ````
-    conda install numpy matplotlib mpld3 scipy libnetcdf netCDF4 basemap
+    conda install numpy matplotlib mpld3 scipy netCDF4 basemap gdal libnetcdf=4.3.3.1
     ````
 
 3. Run `python setup.py install`

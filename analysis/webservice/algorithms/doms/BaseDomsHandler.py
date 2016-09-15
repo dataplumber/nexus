@@ -1,3 +1,5 @@
+from datetime import datetime
+from pytz import timezone, UTC
 from webservice.NexusHandler import NexusHandler as BaseHandler
 from webservice.webmodel import StatsComputeOptions
 from webservice.NexusHandler import nexus_handler
@@ -7,6 +9,19 @@ from webservice.webmodel import NexusResults, NexusProcessingException
 import json
 import config
 import numpy as np
+
+EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
+
+try:
+    from osgeo import gdal
+    from osgeo.gdalnumeric import *
+except ImportError:
+    import gdal
+    from gdalnumeric import *
+from netCDF4 import Dataset
+from os import listdir
+from os.path import isfile, join
+import tempfile
 
 class BaseDomsQueryHandler(BaseHandler):
 
@@ -33,10 +48,12 @@ class DomsEncoder(json.JSONEncoder):
         json.JSONEncoder.__init__(self, **args)
 
     def default(self, obj):
-        print 'MyEncoder.default() called'
-        print type(obj)
-        if isinstance(obj, np.nan):
+        #print 'MyEncoder.default() called'
+        #print type(obj)
+        if obj == np.nan:
             return None  # hard code string for now
+        elif isinstance(obj, datetime):
+            return long((obj - EPOCH).total_seconds())
         else:
             return json.JSONEncoder.default(self, obj)
 
@@ -58,4 +75,11 @@ class DomsQueryResults(NexusResults):
         pass
 
     def toNetCDF(self):
-        pass
+        t = tempfile.mkstemp(prefix="doms_")
+        print "Temp File: ", t
+        #dataset = Dataset(t.name, "w", format="NETCDF4")
+
+        #dataset.close()
+        print "Hello!!"
+        return self.toJson()
+        #return "HI"

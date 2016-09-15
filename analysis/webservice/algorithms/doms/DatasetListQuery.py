@@ -2,7 +2,7 @@ from webservice.NexusHandler import NexusHandler as BaseHandler
 from webservice.webmodel import StatsComputeOptions
 from webservice.NexusHandler import nexus_handler
 from webservice.NexusHandler import DEFAULT_PARAMETERS_SPEC
-from webservice.webmodel import NexusResults, NexusProcessingException, DatasetNotFoundException
+from webservice.webmodel import NexusResults, NexusProcessingException, DatasetNotFoundException, cached
 import BaseDomsHandler
 import datafetch
 import config
@@ -67,9 +67,10 @@ class DomsDatasetListQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
         except:
             return None
 
+    @cached(ttl=(60 * 60 * 1000))  # 1 hour cached
     def calc(self, computeOptions, **args):
 
-        satellitesList = self._tile_service.get_dataseries_list()
+        satellitesList = self._tile_service.get_dataseries_list(simple=True)
 
         insituList = []
 
