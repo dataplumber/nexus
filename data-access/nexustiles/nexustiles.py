@@ -20,9 +20,11 @@ def tile_data(default_fetch=True):
     def tile_data_decorator(func):
         @wraps(func)
         def fetch_data_for_func(*args, **kwargs):
-            if ('fetch_data' not in kwargs and default_fetch == False) or (
-                            'fetch_data' in kwargs and kwargs['fetch_data'] == False):
-                return func(*args, **kwargs)
+            if ('fetch_data' not in kwargs and not default_fetch) or (
+                            'fetch_data' in kwargs and not kwargs['fetch_data']):
+                solr_docs = func(*args, **kwargs)
+                tiles = args[0]._solr_docs_to_tiles(*solr_docs)
+                return tiles
             else:
                 solr_docs = func(*args, **kwargs)
                 tiles = args[0]._solr_docs_to_tiles(*solr_docs)
@@ -57,6 +59,10 @@ class NexusTileService(object):
     def find_tile_by_id(self, tile_id, **kwargs):
         return self._solr.find_tile_by_id(tile_id)
 
+    @tile_data()
+    def find_tiles_by_id(self, tile_ids, ds=None, **kwargs):
+        return self._solr.find_tiles_by_id(tile_ids, ds=ds, **kwargs)
+
     def find_days_in_range_asc(self, min_lat, max_lat, min_lon, max_lon, dataset, start_time, end_time, **kwargs):
         return self._solr.find_days_in_range_asc(min_lat, max_lat, min_lon, max_lon, dataset, start_time, end_time,
                                                  **kwargs)
@@ -84,7 +90,8 @@ class NexusTileService(object):
         if 'sort' in kwargs.keys():
             tiles = self._solr.find_all_tiles_in_polygon(bounding_polygon, ds, start_time, end_time, **kwargs)
         else:
-            tiles = self._solr.find_all_tiles_in_polygon_sorttimeasc(bounding_polygon, ds, start_time, end_time, **kwargs)
+            tiles = self._solr.find_all_tiles_in_polygon_sorttimeasc(bounding_polygon, ds, start_time, end_time,
+                                                                     **kwargs)
         return tiles
 
     @tile_data()
@@ -116,6 +123,14 @@ class NexusTileService(object):
                                                              **kwargs)
 
         return tiles
+
+    def get_bounding_box(self, *tile_ids):
+        """
+        Retrieve a bounding box that encompasses all of the tiles represented by the given tile ids.
+        :param tile_ids: List of tile ids
+        :return: shapely.geometry.Polygon that represents the smallest bounding box that encompasses all of the tiles
+        """
+        pass
 
     def mask_tiles_to_bbox(self, min_lat, max_lat, min_lon, max_lon, tiles):
 

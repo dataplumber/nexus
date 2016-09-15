@@ -26,6 +26,26 @@ class SolrProxy(object):
         assert len(results) == 1, "Found %s results, expected exactly 1" % len(results)
         return [results[0]]
 
+    def find_tiles_by_id(self, tile_ids, ds=None, **kwargs):
+
+        if ds is not None:
+            search = 'dataset_s:%s' % ds
+        else:
+            search = '*:*'
+
+        additionalparams = {
+            'fq': [
+                "{!terms f=id}%s" % ','.join(tile_ids)
+            ]
+        }
+
+        self._merge_kwargs(additionalparams, **kwargs)
+
+        results = self.do_query_all(*(search, None, None, False, None), **additionalparams)
+
+        assert len(results) == len(tile_ids), "Found %s results, expected exactly %s" % (len(results), len(tile_ids))
+        return results
+
     def get_data_series_list(self):
         search = "*:*"
         params = {
