@@ -132,7 +132,7 @@ class Matchup(NexusHandler):
 
         self.log.debug("Querying for tiles in search domain")
         # Get tile ids in box
-        tile_ids = [tile['id'] for tile in
+        tile_ids = [tile.tile_id for tile in
                     self._tile_service.find_tiles_in_polygon(bounding_polygon, primary_ds_name,
                                                              start_seconds_from_epoch, end_seconds_from_epoch,
                                                              fetch_data=False, fl='id')]
