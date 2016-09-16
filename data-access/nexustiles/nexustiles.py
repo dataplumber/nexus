@@ -200,20 +200,55 @@ class NexusTileService(object):
         tiles = []
         for solr_doc in solr_docs:
             tile = Tile()
-            tile.tile_id = solr_doc['id']
-            tile.bbox = BBox(
-                solr_doc['tile_min_lat'], solr_doc['tile_max_lat'],
-                solr_doc['tile_min_lon'], solr_doc['tile_max_lon'])
-            tile.dataset = solr_doc['dataset_s']
-            # tile.dataset_id = solr_doc['dataset_id_s']
-            tile.granule = solr_doc['granule_s']
-            tile.min_time = solr_doc['tile_min_time_dt']
-            tile.max_time = solr_doc['tile_max_time_dt']
-            tile.section_spec = solr_doc['sectionSpec_s']
-            tile.tile_stats = TileStats(
-                solr_doc['tile_min_val_d'], solr_doc['tile_max_val_d'],
-                solr_doc['tile_avg_val_d'], solr_doc['tile_count_i']
-            )
+            try:
+                tile.tile_id = solr_doc['id']
+            except KeyError:
+                pass
+
+            try:
+                tile.bbox = BBox(
+                    solr_doc['tile_min_lat'], solr_doc['tile_max_lat'],
+                    solr_doc['tile_min_lon'], solr_doc['tile_max_lon'])
+            except KeyError:
+                pass
+
+            try:
+                tile.dataset = solr_doc['dataset_s']
+            except KeyError:
+                pass
+
+            try:
+                tile.dataset_id = solr_doc['dataset_id_s']
+            except KeyError:
+                pass
+
+            try:
+                tile.granule = solr_doc['granule_s']
+            except KeyError:
+                pass
+
+            try:
+                tile.min_time = solr_doc['tile_min_time_dt']
+            except KeyError:
+                pass
+
+            try:
+                tile.max_time = solr_doc['tile_max_time_dt']
+            except KeyError:
+                pass
+
+            try:
+                tile.section_spec = solr_doc['sectionSpec_s']
+            except KeyError:
+                pass
+
+            try:
+                tile.tile_stats = TileStats(
+                    solr_doc['tile_min_val_d'], solr_doc['tile_max_val_d'],
+                    solr_doc['tile_avg_val_d'], solr_doc['tile_count_i']
+                )
+            except KeyError:
+                pass
 
             tiles.append(tile)
 
