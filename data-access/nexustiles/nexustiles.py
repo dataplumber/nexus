@@ -2,18 +2,21 @@
 Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
-from functools import wraps
 import ConfigParser
-import pkg_resources
-from StringIO import StringIO
+from datetime import datetime
+from functools import wraps
 
 import numpy as np
 import numpy.ma as ma
+import pkg_resources
+from pytz import timezone
+from shapely.geometry import MultiPolygon, box
 
 from dao.CassandraProxy import CassandraProxy
 from dao.SolrProxy import SolrProxy
 from model.nexusmodel import Tile, BBox, TileStats
-from shapely.geometry import MultiPolygon, box
+
+EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
 
 
 def tile_data(default_fetch=True):
@@ -130,11 +133,30 @@ class NexusTileService(object):
         :param tile_ids: List of tile ids
         :return: shapely.geometry.Polygon that represents the smallest bounding box that encompasses all of the tiles
         """
-        tiles = self.find_tiles_by_id(tile_ids, fetch_data=False, rows=len(tile_ids))
+        tiles = self.find_tiles_by_id(tile_ids, fl=['tile_min_lat', 'tile_max_lat', 'tile_min_lon', 'tile_max_lon'],
+                                      fetch_data=False, rows=len(tile_ids))
         polys = []
         for tile in tiles:
             polys.append(box(tile.bbox.min_lon, tile.bbox.min_lat, tile.bbox.max_lon, tile.bbox.max_lat))
         return box(*MultiPolygon(polys).bounds)
+
+    def get_min_time(self, tile_ids):
+        """
+        Get the minimum tile date from the list of tile ids
+        :param tile_ids: List of tile ids
+        :return: long time in seconds since epoch
+        """
+        min_time = self._solr.find_min_date_from_tiles(tile_ids)
+        return long((min_time - EPOCH).total_seconds())
+
+    def get_max_time(self, tile_ids):
+        """
+        Get the maximum tile date from the list of tile ids
+        :param tile_ids: List of tile ids
+        :return: long time in seconds since epoch
+        """
+        max_time = self._solr.find_max_date_from_tiles(tile_ids)
+        return long((max_time - EPOCH).total_seconds())
 
     def mask_tiles_to_bbox(self, min_lat, max_lat, min_lon, max_lon, tiles):
 

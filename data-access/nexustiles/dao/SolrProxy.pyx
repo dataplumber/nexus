@@ -46,6 +46,50 @@ class SolrProxy(object):
         assert len(results) == len(tile_ids), "Found %s results, expected exactly %s" % (len(results), len(tile_ids))
         return results
 
+    def find_min_date_from_tiles(self, tile_ids, ds=None, **kwargs):
+
+        if ds is not None:
+            search = 'dataset_s:%s' % ds
+        else:
+            search = '*:*'
+
+        kwargs['rows'] = 1
+        kwargs['fl'] = 'tile_min_time_dt'
+        kwargs['sort'] = ['tile_min_time_dt asc']
+        additionalparams = {
+            'fq': [
+                "{!terms f=id}%s" % ','.join(tile_ids)
+            ]
+        }
+
+        self._merge_kwargs(additionalparams, **kwargs)
+
+        results, start, found = self.do_query(*(search, None, None, True, None), **additionalparams)
+
+        return results[0]['tile_min_time_dt']
+
+    def find_max_date_from_tiles(self, tile_ids, ds=None, **kwargs):
+
+        if ds is not None:
+            search = 'dataset_s:%s' % ds
+        else:
+            search = '*:*'
+
+        kwargs['rows'] = 1
+        kwargs['fl'] = 'tile_max_time_dt'
+        kwargs['sort'] = ['tile_max_time_dt desc']
+        additionalparams = {
+            'fq': [
+                "{!terms f=id}%s" % ','.join(tile_ids)
+            ]
+        }
+
+        self._merge_kwargs(additionalparams, **kwargs)
+
+        results, start, found = self.do_query(*(search, None, None, True, None), **additionalparams)
+
+        return results[0]['tile_max_time_dt']
+
     def get_data_series_list(self):
         search = "*:*"
         params = {
