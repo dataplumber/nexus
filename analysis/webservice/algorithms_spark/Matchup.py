@@ -344,6 +344,7 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
     # Configure Spark
     sp_conf = SparkConf()
     sp_conf.setAppName("Spark Matchup")
+    sp_conf.setMaster("local[1]")
 
     try:
         sc = SparkContext(conf=sp_conf)
@@ -406,7 +407,63 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
     from nexustiles.model.nexusmodel import NexusPoint
 
     tile_service = NexusTileService()
+
+    # Query edge for all points in the current partition of tiles
+    tile_ids = list(tile_ids)
+    tiles_bbox = tile_service.get_bounding_box(tile_ids)
+    tiles_min_time = tile_service.get_min_time(tile_ids)
+    tiles_max_time = tile_service.get_max_time(tile_ids)
+
+    # TODO rt_b is in meters. Need to figure out how to increase lat/lon bbox by meters
+    matchup_min_lon = tiles_bbox.bounds[0]  # - rt_b.value
+    matchup_min_lat = tiles_bbox.bounds[1]  # - rt_b.value
+    matchup_max_lon = tiles_bbox.bounds[2]  # + rt_b.value
+    matchup_max_lat = tiles_bbox.bounds[3]  # + rt_b.value
+
+    # TODO in situ points are no longer guaranteed to be within the tolerance window for an individual tile. Add filter?
+    matchup_min_time = tiles_min_time - tt_b.value
+    matchup_max_time = tiles_max_time + tt_b.value
+
+    # Query edge for points
+    the_time = datetime.now()
     edge_session = requests.Session()
+    edge_results = []
+    with edge_session:
+        for insitudata_name in matchup_b.value.split(','):
+            bbox = ','.join(
+                [str(matchup_min_lon), str(matchup_min_lat), str(matchup_max_lon), str(matchup_max_lat)])
+            edge_response = query_edge(insitudata_name, matchup_min_time, matchup_max_time, bbox, dt_b.value,
+                                       platforms_b.value, session=edge_session)
+            if edge_response['totalResults'] == 0:
+                continue
+            r = edge_response['results']
+            for p in r:
+                p['source'] = insitudata_name
+            edge_results.extend(r)
+    print "%s Time to call edge for partition %s to %s" % (str(datetime.now() - the_time), tile_ids[0], tile_ids[-1])
+    if len(edge_results) == 0:
+        return []
+
+    # Convert edge points to utm
+    the_time = datetime.now()
+    matchup_points = []
+    for edge_point in edge_results:
+        try:
+            x, y = wkt.loads(edge_point['point']).coords[0]
+        except ReadingError:
+            try:
+                x, y = Point(*[float(c) for c in edge_point['point'].split(' ')]).coords[0]
+            except ValueError:
+                y, x = Point(*[float(c) for c in edge_point['point'].split(',')]).coords[0]
+
+        matchup_points.append(utm.from_latlon(y, x)[0:2])
+    print "%s Time to convert match points for partition %s to %s" % (
+        str(datetime.now() - the_time), tile_ids[0], tile_ids[-1])
+
+    # Build kdtree from matchup points
+    the_time = datetime.now()
+    m_tree = spatial.cKDTree(matchup_points, leafsize=30)
+    print "%s Time to build matchup tree" % (str(datetime.now() - the_time))
 
     match_generators = []
     with edge_session:
@@ -421,37 +478,6 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
                 # This should only happen if all measurements in a tile become masked after applying the bounding polygon
                 continue
 
-            # Get tile bounding lat/lon and time, expand lat/lon and time by tolerance
-            # TODO rt_b is in meters. Need to figure out how to increase lat/lon bbox by meters
-            easting, northing, zone_number, zone_letter = utm.from_latlon(tile.bbox.min_lat, tile.bbox.min_lon)
-            matchup_min_lon = tile.bbox.min_lon  # - rt_b.value
-            matchup_min_lat = tile.bbox.min_lat  # - rt_b.value
-            matchup_max_lon = tile.bbox.max_lon  # + rt_b.value
-            matchup_max_lat = tile.bbox.max_lat  # + rt_b.value
-
-            matchup_min_time = (tile.min_time - datetime.utcfromtimestamp(0).replace(
-                tzinfo=UTC)).total_seconds() - tt_b.value
-            matchup_max_time = (tile.max_time - datetime.utcfromtimestamp(0).replace(
-                tzinfo=UTC)).total_seconds() + tt_b.value
-
-            # Query edge for points
-            the_time = datetime.now()
-            edge_results = []
-            for insitudata_name in matchup_b.value.split(','):
-                bbox = ','.join(
-                    [str(matchup_min_lon), str(matchup_min_lat), str(matchup_max_lon), str(matchup_max_lat)])
-                edge_response = query_edge(insitudata_name, matchup_min_time, matchup_max_time, bbox, dt_b.value,
-                                           platforms_b.value, session=edge_session)
-                if edge_response['totalResults'] == 0:
-                    continue
-                r = edge_response['results']
-                for p in r:
-                    p['source'] = insitudata_name
-                edge_results.extend(r)
-            print "%s Time to call edge for tile %s" % (str(datetime.now() - the_time), tile_id)
-            if len(edge_results) == 0:
-                continue
-
             # Convert tile measurements to DomsPoints
             the_time = datetime.now()
             # Get list of indecies of valid values
@@ -461,25 +487,15 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
 
             print "%s Time to convert primary points for tile %s" % (str(datetime.now() - the_time), tile_id)
 
-            # Convert edge points to DomsPoints
-            the_time = datetime.now()
-            matchup_points = []
-            for edge_point in edge_results:
-                try:
-                    x, y = wkt.loads(edge_point['point']).coords[0]
-                except ReadingError:
-                    try:
-                        x, y = Point(*[float(c) for c in edge_point['point'].split(' ')]).coords[0]
-                    except ValueError:
-                        y, x = Point(*[float(c) for c in edge_point['point'].split(',')]).coords[0]
-
-                matchup_points.append(utm.from_latlon(y, x)[0:2])
-
-            print "%s Time to convert match points for tile %s" % (str(datetime.now() - the_time), tile_id)
-
             # call match_points
             def yield_doms_points():
-                matched_indexes = match_utm_points(primary_points, matchup_points, rt_b.value)
+                a_time = datetime.now()
+                p_tree = spatial.cKDTree(primary_points, leafsize=30)
+                print "%s Time to build primary tree" % (str(datetime.now() - a_time))
+
+                a_time = datetime.now()
+                matched_indexes = p_tree.query_ball_tree(m_tree, rt_b.value)
+                print "%s Time to query primary tree" % (str(datetime.now() - a_time))
                 for i, point_matches in enumerate(matched_indexes):
                     if len(point_matches) > 0:
                         p_nexus_point = NexusPoint(tile.latitudes[valid_indices[i][1]],
