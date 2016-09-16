@@ -13,16 +13,18 @@ import numpy.ma as ma
 from dao.CassandraProxy import CassandraProxy
 from dao.SolrProxy import SolrProxy
 from model.nexusmodel import Tile, BBox, TileStats
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPolygon, box
 
 
 def tile_data(default_fetch=True):
     def tile_data_decorator(func):
         @wraps(func)
         def fetch_data_for_func(*args, **kwargs):
-            if ('fetch_data' not in kwargs and default_fetch == False) or (
-                            'fetch_data' in kwargs and kwargs['fetch_data'] == False):
-                return func(*args, **kwargs)
+            if ('fetch_data' not in kwargs and not default_fetch) or (
+                            'fetch_data' in kwargs and not kwargs['fetch_data']):
+                solr_docs = func(*args, **kwargs)
+                tiles = args[0]._solr_docs_to_tiles(*solr_docs)
+                return tiles
             else:
                 solr_docs = func(*args, **kwargs)
                 tiles = args[0]._solr_docs_to_tiles(*solr_docs)
@@ -57,6 +59,10 @@ class NexusTileService(object):
     def find_tile_by_id(self, tile_id, **kwargs):
         return self._solr.find_tile_by_id(tile_id)
 
+    @tile_data()
+    def find_tiles_by_id(self, tile_ids, ds=None, **kwargs):
+        return self._solr.find_tiles_by_id(tile_ids, ds=ds, **kwargs)
+
     def find_days_in_range_asc(self, min_lat, max_lat, min_lon, max_lon, dataset, start_time, end_time, **kwargs):
         return self._solr.find_days_in_range_asc(min_lat, max_lat, min_lon, max_lon, dataset, start_time, end_time,
                                                  **kwargs)
@@ -81,7 +87,12 @@ class NexusTileService(object):
     @tile_data()
     def find_tiles_in_polygon(self, bounding_polygon, ds=None, start_time=0, end_time=-1, **kwargs):
         # Find tiles that fall within the polygon in the Solr index
-        return self._solr.find_all_tiles_in_polygon_sorttimeasc(bounding_polygon, ds, start_time, end_time, **kwargs)
+        if 'sort' in kwargs.keys():
+            tiles = self._solr.find_all_tiles_in_polygon(bounding_polygon, ds, start_time, end_time, **kwargs)
+        else:
+            tiles = self._solr.find_all_tiles_in_polygon_sorttimeasc(bounding_polygon, ds, start_time, end_time,
+                                                                     **kwargs)
+        return tiles
 
     @tile_data()
     def find_all_boundary_tiles_at_time(self, min_lat, max_lat, min_lon, max_lon, dataset, time, **kwargs):
@@ -112,6 +123,18 @@ class NexusTileService(object):
                                                              **kwargs)
 
         return tiles
+
+    def get_bounding_box(self, tile_ids):
+        """
+        Retrieve a bounding box that encompasses all of the tiles represented by the given tile ids.
+        :param tile_ids: List of tile ids
+        :return: shapely.geometry.Polygon that represents the smallest bounding box that encompasses all of the tiles
+        """
+        tiles = self.find_tiles_by_id(tile_ids, fetch_data=False, rows=len(tile_ids))
+        polys = []
+        for tile in tiles:
+            polys.append(box(tile.bbox.min_lon, tile.bbox.min_lat, tile.bbox.max_lon, tile.bbox.max_lat))
+        return box(*MultiPolygon(polys).bounds)
 
     def mask_tiles_to_bbox(self, min_lat, max_lat, min_lon, max_lon, tiles):
 
@@ -177,20 +200,55 @@ class NexusTileService(object):
         tiles = []
         for solr_doc in solr_docs:
             tile = Tile()
-            tile.tile_id = solr_doc['id']
-            tile.bbox = BBox(
-                solr_doc['tile_min_lat'], solr_doc['tile_max_lat'],
-                solr_doc['tile_min_lon'], solr_doc['tile_max_lon'])
-            tile.dataset = solr_doc['dataset_s']
-            # tile.dataset_id = solr_doc['dataset_id_s']
-            tile.granule = solr_doc['granule_s']
-            tile.min_time = solr_doc['tile_min_time_dt']
-            tile.max_time = solr_doc['tile_max_time_dt']
-            tile.section_spec = solr_doc['sectionSpec_s']
-            tile.tile_stats = TileStats(
-                solr_doc['tile_min_val_d'], solr_doc['tile_max_val_d'],
-                solr_doc['tile_avg_val_d'], solr_doc['tile_count_i']
-            )
+            try:
+                tile.tile_id = solr_doc['id']
+            except KeyError:
+                pass
+
+            try:
+                tile.bbox = BBox(
+                    solr_doc['tile_min_lat'], solr_doc['tile_max_lat'],
+                    solr_doc['tile_min_lon'], solr_doc['tile_max_lon'])
+            except KeyError:
+                pass
+
+            try:
+                tile.dataset = solr_doc['dataset_s']
+            except KeyError:
+                pass
+
+            try:
+                tile.dataset_id = solr_doc['dataset_id_s']
+            except KeyError:
+                pass
+
+            try:
+                tile.granule = solr_doc['granule_s']
+            except KeyError:
+                pass
+
+            try:
+                tile.min_time = solr_doc['tile_min_time_dt']
+            except KeyError:
+                pass
+
+            try:
+                tile.max_time = solr_doc['tile_max_time_dt']
+            except KeyError:
+                pass
+
+            try:
+                tile.section_spec = solr_doc['sectionSpec_s']
+            except KeyError:
+                pass
+
+            try:
+                tile.tile_stats = TileStats(
+                    solr_doc['tile_min_val_d'], solr_doc['tile_max_val_d'],
+                    solr_doc['tile_avg_val_d'], solr_doc['tile_count_i']
+                )
+            except KeyError:
+                pass
 
             tiles.append(tile)
 

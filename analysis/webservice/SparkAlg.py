@@ -101,14 +101,14 @@ class SparkAlg(NexusHandler):
         print 'trying query: ',min_lat, max_lat, min_lon, max_lon, \
             dataset, start_time, end_time
         try:
-            solr_docs = \
+            tiles = \
                 tile_service.find_tiles_in_box(min_lat, max_lat, 
                                                min_lon, max_lon, 
                                                dataset, 
                                                start_time=start_time, 
                                                end_time=end_time,
                                                fetch_data=False)
-            assert(len(solr_docs) <= nexus_max_tiles_per_query)
+            assert(len(tiles) <= nexus_max_tiles_per_query)
         except:
             print 'failed query: ',min_lat, max_lat, min_lon, max_lon, \
                 dataset, start_time, end_time
@@ -163,12 +163,11 @@ class SparkAlg(NexusHandler):
         else:
             # No exception, so query Cassandra for the tile data.
             print 'Making NEXUS query to Cassandra for %d tiles...' % \
-                len(solr_docs)
+                len(tiles)
             t1 = time()
             print 'NEXUS call start at time %f' % t1
             sys.stdout.flush()
-            solr_tiles = tile_service._solr_docs_to_tiles(*solr_docs)
-            nexus_tiles = tile_service.fetch_data_for_tiles(*solr_tiles)
+            nexus_tiles = tile_service.fetch_data_for_tiles(*tiles)
             nexus_tiles = tile_service.mask_tiles_to_bbox(min_lat, max_lat,
                                                           min_lon, max_lon,
                                                           nexus_tiles)

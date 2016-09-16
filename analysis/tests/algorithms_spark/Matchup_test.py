@@ -244,7 +244,7 @@ class TestMatchup(unittest.TestCase):
         platforms = "1,2,3,4,5,6,7,8,9"
 
         tile_service = NexusTileService()
-        tile_ids = [tile['id'] for tile in
+        tile_ids = [tile.tile_id for tile in
                     tile_service.find_tiles_in_polygon(polygon, primary_ds, start_time, end_time, fetch_data=False,
                                                        fl='id')]
         result = spark_matchup_driver(tile_ids, wkt.dumps(polygon), primary_ds, matchup_ds, parameter, time_tolerance,
@@ -271,7 +271,7 @@ class TestMatchup(unittest.TestCase):
         platforms = "1,2,3,4,5,6,7,8,9"
 
         tile_service = NexusTileService()
-        tile_ids = [tile['id'] for tile in
+        tile_ids = [tile.tile_id for tile in
                     tile_service.find_tiles_in_polygon(polygon, primary_ds, start_time, end_time, fetch_data=False,
                                                        fl='id')]
         result = spark_matchup_driver(tile_ids, wkt.dumps(polygon), primary_ds, matchup_ds, parameter, time_tolerance,
@@ -298,7 +298,7 @@ class TestMatchup(unittest.TestCase):
         platforms = "1,2,3,4,5,6,7,8,9"
 
         tile_service = NexusTileService()
-        tile_ids = [tile['id'] for tile in
+        tile_ids = [tile.tile_id for tile in
                     tile_service.find_tiles_in_polygon(polygon, primary_ds, start_time, end_time, fetch_data=False,
                                                        fl='id')]
         result = spark_matchup_driver(tile_ids, wkt.dumps(polygon), primary_ds, matchup_ds, parameter, time_tolerance,

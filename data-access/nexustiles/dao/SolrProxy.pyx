@@ -26,6 +26,26 @@ class SolrProxy(object):
         assert len(results) == 1, "Found %s results, expected exactly 1" % len(results)
         return [results[0]]
 
+    def find_tiles_by_id(self, tile_ids, ds=None, **kwargs):
+
+        if ds is not None:
+            search = 'dataset_s:%s' % ds
+        else:
+            search = '*:*'
+
+        additionalparams = {
+            'fq': [
+                "{!terms f=id}%s" % ','.join(tile_ids)
+            ]
+        }
+
+        self._merge_kwargs(additionalparams, **kwargs)
+
+        results = self.do_query_all(*(search, None, None, False, None), **additionalparams)
+
+        assert len(results) == len(tile_ids), "Found %s results, expected exactly %s" % (len(results), len(tile_ids))
+        return results
+
     def get_data_series_list(self):
         search = "*:*"
         params = {
@@ -52,7 +72,6 @@ class SolrProxy(object):
         l = sorted(l, key=lambda entry: entry["title"])
         return l
 
-
     def get_data_series_list_simple(self):
         search = "*:*"
         params = {
@@ -64,7 +83,7 @@ class SolrProxy(object):
         l = []
         for g in response.facet_counts["facet_fields"]["dataset_s"]:
             l.append({
-                "shortName":g,
+                "shortName": g,
                 "title": g
             })
         l = sorted(l, key=lambda entry: entry["title"])
@@ -184,6 +203,38 @@ class SolrProxy(object):
             *(search, None, None, False, 'tile_min_time_dt asc, tile_max_time_dt asc'),
             **additionalparams)
 
+    def find_all_tiles_in_polygon(self, bounding_polygon, ds, start_time=0, end_time=-1, **kwargs):
+
+        search = 'dataset_s:%s' % ds
+
+        additionalparams = {
+            'fq': [
+                "{!field f=geo}Intersects(%s)" % bounding_polygon.wkt,
+                "tile_count_i:[1 TO *]"
+            ]
+        }
+
+        if 0 < start_time <= end_time:
+            search_start_s = datetime.utcfromtimestamp(start_time).strftime('%Y-%m-%dT%H:%M:%SZ')
+            search_end_s = datetime.utcfromtimestamp(end_time).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+            time_clause = "(" \
+                          "tile_min_time_dt:[%s TO %s] " \
+                          "OR tile_max_time_dt:[%s TO %s] " \
+                          "OR (tile_min_time_dt:[* TO %s] AND tile_max_time_dt:[%s TO *])" \
+                          ")" % (
+                              search_start_s, search_end_s,
+                              search_start_s, search_end_s,
+                              search_start_s, search_end_s
+                          )
+            additionalparams['fq'].append(time_clause)
+
+        self._merge_kwargs(additionalparams, **kwargs)
+
+        return self.do_query_all(
+            *(search, None, None, False, None),
+            **additionalparams)
+
     def find_all_tiles_in_box_at_time(self, min_lat, max_lat, min_lon, max_lon, ds, time, **kwargs):
         search = 'dataset_s:%s' % ds
 
@@ -268,11 +319,18 @@ class SolrProxy(object):
         # fl only works when passed as the second argument to solrcon.select
         try:
             fl = params['fl']
-            del(params['fl'])
+            del (params['fl'])
         except KeyError:
-            fl = None
+            fl = args[1]
 
-        args = (args[0],) + (fl,) + (args[2:])
+        # sort only works when passed as the fourth argument to solrcon.select
+        try:
+            s = ','.join(params['sort'])
+            del (params['sort'])
+        except KeyError:
+            s = args[4]
+
+        args = (args[0],) + (fl,) + (args[2:4]) + (s,)
 
         response = self.solrcon.select(*args, **params)
 
@@ -280,22 +338,14 @@ class SolrProxy(object):
 
     def do_query_all(self, *args, **params):
 
-        # fl only works when passed as the second argument to solrcon.select
-        try:
-            fl = params['fl']
-            del(params['fl'])
-        except KeyError:
-            fl = None
-
-        args = (args[0],) + (fl,) + (args[2:])
-
         results = []
-        response = self.solrcon.select(*args, **params)
+
+        response = self.do_query_raw(*args, **params)
         results.extend(response.results)
 
         while len(results) < response.numFound:
             params['start'] = len(results)
-            response = self.solrcon.select(*args, **params)
+            response = self.do_query_raw(*args, **params)
             results.extend(response.results)
 
         assert len(results) == response.numFound
@@ -334,3 +384,13 @@ class SolrProxy(object):
             additionalparams['fl'].extend(kwfl)
         except KeyError:
             additionalparams['fl'] = kwfl
+
+        try:
+            s = kwargs['sort'] if isinstance(kwargs['sort'], list) else [kwargs['sort']]
+        except KeyError:
+            s = []
+
+        try:
+            additionalparams['sort'].extend(s)
+        except KeyError:
+            additionalparams['sort'] = s

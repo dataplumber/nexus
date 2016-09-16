@@ -39,12 +39,30 @@ class Tile(object):
     def get_summary(self):
         summary = self.__dict__
 
-        summary['latitudes'] = self.latitudes.shape
-        summary['longitudes'] = self.longitudes.shape
-        summary['times'] = self.times.shape
-        summary['data'] = self.data.shape
+        try:
+            summary['latitudes'] = self.latitudes.shape
+        except AttributeError:
+            summary['latitudes'] = 'None'
 
-        summary['meta_data'] = {meta_name: meta_array.shape for meta_name, meta_array in self.meta_data.iteritems()}
+        try:
+            summary['longitudes'] = self.longitudes.shape
+        except AttributeError:
+            summary['longitudes'] = 'None'
+
+        try:
+            summary['times'] = self.times.shape
+        except AttributeError:
+            summary['times'] = 'None'
+
+        try:
+            summary['data'] = self.data.shape
+        except AttributeError:
+            summary['data'] = 'None'
+
+        try:
+            summary['meta_data'] = {meta_name: meta_array.shape for meta_name, meta_array in self.meta_data.iteritems()}
+        except AttributeError:
+            summary['meta_data'] = 'None'
 
         return summary
 
