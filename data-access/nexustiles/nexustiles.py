@@ -13,7 +13,7 @@ import numpy.ma as ma
 from dao.CassandraProxy import CassandraProxy
 from dao.SolrProxy import SolrProxy
 from model.nexusmodel import Tile, BBox, TileStats
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPolygon, box
 
 
 def tile_data(default_fetch=True):
@@ -124,13 +124,17 @@ class NexusTileService(object):
 
         return tiles
 
-    def get_bounding_box(self, *tile_ids):
+    def get_bounding_box(self, tile_ids):
         """
         Retrieve a bounding box that encompasses all of the tiles represented by the given tile ids.
         :param tile_ids: List of tile ids
         :return: shapely.geometry.Polygon that represents the smallest bounding box that encompasses all of the tiles
         """
-        pass
+        tiles = self.find_tiles_by_id(tile_ids, fetch_data=False, rows=len(tile_ids))
+        polys = []
+        for tile in tiles:
+            polys.append(box(tile.bbox.min_lon, tile.bbox.min_lat, tile.bbox.max_lon, tile.bbox.max_lat))
+        return box(*MultiPolygon(polys).bounds)
 
     def mask_tiles_to_bbox(self, min_lat, max_lat, min_lon, max_lon, tiles):
 
