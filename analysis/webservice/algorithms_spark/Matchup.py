@@ -344,7 +344,6 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
     # Configure Spark
     sp_conf = SparkConf()
     sp_conf.setAppName("Spark Matchup")
-    sp_conf.setMaster("local[1]")
 
     try:
         sc = SparkContext(conf=sp_conf)
