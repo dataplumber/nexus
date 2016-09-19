@@ -10,7 +10,6 @@ import numpy as np
 import requests
 import utm
 import logging
-from nexustiles.nexustiles import NexusTileService
 from pyspark import SparkContext, SparkConf
 from pytz import timezone, UTC
 from scipy import spatial
@@ -135,13 +134,16 @@ class Matchup(NexusHandler):
         tile_ids = [tile.tile_id for tile in
                     self._tile_service.find_tiles_in_polygon(bounding_polygon, primary_ds_name,
                                                              start_seconds_from_epoch, end_seconds_from_epoch,
-                                                             fetch_data=False, fl='id')]
+                                                             fetch_data=False, fl='id',
+                                                             sort=['tile_min_time_dt asc', 'tile_min_lon asc',
+                                                                   'tile_min_lat asc'], rows=5000)]
 
         self.log.debug("Calling Spark Driver")
         # Call spark_matchup
-        spark_result = spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name, matchup_ds_names,
-                                            parameter_s, time_tolerance, depth_tolerance, radius_tolerance, platforms)
-
+        spark_result = spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name,
+                                            matchup_ds_names,
+                                            parameter_s, time_tolerance, depth_tolerance, radius_tolerance,
+                                            platforms)
         end = int(round(time.time() * 1000))
 
         self.log.debug("Building and saving results")
@@ -349,7 +351,7 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
                                        code=503)
 
     # TODO Better handling of the Spark context. Do we really need to create/shutdown on every request?
-    try:
+    with sc:
         # Broadcast parameters
         primary_b = sc.broadcast(primary_ds_name)
         matchup_b = sc.broadcast(matchup_ds_names)
@@ -373,81 +375,140 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
                           lambda value_list, value: value_list + [value],  # Add 1 element to list
                           lambda value_list_a, value_list_b: value_list_a + value_list_b)  # Add two lists together
         result_as_map = rdd.collectAsMap()
-    finally:
-        sc.stop()
+
     return result_as_map
+
+
+def spark_matchup_driver_2(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_names, parameter, time_tolerance,
+                           depth_tolerance, radius_tolerance, platforms):
+    # Query for count of insitu points in search domain from each matchup source
+    # Parallelize range from 0 to in situ count step size = page size
+    # Map int from range -> (cKDTree of edge points, list of edge points in tree)
+    # Cache rdd
+
+    # Query for tile ids in search domain
+    # parallelize tile ids
+    # map tile id -> (cKDTree of tile, tile)
+
+    pass
 
 
 def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b, dt_b, rt_b, platforms_b,
                               bounding_wkt_b):
     from itertools import chain
     from datetime import datetime
-    from pytz import UTC
-    from webservice.algorithms_spark.Matchup import DomsPoint  # Must import DomsPoint or Spark complains
+    from shapely.geos import ReadingError
+    from shapely import wkt
+    from nexustiles.nexustiles import NexusTileService
 
+    tile_ids = list(tile_ids)
+    if len(tile_ids) == 0:
+        return []
     tile_service = NexusTileService()
+
+    # Query edge for all points in the current partition of tiles
+    tiles_bbox = tile_service.get_bounding_box(tile_ids)
+    tiles_min_time = tile_service.get_min_time(tile_ids)
+    tiles_max_time = tile_service.get_max_time(tile_ids)
+
+    # TODO rt_b is in meters. Need to figure out how to increase lat/lon bbox by meters
+    matchup_min_lon = tiles_bbox.bounds[0]  # - rt_b.value
+    matchup_min_lat = tiles_bbox.bounds[1]  # - rt_b.value
+    matchup_max_lon = tiles_bbox.bounds[2]  # + rt_b.value
+    matchup_max_lat = tiles_bbox.bounds[3]  # + rt_b.value
+
+    # TODO in situ points are no longer guaranteed to be within the tolerance window for an individual tile. Add filter?
+    matchup_min_time = tiles_min_time - tt_b.value
+    matchup_max_time = tiles_max_time + tt_b.value
+
+    # Query edge for points
+    the_time = datetime.now()
     edge_session = requests.Session()
-
-    match_generators = []
+    edge_results = []
     with edge_session:
-        for tile_id in tile_ids:
-            # Load tile
+        for insitudata_name in matchup_b.value.split(','):
+            bbox = ','.join(
+                [str(matchup_min_lon), str(matchup_min_lat), str(matchup_max_lon), str(matchup_max_lat)])
+            edge_response = query_edge(insitudata_name, matchup_min_time, matchup_max_time, bbox, dt_b.value,
+                                       platforms_b.value, session=edge_session)
+            if edge_response['totalResults'] == 0:
+                continue
+            r = edge_response['results']
+            for p in r:
+                p['source'] = insitudata_name
+            edge_results.extend(r)
+    print "%s Time to call edge for partition %s to %s" % (str(datetime.now() - the_time), tile_ids[0], tile_ids[-1])
+    if len(edge_results) == 0:
+        return []
+
+    # Convert edge points to utm
+    the_time = datetime.now()
+    matchup_points = []
+    for edge_point in edge_results:
+        try:
+            x, y = wkt.loads(edge_point['point']).coords[0]
+        except ReadingError:
             try:
-                the_time = datetime.now()
-                tile = tile_service.mask_tiles_to_polygon(wkt.loads(bounding_wkt_b.value),
-                                                          tile_service.find_tile_by_id(tile_id))[0]
-                print "%s Time to load tile %s" % (str(datetime.now() - the_time), tile_id)
-            except IndexError:
-                # This should only happen if all measurements in a tile become masked after applying the bounding polygon
-                continue
+                x, y = Point(*[float(c) for c in edge_point['point'].split(' ')]).coords[0]
+            except ValueError:
+                y, x = Point(*[float(c) for c in edge_point['point'].split(',')]).coords[0]
 
-            # Get tile bounding lat/lon and time, expand lat/lon and time by tolerance
-            # TODO rt_b is in meters. Need to figure out how to increase lat/lon bbox by meters
-            easting, northing, zone_number, zone_letter = utm.from_latlon(tile.bbox.min_lat, tile.bbox.min_lon)
-            matchup_min_lon = tile.bbox.min_lon  # - rt_b.value
-            matchup_min_lat = tile.bbox.min_lat  # - rt_b.value
-            matchup_max_lon = tile.bbox.max_lon  # + rt_b.value
-            matchup_max_lat = tile.bbox.max_lat  # + rt_b.value
+        matchup_points.append(utm.from_latlon(y, x)[0:2])
+    print "%s Time to convert match points for partition %s to %s" % (
+        str(datetime.now() - the_time), tile_ids[0], tile_ids[-1])
 
-            matchup_min_time = (tile.min_time - datetime.utcfromtimestamp(0).replace(
-                tzinfo=UTC)).total_seconds() - tt_b.value
-            matchup_max_time = (tile.max_time - datetime.utcfromtimestamp(0).replace(
-                tzinfo=UTC)).total_seconds() + tt_b.value
+    # Build kdtree from matchup points
+    the_time = datetime.now()
+    m_tree = spatial.cKDTree(matchup_points, leafsize=30)
+    print "%s Time to build matchup tree" % (str(datetime.now() - the_time))
 
-            # Query edge for points
-            the_time = datetime.now()
-            edge_results = []
-            for insitudata_name in matchup_b.value.split(','):
-                bbox = ','.join(
-                    [str(matchup_min_lon), str(matchup_min_lat), str(matchup_max_lon), str(matchup_max_lat)])
-                edge_response = query_edge(insitudata_name, matchup_min_time, matchup_max_time, bbox, dt_b.value,
-                                           platforms_b.value, session=edge_session)
-                if edge_response['totalResults'] == 0:
-                    continue
-                r = edge_response['results']
-                for p in r:
-                    p['source'] = insitudata_name
-                edge_results.extend(r)
-            print "%s Time to call edge for tile %s" % (str(datetime.now() - the_time), tile_id)
-            if len(edge_results) == 0:
-                continue
-
-            # Convert tile measurements to DomsPoints
-            the_time = datetime.now()
-            nexus_doms_points = [DomsPoint.from_nexus_point(value, tile=tile, parameter=parameter_b.value)
-                                 for
-                                 value in tile.nexus_point_generator()]
-            print "%s Time to convert primary points for tile %s" % (str(datetime.now() - the_time), tile_id)
-
-            # Convert edge points to DomsPoints
-            the_time = datetime.now()
-            edge_doms_points = [DomsPoint.from_edge_point(value) for value in edge_results]
-            print "%s Time to convert match points for tile %s" % (str(datetime.now() - the_time), tile_id)
-
-            # call match_points
-            match_generators.append(match_points_generator(nexus_doms_points, edge_doms_points, rt_b.value))
+    # The actual matching happens in the generator. This is so that we only load 1 tile into memory at a time
+    match_generators = [match_tile_to_point_generator(tile_service, tile_id, m_tree, edge_results, bounding_wkt_b.value,
+                                                      parameter_b.value, rt_b.value) for tile_id in tile_ids]
 
     return chain(*match_generators)
+
+
+def match_tile_to_point_generator(tile_service, tile_id, m_tree, edge_results, search_domain_bounding_wkt,
+                                  search_parameter, radius_tolerance):
+    from nexustiles.model.nexusmodel import NexusPoint
+    from webservice.algorithms_spark.Matchup import DomsPoint  # Must import DomsPoint or Spark complains
+
+    # Load tile
+    try:
+        the_time = datetime.now()
+        tile = tile_service.mask_tiles_to_polygon(wkt.loads(search_domain_bounding_wkt),
+                                                  tile_service.find_tile_by_id(tile_id))[0]
+        print "%s Time to load tile %s" % (str(datetime.now() - the_time), tile_id)
+    except IndexError:
+        # This should only happen if all measurements in a tile become masked after applying the bounding polygon
+        raise StopIteration
+
+    # Convert valid tile lat,lon tuples to UTM tuples
+    the_time = datetime.now()
+    # Get list of indices of valid values
+    valid_indices = tile.get_indices()
+    primary_points = np.array([utm.from_latlon(tile.latitudes[aslice[1]], tile.longitudes[aslice[2]])[0:2] for
+                               aslice in valid_indices])
+    print "%s Time to convert primary points for tile %s" % (str(datetime.now() - the_time), tile_id)
+
+    a_time = datetime.now()
+    p_tree = spatial.cKDTree(primary_points, leafsize=30)
+    print "%s Time to build primary tree" % (str(datetime.now() - a_time))
+
+    a_time = datetime.now()
+    matched_indexes = p_tree.query_ball_tree(m_tree, radius_tolerance)
+    print "%s Time to query primary tree for tile %s" % (str(datetime.now() - a_time), tile_id)
+    for i, point_matches in enumerate(matched_indexes):
+        if len(point_matches) > 0:
+            p_nexus_point = NexusPoint(tile.latitudes[valid_indices[i][1]],
+                                       tile.longitudes[valid_indices[i][2]], None,
+                                       tile.times[valid_indices[i][0]], valid_indices[i],
+                                       tile.data[tuple(valid_indices[i])])
+            p_doms_point = DomsPoint.from_nexus_point(p_nexus_point, tile=tile, parameter=search_parameter)
+            for m_point_index in point_matches:
+                m_doms_point = DomsPoint.from_edge_point(edge_results[m_point_index])
+                yield p_doms_point, m_doms_point
 
 
 def query_edge(dataset, startTime, endTime, bbox, maxDepth, platform, itemsPerPage=1000, startIndex=0, stats=True,
@@ -492,9 +553,7 @@ def query_edge(dataset, startTime, endTime, bbox, maxDepth, platform, itemsPerPa
 
 
 # primary_points and matchup_points are both a list of DomsPoint
-# Result is a map of DomsPoint to list of DomsPoint
-#   map keys == primary_points
-#   map values == subset of matchup_points that match the primary_point key
+# Yields a tuple of Primary DomsPoint, Matchup DomsPoint. One tuple per match (primary point could be repeated)
 def match_points_generator(primary_points, matchup_points, r_tol):
     import logging
     log = logging.getLogger(__name__)
@@ -521,6 +580,32 @@ def match_points_generator(primary_points, matchup_points, r_tol):
     for i, point_matches in enumerate(matched_indexes):
         for m_point_index in point_matches:
             yield primary_points[i], matchup_points[m_point_index]
+
+
+# primary_points and matchup_points are both a list of (lon, lat) tuples. lon/lat should be in utm.
+# Returns a list of lists. Each index in the outer list corresponds to the index in the input primary_points list.
+#   Each inner list contains index values that correspond to the index in the input matchup_points list of points that
+#   match to the primary point.
+# There will be exactly one entry for every primary_point. But it could contain an empty list, signifying no matches.
+def match_utm_points(primary_points, matchup_points, r_tol):
+    import logging
+    log = logging.getLogger(__name__)
+    log.debug("Building primary tree")
+    the_time = datetime.now()
+    p_tree = spatial.cKDTree(primary_points, leafsize=30)
+    print "%s Time to build primary tree" % (str(datetime.now() - the_time))
+
+    log.debug("Building matchup tree")
+    the_time = datetime.now()
+    m_tree = spatial.cKDTree(matchup_points, leafsize=30)
+    print "%s Time to build matchup tree" % (str(datetime.now() - the_time))
+
+    log.debug("Querying primary tree for all nearest neighbors")
+    the_time = datetime.now()
+    matched_indexes = p_tree.query_ball_tree(m_tree, r_tol)
+    print "%s Time to query primary tree" % (str(datetime.now() - the_time))
+
+    return matched_indexes
 
 
 # primary_points and matchup_points are both a list of DomsPoint

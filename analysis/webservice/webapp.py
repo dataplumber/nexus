@@ -14,7 +14,7 @@ import matplotlib
 import tornado.web
 from tornado.options import define, options, parse_command_line
 
-from webmodel import NexusRequestObject, NexusResults, NexusProcessingException
+from webservice.webmodel import NexusRequestObject, NexusResults, NexusProcessingException
 from webservice import NexusHandler
 import traceback
 
@@ -34,57 +34,6 @@ class BaseHandler(tornado.web.RequestHandler):
 
     def initialize(self):
         self.logger = logging.getLogger('nexus')
-
-    # def __toCSV(self, data):
-    #     data0 = []
-    #     for row in data['data']:
-    #         data0.append(row[0])
-    #
-    #     output = StringIO.StringIO()
-    #     w = csv.DictWriter(output, data0[0].keys(), dialect='excel')
-    #     w.writeheader()
-    #     for row in data0:
-    #         w.writerow(row)
-    #     contents = output.getvalue()
-    #     output.close()
-    #     return contents
-    #
-    # def _formatOutout(self, data, contentType=ContentTypes.JSON):
-    #     if contentType.upper() == ContentTypes.CSV:
-    #         self.set_header("Content-Type", "text/csv")
-    #         return self.__toCSV(data)
-    #     elif contentType.upper() == ContentTypes.JSON:
-    #         self.set_header("Content-Type", "application/json")
-    #         return json.dumps(data, indent=4, cls=CustomEncoder)
-    #
-    # def _extendMeta(self, meta, minLat, maxLat, minLon, maxLon, ds, startTime, endTime):
-    #     if meta is None:
-    #         return None
-    #
-    #     if type(ds) == list and type(meta) == list:
-    #         for i in range(0, len(ds)):
-    #             shortName = ds[i]
-    #             subMeta = meta[i]
-    #             self._extendMeta(subMeta, minLat, maxLat, minLon, maxLon, shortName, startTime, endTime)
-    #
-    #         return meta
-    #     if meta == None:
-    #         meta = {}
-    #
-    #     meta["shortName"] = ds
-    #     if "title" in meta and "units" in meta:
-    #         meta["label"] = "%s (%s)" % (meta["title"], meta["units"])
-    #     meta["bounds"] = {
-    #         "east": maxLon,
-    #         "west": minLon,
-    #         "north": maxLat,
-    #         "south": minLat
-    #     }
-    #     meta["time"] = {
-    #         "start": startTime,
-    #         "stop": endTime
-    #     }
-    #     return meta
 
     @tornado.web.asynchronous
     def get(self):
