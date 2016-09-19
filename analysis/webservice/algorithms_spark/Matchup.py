@@ -405,10 +405,12 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
     from nexustiles.nexustiles import NexusTileService
     from nexustiles.model.nexusmodel import NexusPoint
 
+    tile_ids = list(tile_ids)
+    if len(tile_ids) == 0:
+        return []
     tile_service = NexusTileService()
 
     # Query edge for all points in the current partition of tiles
-    tile_ids = list(tile_ids)
     tiles_bbox = tile_service.get_bounding_box(tile_ids)
     tiles_min_time = tile_service.get_min_time(tile_ids)
     tiles_max_time = tile_service.get_max_time(tile_ids)
