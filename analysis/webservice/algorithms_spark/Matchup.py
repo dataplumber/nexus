@@ -4,7 +4,6 @@ California Institute of Technology.  All rights reserved
 """
 
 import time
-import threading
 from datetime import datetime
 
 import numpy as np
@@ -398,12 +397,9 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
                               bounding_wkt_b):
     from itertools import chain
     from datetime import datetime
-    from pytz import UTC
-    from webservice.algorithms_spark.Matchup import DomsPoint  # Must import DomsPoint or Spark complains
     from shapely.geos import ReadingError
     from shapely import wkt
     from nexustiles.nexustiles import NexusTileService
-    from nexustiles.model.nexusmodel import NexusPoint
 
     tile_ids = list(tile_ids)
     if len(tile_ids) == 0:
@@ -466,51 +462,53 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
     m_tree = spatial.cKDTree(matchup_points, leafsize=30)
     print "%s Time to build matchup tree" % (str(datetime.now() - the_time))
 
-    match_generators = []
-    with edge_session:
-        for tile_id in tile_ids:
-            # Load tile
-            try:
-                the_time = datetime.now()
-                tile = tile_service.mask_tiles_to_polygon(wkt.loads(bounding_wkt_b.value),
-                                                          tile_service.find_tile_by_id(tile_id))[0]
-                print "%s Time to load tile %s" % (str(datetime.now() - the_time), tile_id)
-            except IndexError:
-                # This should only happen if all measurements in a tile become masked after applying the bounding polygon
-                continue
-
-            # Convert tile measurements to DomsPoints
-            the_time = datetime.now()
-            # Get list of indecies of valid values
-            valid_indices = tile.get_indicies()
-            primary_points = [utm.from_latlon(tile.latitudes[aslice[1]], tile.longitudes[aslice[2]])[0:2] for
-                              aslice in valid_indices]
-
-            print "%s Time to convert primary points for tile %s" % (str(datetime.now() - the_time), tile_id)
-
-            # call match_points
-            def yield_doms_points():
-                a_time = datetime.now()
-                p_tree = spatial.cKDTree(primary_points, leafsize=30)
-                print "%s Time to build primary tree" % (str(datetime.now() - a_time))
-
-                a_time = datetime.now()
-                matched_indexes = p_tree.query_ball_tree(m_tree, rt_b.value)
-                print "%s Time to query primary tree" % (str(datetime.now() - a_time))
-                for i, point_matches in enumerate(matched_indexes):
-                    if len(point_matches) > 0:
-                        p_nexus_point = NexusPoint(tile.latitudes[valid_indices[i][1]],
-                                                   tile.longitudes[valid_indices[i][2]], None,
-                                                   tile.times[valid_indices[i][0]], valid_indices[i],
-                                                   tile.data[tuple(valid_indices[i])])
-                        p_doms_point = DomsPoint.from_nexus_point(p_nexus_point, tile=tile, parameter=parameter_b.value)
-                        for m_point_index in point_matches:
-                            m_doms_point = DomsPoint.from_edge_point(edge_results[m_point_index])
-                            yield p_doms_point, m_doms_point
-
-            match_generators.append(yield_doms_points())
+    # The actual matching happens in the generator. This is so that we only load 1 tile into memory at a time
+    match_generators = [match_tile_to_point_generator(tile_service, tile_id, m_tree, edge_results, bounding_wkt_b.value,
+                                                      parameter_b.value, rt_b.value) for tile_id in tile_ids]
 
     return chain(*match_generators)
+
+
+def match_tile_to_point_generator(tile_service, tile_id, m_tree, edge_results, search_domain_bounding_wkt,
+                                  search_parameter, radius_tolerance):
+    from nexustiles.model.nexusmodel import NexusPoint
+    from webservice.algorithms_spark.Matchup import DomsPoint  # Must import DomsPoint or Spark complains
+
+    # Load tile
+    try:
+        the_time = datetime.now()
+        tile = tile_service.mask_tiles_to_polygon(wkt.loads(search_domain_bounding_wkt),
+                                                  tile_service.find_tile_by_id(tile_id))[0]
+        print "%s Time to load tile %s" % (str(datetime.now() - the_time), tile_id)
+    except IndexError:
+        # This should only happen if all measurements in a tile become masked after applying the bounding polygon
+        raise StopIteration
+
+    # Convert valid tile lat,lon tuples to UTM tuples
+    the_time = datetime.now()
+    # Get list of indices of valid values
+    valid_indices = tile.get_indicies()
+    primary_points = np.array([utm.from_latlon(tile.latitudes[aslice[1]], tile.longitudes[aslice[2]])[0:2] for
+                               aslice in valid_indices])
+    print "%s Time to convert primary points for tile %s" % (str(datetime.now() - the_time), tile_id)
+
+    a_time = datetime.now()
+    p_tree = spatial.cKDTree(primary_points, leafsize=30)
+    print "%s Time to build primary tree" % (str(datetime.now() - a_time))
+
+    a_time = datetime.now()
+    matched_indexes = p_tree.query_ball_tree(m_tree, radius_tolerance)
+    print "%s Time to query primary tree for tile %s" % (str(datetime.now() - a_time), tile_id)
+    for i, point_matches in enumerate(matched_indexes):
+        if len(point_matches) > 0:
+            p_nexus_point = NexusPoint(tile.latitudes[valid_indices[i][1]],
+                                       tile.longitudes[valid_indices[i][2]], None,
+                                       tile.times[valid_indices[i][0]], valid_indices[i],
+                                       tile.data[tuple(valid_indices[i])])
+            p_doms_point = DomsPoint.from_nexus_point(p_nexus_point, tile=tile, parameter=search_parameter)
+            for m_point_index in point_matches:
+                m_doms_point = DomsPoint.from_edge_point(edge_results[m_point_index])
+                yield p_doms_point, m_doms_point
 
 
 def query_edge(dataset, startTime, endTime, bbox, maxDepth, platform, itemsPerPage=1000, startIndex=0, stats=True,
