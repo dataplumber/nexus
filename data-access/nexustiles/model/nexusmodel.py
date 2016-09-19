@@ -85,7 +85,7 @@ class Tile(object):
                 point = NexusPoint(lat, lon, None, time, index, data_val)
                 yield point
 
-    def get_indicies(self, include_nan=False):
+    def get_indices(self, include_nan=False):
         if include_nan:
             return list(np.ndindex(self.data.shape))
         else:
