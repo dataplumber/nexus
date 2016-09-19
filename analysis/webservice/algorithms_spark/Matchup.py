@@ -487,7 +487,7 @@ def match_tile_to_point_generator(tile_service, tile_id, m_tree, edge_results, s
     # Convert valid tile lat,lon tuples to UTM tuples
     the_time = datetime.now()
     # Get list of indices of valid values
-    valid_indices = tile.get_indicies()
+    valid_indices = tile.get_indices()
     primary_points = np.array([utm.from_latlon(tile.latitudes[aslice[1]], tile.longitudes[aslice[2]])[0:2] for
                                aslice in valid_indices])
     print "%s Time to convert primary points for tile %s" % (str(datetime.now() - the_time), tile_id)
