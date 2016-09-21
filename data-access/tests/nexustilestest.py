@@ -6,9 +6,7 @@ California Institute of Technology.  All rights reserved
 import pyximport
 pyximport.install()
 
-from nexustiles.nexustiles import NexusTileService
-from nexustiles.model.nexusmodel import get_approximate_value_for_lat_lon
-import numpy as np
+from nexus.data_access import NexusTileService
 
 service = NexusTileService()
 

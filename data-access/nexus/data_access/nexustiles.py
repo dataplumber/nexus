@@ -2,19 +2,17 @@
 Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
-import ConfigParser
 from datetime import datetime
 from functools import wraps
 
 import numpy as np
 import numpy.ma as ma
-import pkg_resources
 from pytz import timezone
 from shapely.geometry import MultiPolygon, box
 
-from dao.CassandraProxy import CassandraProxy
-from dao.SolrProxy import SolrProxy
-from model.nexusmodel import Tile, BBox, TileStats
+from nexus.data_access.dao import CassandraProxy
+from nexus.data_access.dao import SolrProxy
+from nexus.data_access.model import Tile, BBox, TileStats
 
 EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
 
@@ -42,15 +40,12 @@ def tile_data(default_fetch=True):
 
 class NexusTileService(object):
     def __init__(self, skipCassandra=False, skipSolr=False):
-        self._config = ConfigParser.RawConfigParser()
-
-        self._config.readfp(pkg_resources.resource_stream(__name__, "config/datastores.ini"), filename='datastores.ini')
 
         if not skipCassandra:
-            self._cass = CassandraProxy(self._config)
+            self._cass = CassandraProxy()
 
         if not skipSolr:
-            self._solr = SolrProxy(self._config)
+            self._solr = SolrProxy()
 
     def get_dataseries_list(self, simple=False):
         if simple:

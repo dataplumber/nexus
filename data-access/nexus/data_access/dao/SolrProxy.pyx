@@ -1,15 +1,15 @@
 import logging
 import time
 from datetime import datetime
+from nexus.data_access.dao.datastoreconfig import SOLR_HOST, SOLR_CORE
 
 import solr
 
 
 class SolrProxy(object):
-    def __init__(self, config):
-        self.config = config
-        self.solrUrl = config.get("solr", "host")
-        self.solrCore = config.get("solr", "core")
+    def __init__(self):
+        self.solrUrl = SOLR_HOST
+        self.solrCore = SOLR_CORE
         self.logger = logging.getLogger('nexus')
         self.solrcon = solr.Solr('http://%s/solr/%s' % (self.solrUrl, self.solrCore))
 

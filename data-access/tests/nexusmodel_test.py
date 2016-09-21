@@ -4,8 +4,10 @@ California Institute of Technology.  All rights reserved
 """
 
 import unittest
+
 import numpy as np
-from nexustiles.model.nexusmodel import get_approximate_value_for_lat_lon, Tile, BBox
+
+from nexus.data_access.model import get_approximate_value_for_lat_lon, Tile, BBox
 
 
 class TestApproximateValueMethod(unittest.TestCase):

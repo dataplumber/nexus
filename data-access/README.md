@@ -23,7 +23,7 @@ Python module that provides API access to the NEXUS datastores.
 
 ## Code Installation
 
-**NOTE** This project has a dependency on [nexus-messages](https://github.jpl.nasa.gov/thuang/nexus/tree/master/nexus-ingest/nexus-messages). Make sure nexus-messages is installed in the same environment you will be using for this module.
+**NOTE** This project has a dependency on [nexus-messages](https://github.com/dataplumber/nexus/tree/master/nexus-ingest/nexus-messages). Make sure nexus-messages is installed in the same environment you will be using for this module.
 
 1. Setup a separate conda env or activate an existing one
 

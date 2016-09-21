@@ -8,6 +8,8 @@ from cassandra.cqlengine.models import Model
 from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
 from nexusproto.serialization import from_shaped_array
 
+from nexus.data_access.dao.datastoreconfig import CASSANDRA_CONTACT_POINTS, CASSANDRA_KEYSPACE, CASSANDRA_LOCAL_DATACENTER, CASSANDRA_PROTOCOL_VERSION
+
 
 class NexusTileData(Model):
     __table_name__ = 'sea_surface_temp'
@@ -105,12 +107,12 @@ class NexusTileData(Model):
 
 
 class CassandraProxy(object):
-    def __init__(self, config):
-        self.config = config
-        self.__cass_url = config.get("cassandra", "host")
-        self.__cass_keyspace = config.get("cassandra", "keyspace")
-        self.__cass_local_DC = config.get("cassandra", "local_datacenter")
-        self.__cass_protocol_version = int(config.get("cassandra", "protocol_version"))
+    def __init__(self):
+
+        self.__cass_url = CASSANDRA_CONTACT_POINTS
+        self.__cass_keyspace = CASSANDRA_KEYSPACE
+        self.__cass_local_DC = CASSANDRA_LOCAL_DATACENTER
+        self.__cass_protocol_version = int(CASSANDRA_PROTOCOL_VERSION)
         self.__open()
 
     def __open(self):
