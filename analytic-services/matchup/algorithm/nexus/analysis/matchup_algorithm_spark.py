@@ -8,6 +8,14 @@ from shapely.geometry import Point
 from datetime import datetime
 
 
+
+def get_spark_context():
+    # Configure Spark
+    sp_conf = SparkConf()
+    sp_conf.setAppName("Spark Matchup")
+
+    return SparkContext(conf=sp_conf)
+
 class DomsPoint(object):
     def __init__(self, longitude=None, latitude=None, time=None, depth=None, data_id=None):
 
