@@ -22,15 +22,15 @@ class DataInBoundsSearchHandlerImpl(NexusHandler):
     def __init__(self):
         NexusHandler.__init__(self)
 
-    def calc(self, compute_options, **args):
-        min_lat = compute_options.get_min_lat()
-        max_lat = compute_options.get_max_lat()
-        min_lon = compute_options.get_min_lon()
-        max_lon = compute_options.get_max_lon()
-        ds = compute_options.get_dataset()[0]
-        start_time = compute_options.get_start_time()
-        end_time = compute_options.get_end_time()
-        includemeta = compute_options.get_include_meta()
+    def calc(self, computeOptions, **args):
+        min_lat = computeOptions.get_min_lat()
+        max_lat = computeOptions.get_max_lat()
+        min_lon = computeOptions.get_min_lon()
+        max_lon = computeOptions.get_max_lon()
+        ds = computeOptions.get_dataset()[0]
+        start_time = computeOptions.get_start_time()
+        end_time = computeOptions.get_end_time()
+        includemeta = computeOptions.get_include_meta()
 
         tiles = self._tile_service.get_tiles_bounded_by_box(min_lat, max_lat, min_lon, max_lon, ds, start_time,
                                                             end_time)

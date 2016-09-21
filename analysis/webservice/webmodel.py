@@ -267,19 +267,19 @@ class NexusRequestObject(StatsComputeOptions):
 
 
 class NexusResults:
-    def __init__(self, results=None, meta=None, stats=None, compute_options=None, **args):
+    def __init__(self, results=None, meta=None, stats=None, computeOptions=None, **args):
         self.__results = results
         self.__meta = meta if meta is not None else {}
         self.__stats = stats if stats is not None else {}
-        self.__computeOptions = compute_options
-        if compute_options is not None:
-            self.__minLat = compute_options.get_min_lat()
-            self.__maxLat = compute_options.get_max_lat()
-            self.__minLon = compute_options.get_min_lon()
-            self.__maxLon = compute_options.get_max_lon()
-            self.__ds = compute_options.get_dataset()
-            self.__startTime = compute_options.get_start_time()
-            self.__endTime = compute_options.get_end_time()
+        self.__computeOptions = computeOptions
+        if computeOptions is not None:
+            self.__minLat = computeOptions.get_min_lat()
+            self.__maxLat = computeOptions.get_max_lat()
+            self.__minLon = computeOptions.get_min_lon()
+            self.__maxLon = computeOptions.get_max_lon()
+            self.__ds = computeOptions.get_dataset()
+            self.__startTime = computeOptions.get_start_time()
+            self.__endTime = computeOptions.get_end_time()
         else:
             self.__minLat = args["minLat"] if "minLat" in args else -90.0
             self.__maxLat = args["maxLat"] if "maxLat" in args else 90.0

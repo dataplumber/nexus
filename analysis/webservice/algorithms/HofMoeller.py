@@ -127,7 +127,7 @@ class LatitudeTimeHoffMoellerHandlerImpl(BaseHoffMoellerHandlerImpl):
 
         results = self.applyDeseasonToHofMoeller(results)
 
-        result = HoffMoellerResults(results=results, compute_options=computeOptions, type=HoffMoellerResults.LATITUDE)
+        result = HoffMoellerResults(results=results, computeOptions=computeOptions, type=HoffMoellerResults.LATITUDE)
         return result
 
 
@@ -163,7 +163,7 @@ class LongitudeTimeHoffMoellerHandlerImpl(BaseHoffMoellerHandlerImpl):
 
         results = self.applyDeseasonToHofMoeller(results, pivot="lons")
 
-        result = HoffMoellerResults(results=results, compute_options=computeOptions, type=HoffMoellerResults.LONGITUDE)
+        result = HoffMoellerResults(results=results, computeOptions=computeOptions, type=HoffMoellerResults.LONGITUDE)
         return result
 
 
@@ -171,8 +171,8 @@ class HoffMoellerResults(NexusResults):
     LATITUDE = 0
     LONGITUDE = 1
 
-    def __init__(self, results=None, meta=None, stats=None, compute_options=None, **args):
-        NexusResults.__init__(self, results=results, meta=meta, stats=stats, compute_options=compute_options)
+    def __init__(self, results=None, meta=None, stats=None, computeOptions=None, **args):
+        NexusResults.__init__(self, results=results, meta=meta, stats=stats, computeOptions=computeOptions)
         self.__type = args['type']
 
     def createHoffmueller(self, data, coordSeries, timeSeries, coordName, title, interpolate='nearest'):
