@@ -52,6 +52,7 @@ setuptools.setup(
         'cassandra-driver==3.5.0',
         'solrpy==0.9.7',
         'nexusproto',
+        'pytz',
         'shapely'
     ],
 
