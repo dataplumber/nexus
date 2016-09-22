@@ -3,30 +3,29 @@ Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 
+import logging
 import time
 from datetime import datetime
 
 import numpy as np
 import requests
 import utm
-import logging
-from pyspark import SparkContext, SparkConf
 from pytz import timezone, UTC
 from scipy import spatial
 from shapely import wkt
 from shapely.geometry import Point
-from webservice.NexusHandler import NexusHandler, nexus_handler
-from webservice.webmodel import NexusProcessingException
+from webservice.NexusHandler import SparkHandler, nexus_handler
 from webservice.algorithms.doms import values as doms_values
 from webservice.algorithms.doms.BaseDomsHandler import DomsQueryResults
 from webservice.algorithms.doms.ResultsStorage import ResultsStorage
+from webservice.webmodel import NexusProcessingException
 
 EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
 
 
 # TODO Better handling of time tolerance and depth tolerance
 @nexus_handler
-class Matchup(NexusHandler):
+class Matchup(SparkHandler):
     name = "Matchup"
     path = "/match_spark"
     description = "Match measurements between two or more datasets"
@@ -86,7 +85,7 @@ class Matchup(NexusHandler):
     singleton = True
 
     def __init__(self):
-        NexusHandler.__init__(self, skipCassandra=True)
+        SparkHandler.__init__(self, skipCassandra=True)
         self.log = logging.getLogger(__name__)
 
     def calc(self, request, **args):
@@ -138,12 +137,12 @@ class Matchup(NexusHandler):
                                                              sort=['tile_min_time_dt asc', 'tile_min_lon asc',
                                                                    'tile_min_lat asc'], rows=5000)]
 
-        self.log.debug("Calling Spark Driver")
         # Call spark_matchup
+        self.log.debug("Calling Spark Driver")
         spark_result = spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name,
                                             matchup_ds_names,
                                             parameter_s, time_tolerance, depth_tolerance, radius_tolerance,
-                                            platforms)
+                                            platforms, sc=self._sc)
         end = int(round(time.time() * 1000))
 
         self.log.debug("Building and saving results")
@@ -337,44 +336,32 @@ class DomsPoint(object):
 
 
 def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_names, parameter, time_tolerance,
-                         depth_tolerance, radius_tolerance, platforms):
+                         depth_tolerance, radius_tolerance, platforms, sc=None):
     from functools import partial
 
-    # Configure Spark
-    sp_conf = SparkConf()
-    sp_conf.setAppName("Spark Matchup")
+    # Broadcast parameters
+    primary_b = sc.broadcast(primary_ds_name)
+    matchup_b = sc.broadcast(matchup_ds_names)
+    tt_b = sc.broadcast(time_tolerance)
+    dt_b = sc.broadcast(depth_tolerance)
+    rt_b = sc.broadcast(radius_tolerance)
+    platforms_b = sc.broadcast(platforms)
+    bounding_wkt_b = sc.broadcast(bounding_wkt)
+    parameter_b = sc.broadcast(parameter)
 
-    try:
-        sc = SparkContext(conf=sp_conf)
-    except ValueError:
-        raise NexusProcessingException(reason="Only one spark_matchup can be run at time. Please try again later.",
-                                       code=503)
+    # Parallelize list of tile ids
+    rdd = sc.parallelize(tile_ids)
 
-    # TODO Better handling of the Spark context. Do we really need to create/shutdown on every request?
-    with sc:
-        # Broadcast parameters
-        primary_b = sc.broadcast(primary_ds_name)
-        matchup_b = sc.broadcast(matchup_ds_names)
-        tt_b = sc.broadcast(time_tolerance)
-        dt_b = sc.broadcast(depth_tolerance)
-        rt_b = sc.broadcast(radius_tolerance)
-        platforms_b = sc.broadcast(platforms)
-        bounding_wkt_b = sc.broadcast(bounding_wkt)
-        parameter_b = sc.broadcast(parameter)
-
-        # Parallelize list of tile ids
-        rdd = sc.parallelize(tile_ids)
-
-        # Map Partitions ( list(tile_id) )
-        rdd = rdd.mapPartitions(
-            partial(match_satellite_to_insitu, primary_b=primary_b, matchup_b=matchup_b, parameter_b=parameter_b,
-                    tt_b=tt_b,
-                    dt_b=dt_b, rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b),
-            preservesPartitioning=True) \
-            .combineByKey(lambda value: [value],  # Create 1 element list
-                          lambda value_list, value: value_list + [value],  # Add 1 element to list
-                          lambda value_list_a, value_list_b: value_list_a + value_list_b)  # Add two lists together
-        result_as_map = rdd.collectAsMap()
+    # Map Partitions ( list(tile_id) )
+    rdd = rdd.mapPartitions(
+        partial(match_satellite_to_insitu, primary_b=primary_b, matchup_b=matchup_b, parameter_b=parameter_b,
+                tt_b=tt_b,
+                dt_b=dt_b, rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b),
+        preservesPartitioning=True) \
+        .combineByKey(lambda value: [value],  # Create 1 element list
+                      lambda value_list, value: value_list + [value],  # Add 1 element to list
+                      lambda value_list_a, value_list_b: value_list_a + value_list_b)  # Add two lists together
+    result_as_map = rdd.collectAsMap()
 
     return result_as_map
 
