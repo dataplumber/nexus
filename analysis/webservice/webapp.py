@@ -3,20 +3,19 @@ Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 import ConfigParser
-import pkg_resources
+import importlib
 import json
 import logging
 import sys
-import importlib
 import threading
+import traceback
 
 import matplotlib
+import pkg_resources
 import tornado.web
 from tornado.options import define, options, parse_command_line
-
-from webservice.webmodel import NexusRequestObject, NexusResults, NexusProcessingException
 from webservice import NexusHandler
-import traceback
+from webservice.webmodel import NexusRequestObject, NexusProcessingException
 
 matplotlib.use('Agg')
 
@@ -81,12 +80,13 @@ class BaseHandler(tornado.web.RequestHandler):
 
 
 class ModularNexusHandlerWrapper(BaseHandler):
-    def initialize(self, clazz, algorithm_config):
-        self.algorithm_config = algorithm_config
+    def initialize(self, clazz=None, algorithm_config=None, sc=None):
+        self.__algorithm_config = algorithm_config
         self.__clazz = clazz
+        self.__sc = sc
 
     def do_get(self, request):
-        instance = self.__clazz.instance(self.algorithm_config)
+        instance = self.__clazz.instance(algorithm_config=self.__algorithm_config, sc=self.__sc)
 
         results = instance.calc(request)
 
@@ -158,9 +158,23 @@ if __name__ == "__main__":
     NexusHandler.executeInitializers(algorithm_config)
 
     for clazzWrapper in NexusHandler.AVAILABLE_HANDLERS:
-        handlers.append(
-            (clazzWrapper.path(), ModularNexusHandlerWrapper,
-             dict(clazz=clazzWrapper, algorithm_config=algorithm_config)))
+        if issubclass(clazzWrapper.clazz(), NexusHandler.SparkHandler):
+            from pyspark import SparkContext, SparkConf
+
+            # Configure Spark
+            sp_conf = SparkConf()
+            sp_conf.setAppName(str(clazzWrapper.clazz()))
+            sp_conf.set("spark.scheduler.mode", "FAIR")
+
+            sc = SparkContext(conf=sp_conf)
+
+            handlers.append(
+                (clazzWrapper.path(), ModularNexusHandlerWrapper,
+                 dict(clazz=clazzWrapper, algorithm_config=algorithm_config, sc=sc)))
+        else:
+            handlers.append(
+                (clazzWrapper.path(), ModularNexusHandlerWrapper,
+                 dict(clazz=clazzWrapper, algorithm_config=algorithm_config)))
 
 
     class VersionHandler(tornado.web.RequestHandler):

@@ -3,10 +3,12 @@ Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 import logging
+import time
 import types
 from datetime import datetime
-import time
+
 from nexustiles.nexustiles import NexusTileService
+from webservice.webmodel import NexusProcessingException
 
 AVAILABLE_HANDLERS = []
 AVAILABLE_INITIALIZERS = []
@@ -16,10 +18,10 @@ def nexus_initializer(clazz):
     log = logging.getLogger(__name__)
     try:
         wrapper = NexusInitializerWrapper(clazz)
-        log.info("Adding initializer '%s'"%wrapper.clazz())
+        log.info("Adding initializer '%s'" % wrapper.clazz())
         AVAILABLE_INITIALIZERS.append(wrapper)
     except Exception as ex:
-        log.warn("Initializer '%s' failed to load (reason: %s)"%(clazz, ex.message), exc_info=True)
+        log.warn("Initializer '%s' failed to load (reason: %s)" % (clazz, ex.message), exc_info=True)
     return clazz
 
 
@@ -106,7 +108,7 @@ class NexusInitializerWrapper:
             instance = self.__clazz()
             instance.init(config)
         else:
-            self.log("Initializer '%s' has already been run"%self.__clazz)
+            self.log("Initializer '%s' has already been run" % self.__clazz)
 
 
 class AlgorithmModuleWrapper:
@@ -146,19 +148,32 @@ class AlgorithmModuleWrapper:
     def params(self):
         return self.__clazz.params
 
-    def instance(self, algorithm_config):
+    def instance(self, algorithm_config=None, sc=None):
         if "singleton" in self.__clazz.__dict__ and self.__clazz.__dict__["singleton"] is True:
             if self.__instance is None:
                 self.__instance = self.__clazz()
-            try:
-                self.__instance.set_config(algorithm_config)
-            except AttributeError:
-                pass
+
+                try:
+                    self.__instance.set_config(algorithm_config)
+                except AttributeError:
+                    pass
+
+                try:
+                    self.__instance.set_spark_context(sc)
+                except AttributeError:
+                    pass
+
             return self.__instance
         else:
             instance = self.__clazz()
+
             try:
                 instance.set_config(algorithm_config)
+            except AttributeError:
+                pass
+
+            try:
+                self.__instance.set_spark_context(sc)
             except AttributeError:
                 pass
             return instance
@@ -228,6 +243,68 @@ class NexusHandler(CalcHandler):
         resultsList = self._resultsMapToList(resultsMap)
         return resultsList
 
+
+class SparkHandler(NexusHandler):
+    class SparkJobContext(object):
+
+        class MaxConcurrentJobsReached(Exception):
+            def __init__(self, *args, **kwargs):
+                Exception.__init__(self, *args, **kwargs)
+
+        def __init__(self, job_stack):
+            self.spark_job_stack = job_stack
+            self.job_name = None
+            self.log = logging.getLogger(__name__)
+
+        def __enter__(self):
+            try:
+                self.job_name = self.spark_job_stack.pop()
+                self.log.debug("Using %s" % self.job_name)
+            except IndexError:
+                raise SparkHandler.SparkJobContext.MaxConcurrentJobsReached()
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            if self.job_name is not None:
+                self.log.debug("Returning %s" % self.job_name)
+                self.spark_job_stack.append(self.job_name)
+
+    def __init__(self, **kwargs):
+        import inspect
+        NexusHandler.__init__(self, **kwargs)
+        self._sc = None
+
+        self.spark_job_stack = []
+
+        def with_spark_job_context(calc_func):
+            from functools import wraps
+
+            @wraps(calc_func)
+            def wrapped(*args, **kwargs1):
+                try:
+                    with SparkHandler.SparkJobContext(self.spark_job_stack) as job_context:
+                        # TODO Pool and Job are forced to a 1-to-1 relationship
+                        calc_func.im_self._sc.setLocalProperty("spark.scheduler.pool", job_context.job_name)
+                        calc_func.im_self._sc.setJobGroup(job_context.job_name, "a spark job")
+                        return calc_func(*args, **kwargs1)
+                except SparkHandler.SparkJobContext.MaxConcurrentJobsReached:
+                    raise NexusProcessingException(code=503,
+                                                   reason="Max concurrent requests reached. Please try again later.")
+
+            return wrapped
+
+        for member in inspect.getmembers(self, predicate=inspect.ismethod):
+            if member[0] == "calc":
+                setattr(self, member[0], with_spark_job_context(member[1]))
+
+    def set_spark_context(self, sc):
+        self._sc = sc
+
+    def set_config(self, algorithm_config):
+        max_concurrent_jobs = algorithm_config.getint("spark", "maxconcurrentjobs") if algorithm_config.has_section(
+            "spark") and algorithm_config.has_option("spark", "maxconcurrentjobs") else 10
+        self.spark_job_stack = list(["Job %s" % x for x in xrange(1, max_concurrent_jobs + 1)])
+        self.algorithm_config = algorithm_config
 
 
 def executeInitializers(config):
