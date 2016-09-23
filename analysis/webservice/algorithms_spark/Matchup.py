@@ -10,6 +10,8 @@ from datetime import datetime
 import numpy as np
 import requests
 import utm
+import threading
+import functools
 from pytz import timezone, UTC
 from scipy import spatial
 from shapely import wkt
@@ -128,6 +130,10 @@ class Matchup(SparkHandler):
         start_seconds_from_epoch = long((start_time - EPOCH).total_seconds())
         end_seconds_from_epoch = long((end_time - EPOCH).total_seconds())
 
+        with ResultsStorage() as resultsStorage:
+
+            execution_id = resultsStorage.insertExecution(None, start, None, None)
+
         self.log.debug("Querying for tiles in search domain")
         # Get tile ids in box
         tile_ids = [tile.tile_id for tile in
@@ -166,14 +172,24 @@ class Matchup(SparkHandler):
             "numGriddedMatched": 0
         }
 
-        matches = self.convert_to_matches(spark_result)
+        matches = Matchup.convert_to_matches(spark_result)
 
-        resultsStorage = ResultsStorage()
-        result_id = resultsStorage.insertResults(results=matches, params=args, stats=details, startTime=start,
-                                                 completeTime=end, userEmail="")
+        def do_result_insert():
+            with ResultsStorage() as storage:
+                storage.insertResults(results=matches, params=args, stats=details,
+                                      startTime=start, completeTime=end, userEmail="",
+                                      execution_id=execution_id)
 
-        return DomsQueryResults(results=matches, args=args, details=details, bounds=None, count=None,
-                                computeOptions=None, executionId=result_id)
+        threading.Thread(target=do_result_insert).start()
+
+        if len(matches) > self.algorithm_config.getint("sparkmatchup", "maxmatches"):
+            result = DomsQueryResults(results=None, args=args, details=details, bounds=None, count=None,
+                                      computeOptions=None, executionId=execution_id, status_code=202)
+        else:
+            result = DomsQueryResults(results=matches, args=args, details=details, bounds=None, count=None,
+                                      computeOptions=None, executionId=execution_id)
+
+        return result
 
     @classmethod
     def convert_to_matches(cls, spark_result):
@@ -350,7 +366,7 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
     parameter_b = sc.broadcast(parameter)
 
     # Parallelize list of tile ids
-    rdd = sc.parallelize(tile_ids)
+    rdd = sc.parallelize(tile_ids, determine_parllelism(len(tile_ids)))
 
     # Map Partitions ( list(tile_id) )
     rdd = rdd.mapPartitions(
@@ -364,6 +380,15 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
     result_as_map = rdd.collectAsMap()
 
     return result_as_map
+
+
+def determine_parllelism(num_tiles):
+    """
+    Try to stay at a maximum of 140 tiles per partition; But don't go over 128 partitions.
+    Also, don't go below the default of 8
+    """
+    num_partitions = max(min(num_tiles / 140, 128), 8)
+    return num_partitions
 
 
 def spark_matchup_driver_2(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_names, parameter, time_tolerance,

@@ -267,7 +267,8 @@ class NexusRequestObject(StatsComputeOptions):
 
 
 class NexusResults:
-    def __init__(self, results=None, meta=None, stats=None, computeOptions=None, **args):
+    def __init__(self, results=None, meta=None, stats=None, computeOptions=None, status_code=200, **args):
+        self.status_code = status_code
         self.__results = results
         self.__meta = meta if meta is not None else {}
         self.__stats = stats if stats is not None else {}

@@ -7,9 +7,9 @@ import ConfigParser
 import logging
 import string
 import uuid
-import pkg_resources
 from datetime import datetime
 
+import pkg_resources
 from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
 from cassandra.query import BatchStatement
@@ -20,6 +20,9 @@ class AbstractResultsContainer:
         self._log = logging.getLogger(__name__)
         self._log.info("Creating DOMS Results Storage Instance")
 
+        self._session = None
+
+    def __enter__(self):
         domsconfig = ConfigParser.RawConfigParser()
         domsconfig.readfp(pkg_resources.resource_stream(__name__, "domsconfig.ini"), filename='domsconfig.ini')
 
@@ -31,10 +34,14 @@ class AbstractResultsContainer:
         dc_policy = DCAwareRoundRobinPolicy(cassDatacenter)
         token_policy = TokenAwarePolicy(dc_policy)
 
-        cluster = Cluster([host for host in cassHost.split(',')], load_balancing_policy=token_policy,
-                          protocol_version=cassVersion)
+        self._cluster = Cluster([host for host in cassHost.split(',')], load_balancing_policy=token_policy,
+                                protocol_version=cassVersion)
 
-        self._session = cluster.connect(cassKeyspace)
+        self._session = self._cluster.connect(cassKeyspace)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._cluster.shutdown()
 
     def generateExecutionId(self):
         return str(uuid.uuid4())
@@ -50,18 +57,19 @@ class ResultsStorage(AbstractResultsContainer):
     def __init__(self):
         AbstractResultsContainer.__init__(self)
 
-    def insertResults(self, results, params, stats, startTime, completeTime, userEmail):
-        id = self.generateExecutionId()
+    def insertResults(self, results, params, stats, startTime, completeTime, userEmail, execution_id=None):
 
-        self.__insertExecution(id, startTime, completeTime, userEmail)
-        self.__insertParams(id, params)
-        self.__insertStats(id, stats)
-        self.__insertResults(id, results)
-        return id
+        execution_id = self.insertExecution(execution_id, startTime, completeTime, userEmail)
+        self.__insertParams(execution_id, params)
+        self.__insertStats(execution_id, stats)
+        self.__insertResults(execution_id, results)
+        return execution_id
 
-    def __insertExecution(self, id, startTime, completeTime, userEmail):
+    def insertExecution(self, execution_id, startTime, completeTime, userEmail):
+        execution_id = self.generateExecutionId() if execution_id is None else execution_id
         cql = "INSERT INTO doms_executions (id, time_started, time_completed, user_email) VALUES (%s, %s, %s, %s)"
-        self._session.execute(cql, (id, startTime, completeTime, userEmail))
+        self._session.execute(cql, (execution_id, startTime, completeTime, userEmail))
+        return execution_id
 
     def __insertParams(self, id, params):
         cql = """INSERT INTO doms_params

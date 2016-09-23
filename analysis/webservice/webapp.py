@@ -90,6 +90,11 @@ class ModularNexusHandlerWrapper(BaseHandler):
 
         results = instance.calc(request)
 
+        try:
+            self.set_status(results.status_code)
+        except AttributeError:
+            pass
+
         if request.get_content_type() == ContentTypes.JSON:
             self.set_header("Content-Type", "application/json")
             try:
@@ -165,6 +170,7 @@ if __name__ == "__main__":
             sp_conf = SparkConf()
             sp_conf.setAppName(str(clazzWrapper.clazz()))
             sp_conf.set("spark.scheduler.mode", "FAIR")
+            sp_conf.set("spark.executor.memory", "6g")
 
             sc = SparkContext(conf=sp_conf)
 

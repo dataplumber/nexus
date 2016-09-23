@@ -37,13 +37,12 @@ class DomsInitializer:
         dc_policy = DCAwareRoundRobinPolicy(cassDatacenter)
         token_policy = TokenAwarePolicy(dc_policy)
 
-        cluster = Cluster([host for host in cassHost.split(',')], load_balancing_policy=token_policy,
-                          protocol_version=cassVersion)
+        with Cluster([host for host in cassHost.split(',')], load_balancing_policy=token_policy,
+                     protocol_version=cassVersion) as cluster:
+            session = cluster.connect()
 
-        session = cluster.connect()
-
-        self.createKeyspace(session, cassKeyspace)
-        self.createTables(session)
+            self.createKeyspace(session, cassKeyspace)
+            self.createTables(session)
 
     def createKeyspace(self, session, cassKeyspace):
         log = logging.getLogger(__name__)

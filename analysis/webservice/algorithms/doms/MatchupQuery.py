@@ -138,10 +138,10 @@ class CombinedDomsMatchupQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
             "numGriddedMatched": primaryContext.griddedMatched
         }
 
-        resultsStorage = ResultsStorage.ResultsStorage()
-        id = resultsStorage.insertResults(results=matches, params=args, stats=details, startTime=start, completeTime=end, userEmail="")
+        with ResultsStorage.ResultsStorage() as resultsStorage:
+            execution_id = resultsStorage.insertResults(results=matches, params=args, stats=details, startTime=start, completeTime=end, userEmail="")
 
-        return BaseDomsHandler.DomsQueryResults(results=matches, args=args, details=details, bounds=None, count=None, computeOptions=None, executionId=id)
+        return BaseDomsHandler.DomsQueryResults(results=matches, args=args, details=details, bounds=None, count=None, computeOptions=None, executionId=execution_id)
 
 
 

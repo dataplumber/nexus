@@ -23,11 +23,10 @@ from os import listdir
 from os.path import isfile, join
 import tempfile
 
-class BaseDomsQueryHandler(BaseHandler):
 
+class BaseDomsQueryHandler(BaseHandler):
     def __init__(self):
         BaseHandler.__init__(self)
-
 
     def getDataSourceByName(self, source):
         for s in config.ENDPOINTS:
@@ -42,14 +41,13 @@ class BaseDomsQueryHandler(BaseHandler):
         return False
 
 
-
 class DomsEncoder(json.JSONEncoder):
     def __init__(self, **args):
         json.JSONEncoder.__init__(self, **args)
 
     def default(self, obj):
-        #print 'MyEncoder.default() called'
-        #print type(obj)
+        # print 'MyEncoder.default() called'
+        # print type(obj)
         if obj == np.nan:
             return None  # hard code string for now
         elif isinstance(obj, datetime):
@@ -57,10 +55,12 @@ class DomsEncoder(json.JSONEncoder):
         else:
             return json.JSONEncoder.default(self, obj)
 
-class DomsQueryResults(NexusResults):
 
-    def __init__(self, results=None, args=None, bounds=None, count=None, details=None, computeOptions=None, executionId=None):
-        NexusResults.__init__(self, results=results, meta=None, stats=None, computeOptions=computeOptions)
+class DomsQueryResults(NexusResults):
+    def __init__(self, results=None, args=None, bounds=None, count=None, details=None, computeOptions=None,
+                 executionId=None, status_code=200):
+        NexusResults.__init__(self, results=results, meta=None, stats=None, computeOptions=computeOptions,
+                              status_code=status_code)
         self.__args = args
         self.__bounds = bounds
         self.__count = count
@@ -69,7 +69,9 @@ class DomsQueryResults(NexusResults):
 
     def toJson(self):
         bounds = self.__bounds.toMap() if self.__bounds is not None else {}
-        return json.dumps({"executionId": self.__executionId, "data":self.results(), "params":self.__args, "bounds":bounds, "count":self.__count, "details":self.__details}, indent=4,  cls=DomsEncoder)
+        return json.dumps(
+            {"executionId": self.__executionId, "data": self.results(), "params": self.__args, "bounds": bounds,
+             "count": self.__count, "details": self.__details}, indent=4, cls=DomsEncoder)
 
     def toCSV(self):
         pass
@@ -77,9 +79,9 @@ class DomsQueryResults(NexusResults):
     def toNetCDF(self):
         t = tempfile.mkstemp(prefix="doms_")
         print "Temp File: ", t
-        #dataset = Dataset(t.name, "w", format="NETCDF4")
+        # dataset = Dataset(t.name, "w", format="NETCDF4")
 
-        #dataset.close()
+        # dataset.close()
         print "Hello!!"
         return self.toJson()
-        #return "HI"
+        # return "HI"
