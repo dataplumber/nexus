@@ -75,13 +75,93 @@ class DomsQueryResults(NexusResults):
              "count": self.__count, "details": self.__details}, indent=4, cls=DomsEncoder)
 
     def toCSV(self):
-        pass
-
-
-
+        return DomsCSVFormatter.create(self.__executionId, self.results(), self.__args, self.__details)
 
     def toNetCDF(self):
         return DomsNetCDFFormatter.create(self.__executionId, self.results(), self.__args, self.__details)
+
+
+class DomsCSVFormatter:
+
+    @staticmethod
+    def create(executionId, results, params, details):
+
+        rows = []
+        DomsCSVFormatter.__addConstants(rows)
+
+        rows.append("%s = \"%s\"" % ("matchID", executionId))
+        rows.append("%s = \"%s\"" % ("Matchup_TimeWindow", params["timeTolerance"]))
+        rows.append("%s = \"%s\"" % ("Matchup_TimeWindow_Units", "hours"))
+
+        rows.append("%s = \"%s\"" % ("time_coverage_start", datetime.fromtimestamp(params["startTime"] / 1000).strftime('%Y%m%d %H:%M:%S')))
+        rows.append("%s = \"%s\"" % ("time_coverage_end", datetime.fromtimestamp(params["endTime"] / 1000).strftime('%Y%m%d %H:%M:%S')))
+        rows.append("%s = \"%s\"" % ("depth_tolerance", params["depthTolerance"]))
+        rows.append("%s = \"%s\"" % ("platforms", params["platforms"]))
+
+        rows.append("%s = \"%s\"" % ("Matchup_SearchRadius", params["radiusTolerance"]))
+        rows.append("%s = \"%s\"" % ("Matchup_SearchRadius_Units", "m"))
+
+        rows.append("%s = \"%s\"" % ("bounding_box", params["bbox"]))
+        rows.append("%s = \"%s\"" % ("primary", params["primary"]))
+        rows.append("%s = \"%s\"" % ("secondary", ",".join(params["matchup"])))
+
+        rows.append("%s = \"%s\"" % ("Matchup_ParameterPrimary", params["parameter"] if "parameter" in params else ""))
+
+        rows.append("%s = \"%s\"" % ("time_coverage_resolution", "point"))
+
+        bbox = geo.BoundingBox(asString=params["bbox"])
+        rows.append("%s = \"%s\"" % ("geospatial_lat_max", bbox.north))
+        rows.append("%s = \"%s\"" % ("geospatial_lat_min", bbox.south))
+        rows.append("%s = \"%s\"" % ("geospatial_lon_max", bbox.east))
+        rows.append("%s = \"%s\"" % ("geospatial_lon_min", bbox.west))
+        rows.append("%s = \"%s\"" % ("geospatial_lat_resolution", "point"))
+        rows.append("%s = \"%s\"" % ("geospatial_lon_resolution", "point"))
+        rows.append("%s = \"%s\"" % ("geospatial_lat_units", "degrees_north"))
+        rows.append("%s = \"%s\"" % ("geospatial_lon_units", "degrees_east"))
+        rows.append("%s = \"%s\"" % ("geospatial_vertical_min", 0.0))
+        rows.append("%s = \"%s\"" % ("geospatial_vertical_max", params["radiusTolerance"]))
+        rows.append("%s = \"%s\"" % ("geospatial_vertical_units", "m"))
+        rows.append("%s = \"%s\"" % ("geospatial_vertical_resolution", "point"))
+        rows.append("%s = \"%s\"" % ("geospatial_vertical_positive", "down"))
+
+        rows.append("%s = \"%s\"" % ("time_to_complete", details["timeToComplete"]))
+        rows.append("%s = \"%s\"" % ("num_insitu_matched", details["numInSituMatched"]))
+        rows.append("%s = \"%s\"" % ("num_gridded_checked", details["numGriddedChecked"]))
+        rows.append("%s = \"%s\"" % ("num_gridded_matched", details["numGriddedMatched"]))
+        rows.append("%s = \"%s\"" % ("num_insitu_checked", details["numInSituChecked"]))
+
+        rows.append("%s = \"%s\"" % ("date_modified", datetime.now().strftime('%Y%m%d %H:%M:%S')))
+        rows.append("%s = \"%s\"" % ("date_created", datetime.now().strftime('%Y%m%d %H:%M:%S')))
+
+
+
+
+        return "\r\n".join(rows)
+
+    @staticmethod
+    def __addConstants(rows):
+
+        rows.append("%s = \"%s\"" % ("bnds","2"))
+        rows.append("%s = \"%s\"" % ("Conventions", "CF-1.6, ACDD-1.3"))
+        rows.append("%s = \"%s\"" % ("title", "DOMS satellite-insitu machup output file"))
+        rows.append("%s = \"%s\"" % ("history", "Processing_Version = V1.0, Software_Name = DOMS, Software_Version = 1.03"))
+        rows.append("%s = \"%s\"" % ("institution", "JPL, FSU, NCAR"))
+        rows.append("%s = \"%s\"" % ("source", "doms.jpl.nasa.gov"))
+        rows.append("%s = \"%s\"" % ("standard_name_vocabulary", "CF Standard Name Table v27\", \"BODC controlled vocabulary"))
+        rows.append("%s = \"%s\"" % ("cdm_data_type", "Point/Profile, Swath/Grid"))
+        rows.append("%s = \"%s\"" % ("processing_level", "4"))
+        rows.append("%s = \"%s\"" % ("platform", "Endeavor"))
+        rows.append("%s = \"%s\"" % ("instrument", "Endeavor on-board sea-bird SBE 9/11 CTD"))
+        rows.append("%s = \"%s\"" % ("project", "Distributed Oceanographic Matchup System (DOMS)"))
+        rows.append("%s = \"%s\"" % ("keywords_vocabulary", "NASA Global Change Master Directory (GCMD) Science Keywords"))
+        rows.append("%s = \"%s\"" % ("keywords", "Salinity, Upper Ocean, SPURS, CTD, Endeavor, Atlantic Ocean"))
+        rows.append("%s = \"%s\"" % ("creator_name", "NASA PO.DAAC"))
+        rows.append("%s = \"%s\"" % ("creator_email", "podaac@podaac.jpl.nasa.gov"))
+        rows.append("%s = \"%s\"" % ("creator_url", "https://podaac.jpl.nasa.gov/"))
+        rows.append("%s = \"%s\"" % ("publisher_name", "NASA PO.DAAC"))
+        rows.append("%s = \"%s\"" % ("publisher_email", "podaac@podaac.jpl.nasa.gov"))
+        rows.append("%s = \"%s\"" % ("publisher_url", "https://podaac.jpl.nasa.gov"))
+        rows.append("%s = \"%s\"" % ("acknowledgment", "DOMS is a NASA/AIST-funded project.  Grant number ####."))
 
 
 class DomsNetCDFFormatter:

@@ -114,6 +114,7 @@ class ModularNexusHandlerWrapper(BaseHandler):
             try:
                 self.write(results.toCSV())
             except:
+                traceback.print_exc(file=sys.stdout)
                 raise NexusProcessingException(reason="Unable to convert results to CSV.")
         elif request.get_content_type() == ContentTypes.NETCDF:
             self.set_header("Content-Type", "application/x-netcdf")
