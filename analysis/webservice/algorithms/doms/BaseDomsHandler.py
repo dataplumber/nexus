@@ -78,66 +78,42 @@ class DomsQueryResults(NexusResults):
         pass
 
 
-    def __packDataIntoDimensions(self, idVar, primaryIdVar, values, primaryValueId=None):
-
-        idIndex = primaryValueId + 1 if primaryValueId is not None else 0
-
-        for value in values:
-            idVar.append(idIndex)
-            primaryIdVar.append(primaryValueId if primaryValueId is not None else -1)
-            idIndex = idIndex + 1
-
-            if "matches" in value and len(value["matches"]) > 0:
-                idIndex = self.__packDataIntoDimensions(idVar, primaryIdVar, value["matches"], idIndex)
-
-        return idIndex
-
-    def __packDimensionList(self, values, field, varList):
-        for value in values:
-            if field in value:
-                varList.append(value[field])
-            else:
-                varList.append(np.nan)
-            if "matches" in value and len(value["matches"]) > 0:
-                self.__packDimensionList(value["matches"], field, varList)
-
-    def __createDimension(self, dataset, values, name, type, arrayField):
-        dim = dataset.createDimension(name, size=None)
-        var = dataset.createVariable(name, type, (name,))
-
-        varList = []
-        self.__packDimensionList(values, arrayField, varList)
-
-        var[:] = varList
 
 
     def toNetCDF(self):
+        return DomsNetCDFFormatter.create(self.__executionId, self.results(), self.__args, self.__details)
+
+
+class DomsNetCDFFormatter:
+
+    @staticmethod
+    def create(executionId, results, params, details):
         t = tempfile.mkstemp(prefix="doms_", suffix=".nc")
         tempFileName = t[1]
 
         dataset = Dataset(tempFileName, "w", format="NETCDF4")
 
-        dataset.matchID = self.__executionId
-        dataset.Matchup_TimeWindow = self.__args["timeTolerance"]
+        dataset.matchID = executionId
+        dataset.Matchup_TimeWindow = params["timeTolerance"]
         dataset.Matchup_TimeWindow_Units = "hours"
 
-        dataset.time_coverage_start = datetime.fromtimestamp(self.__args["startTime"] / 1000).strftime('%Y%m%d %H:%M:%S')
-        dataset.time_coverage_end = datetime.fromtimestamp(self.__args["endTime"] / 1000).strftime('%Y%m%d %H:%M:%S')
-        dataset.depth_tolerance = self.__args["depthTolerance"]
-        dataset.platforms = self.__args["platforms"]
+        dataset.time_coverage_start = datetime.fromtimestamp(params["startTime"] / 1000).strftime('%Y%m%d %H:%M:%S')
+        dataset.time_coverage_end = datetime.fromtimestamp(params["endTime"] / 1000).strftime('%Y%m%d %H:%M:%S')
+        dataset.depth_tolerance = params["depthTolerance"]
+        dataset.platforms = params["platforms"]
 
-        dataset.Matchup_SearchRadius = self.__args["radiusTolerance"]
+        dataset.Matchup_SearchRadius = params["radiusTolerance"]
         dataset.Matchup_SearchRadius_Units = "m"
 
-        dataset.bounding_box = self.__args["bbox"]
-        dataset.primary = self.__args["primary"]
-        dataset.secondary = ",".join(self.__args["matchup"])
+        dataset.bounding_box = params["bbox"]
+        dataset.primary = params["primary"]
+        dataset.secondary = ",".join(params["matchup"])
 
-        dataset.Matchup_ParameterPrimary = self.__args["parameter"] if "parameter" in self.__args else ""
+        dataset.Matchup_ParameterPrimary = params["parameter"] if "parameter" in params else ""
 
         dataset.time_coverage_resolution = "point"
 
-        bbox = geo.BoundingBox(asString=self.__args["bbox"])
+        bbox = geo.BoundingBox(asString=params["bbox"])
         dataset.geospatial_lat_max = bbox.north
         dataset.geospatial_lat_min = bbox.south
         dataset.geospatial_lon_max = bbox.east
@@ -147,25 +123,25 @@ class DomsQueryResults(NexusResults):
         dataset.geospatial_lat_units = "degrees_north"
         dataset.geospatial_lon_units = "degrees_east"
         dataset.geospatial_vertical_min = 0.0
-        dataset.geospatial_vertical_max = self.__args["radiusTolerance"]
+        dataset.geospatial_vertical_max = params["radiusTolerance"]
         dataset.geospatial_vertical_units = "m"
         dataset.geospatial_vertical_resolution = "point"
         dataset.geospatial_vertical_positive = "down"
 
-        dataset.time_to_complete = self.__details["timeToComplete"]
-        dataset.num_insitu_matched = self.__details["numInSituMatched"]
-        dataset.num_gridded_checked = self.__details["numGriddedChecked"]
-        dataset.num_gridded_matched = self.__details["numGriddedMatched"]
-        dataset.num_insitu_checked = self.__details["numInSituChecked"]
+        dataset.time_to_complete = details["timeToComplete"]
+        dataset.num_insitu_matched = details["numInSituMatched"]
+        dataset.num_gridded_checked = details["numGriddedChecked"]
+        dataset.num_gridded_matched = details["numGriddedMatched"]
+        dataset.num_insitu_checked = details["numInSituChecked"]
 
         dataset.date_modified = datetime.now().strftime('%Y%m%d %H:%M:%S')
         dataset.date_created = datetime.now().strftime('%Y%m%d %H:%M:%S')
 
-        self.__addNetCDFConstants(dataset)
+        DomsNetCDFFormatter.__addNetCDFConstants(dataset)
 
         idList = []
         primaryIdList = []
-        self.__packDataIntoDimensions(idList, primaryIdList, self.results())
+        DomsNetCDFFormatter.__packDataIntoDimensions(idList, primaryIdList, results)
 
         idDim = dataset.createDimension("id", size=None)
         primaryIdDim = dataset.createDimension("primary_id", size=None)
@@ -176,19 +152,20 @@ class DomsQueryResults(NexusResults):
         idVar[:] = idList
         primaryIdVar[:] = primaryIdList
 
-        self.__createDimension(dataset, self.results(), "lat", "f4", "y")
-        self.__createDimension(dataset, self.results(), "lon", "f4", "x")
+        DomsNetCDFFormatter.__createDimension(dataset, results, "lat", "f4", "y")
+        DomsNetCDFFormatter.__createDimension(dataset, results, "lon", "f4", "x")
 
-        self.__createDimension(dataset, self.results(), "sea_water_temperature_depth", "f4", "sea_water_temperature_depth")
-        self.__createDimension(dataset, self.results(), "sea_water_temperature", "f4", "sea_water_temperature")
-        self.__createDimension(dataset, self.results(), "sea_water_salinity_depth", "f4", "sea_water_salinity_depth")
-        self.__createDimension(dataset, self.results(), "sea_water_salinity", "f4", "sea_water_salinity")
+        DomsNetCDFFormatter.__createDimension(dataset, results, "sea_water_temperature_depth", "f4", "sea_water_temperature_depth")
+        DomsNetCDFFormatter.__createDimension(dataset, results, "sea_water_temperature", "f4", "sea_water_temperature")
+        DomsNetCDFFormatter.__createDimension(dataset, results, "sea_water_salinity_depth", "f4", "sea_water_salinity_depth")
+        DomsNetCDFFormatter.__createDimension(dataset, results, "sea_water_salinity", "f4", "sea_water_salinity")
 
-        self.__createDimension(dataset, self.results(), "wind_speed", "f4", "wind_speed")
-        self.__createDimension(dataset, self.results(), "wind_direction", "f4", "wind_direction")
-        self.__createDimension(dataset, self.results(), "wind_u", "f4", "wind_u")
-        self.__createDimension(dataset, self.results(), "wind_v", "f4", "wind_v")
+        DomsNetCDFFormatter.__createDimension(dataset, results, "wind_speed", "f4", "wind_speed")
+        DomsNetCDFFormatter.__createDimension(dataset, results, "wind_direction", "f4", "wind_direction")
+        DomsNetCDFFormatter.__createDimension(dataset, results, "wind_u", "f4", "wind_u")
+        DomsNetCDFFormatter.__createDimension(dataset, results, "wind_v", "f4", "wind_v")
 
+        DomsNetCDFFormatter.__createDimension(dataset, results, "time", "f4", "time")
         dataset.close()
 
         f = open(tempFileName, "rb")
@@ -197,15 +174,50 @@ class DomsQueryResults(NexusResults):
         os.unlink(tempFileName)
         return data
 
-    def __addNetCDFConstants(self, dataset):
+    @staticmethod
+    def __packDataIntoDimensions(idVar, primaryIdVar, values, primaryValueId=None):
 
+        idIndex = primaryValueId + 1 if primaryValueId is not None else 0
+
+        for value in values:
+            idVar.append(idIndex)
+            primaryIdVar.append(primaryValueId if primaryValueId is not None else -1)
+            idIndex = idIndex + 1
+
+            if "matches" in value and len(value["matches"]) > 0:
+                idIndex = DomsNetCDFFormatter.__packDataIntoDimensions(idVar, primaryIdVar, value["matches"], idIndex)
+
+        return idIndex
+
+    @staticmethod
+    def __packDimensionList(values, field, varList):
+        for value in values:
+            if field in value:
+                varList.append(value[field])
+            else:
+                varList.append(np.nan)
+            if "matches" in value and len(value["matches"]) > 0:
+                DomsNetCDFFormatter.__packDimensionList(value["matches"], field, varList)
+
+    @staticmethod
+    def __createDimension(dataset, values, name, type, arrayField):
+        dim = dataset.createDimension(name, size=None)
+        var = dataset.createVariable(name, type, (name,))
+
+        varList = []
+        DomsNetCDFFormatter.__packDimensionList(values, arrayField, varList)
+
+        var[:] = varList
+
+    @staticmethod
+    def __addNetCDFConstants(dataset):
         dataset.bnds = 2
         dataset.Conventions = "CF-1.6, ACDD-1.3"
         dataset.title = "DOMS satellite-insitu machup output file"
         dataset.history = "Processing_Version = V1.0, Software_Name = DOMS, Software_Version = 1.03"
         dataset.institution = "JPL, FSU, NCAR"
         dataset.source = "doms.jpl.nasa.gov"
-        dataset.standard_name_vocabulary = "CF Standard Name Table v27","BODC controlled vocabulary"
+        dataset.standard_name_vocabulary = "CF Standard Name Table v27", "BODC controlled vocabulary"
         dataset.cdm_data_type = "Point/Profile, Swath/Grid"
         dataset.processing_level = "4"
         dataset.platform = "Endeavor"
