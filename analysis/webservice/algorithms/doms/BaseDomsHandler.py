@@ -133,10 +133,42 @@ class DomsCSVFormatter:
         rows.append("%s = \"%s\"" % ("date_modified", datetime.now().strftime('%Y%m%d %H:%M:%S')))
         rows.append("%s = \"%s\"" % ("date_created", datetime.now().strftime('%Y%m%d %H:%M:%S')))
 
-
-
+        for value in results:
+            DomsCSVFormatter.__packValues(value, rows)
 
         return "\r\n".join(rows)
+
+    @staticmethod
+    def __packValues(primaryValue, rows):
+
+        cols = []
+
+        cols.append(primaryValue["id"])
+        cols.append(str(primaryValue["x"]))
+        cols.append(str(primaryValue["y"]))
+        cols.append(datetime.fromtimestamp(primaryValue["time"] / 1000).strftime('%Y%m%d %H:%M:%S') if "time" in primaryValue else "")
+        cols.append(primaryValue["platform"])
+        cols.append(str(primaryValue["sea_water_salinity"] if "sea_water_salinity" in primaryValue else ""))
+        cols.append(str(primaryValue["sea_water_salinity_depth"] if "sea_water_salinity_depth" in primaryValue else ""))
+        cols.append(str(primaryValue["sea_water_temperature"] if "sea_water_temperature" in primaryValue else ""))
+        cols.append(str(primaryValue["sea_water_temperature_depth"] if "sea_water_temperature_depth" in primaryValue else ""))
+
+        for value in primaryValue["matches"]:
+            cols.append(value["id"])
+            cols.append(str(value["x"]))
+            cols.append(str(value["y"]))
+            cols.append(datetime.fromtimestamp(value["time"] / 1000).strftime('%Y%m%d %H:%M:%S') if "time" in value else "")
+            cols.append(value["platform"])
+            cols.append(str(value["sea_water_salinity"] if "sea_water_salinity" in value else ""))
+            cols.append(str(value["sea_water_salinity_depth"] if "sea_water_salinity_depth" in value else ""))
+            cols.append(str(value["sea_water_temperature"] if "sea_water_temperature" in value else ""))
+            cols.append(str(value["sea_water_temperature_depth"] if "sea_water_temperature_depth" in value else ""))
+
+        cols = [v if v is not None else "" for v in cols]
+
+        rows.append(",".join(cols))
+
+
 
     @staticmethod
     def __addConstants(rows):
