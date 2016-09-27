@@ -41,9 +41,10 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         id = computeOptions.get_argument("id", None)
 
 
-        retrieval = ResultsStorage.ResultsRetrieval()
+        #retrieval = ResultsStorage.ResultsRetrieval()
 
-        params, stats, data = retrieval.retrieveResults(id)
+        with ResultsStorage.ResultsRetrieval() as storage:
+            params, stats, data = storage.retrieveResults(id)
 
         return BaseDomsHandler.DomsQueryResults(results=data, args=params, details=stats, bounds=None, count=None, computeOptions=None, executionId=id)
 

@@ -5,7 +5,7 @@ from webservice.webmodel import StatsComputeOptions
 from webservice.NexusHandler import nexus_handler
 from webservice.NexusHandler import DEFAULT_PARAMETERS_SPEC
 from webservice.webmodel import NexusResults, NexusProcessingException
-
+import os
 import json
 import config
 import numpy as np
@@ -76,12 +76,98 @@ class DomsQueryResults(NexusResults):
     def toCSV(self):
         pass
 
-    def toNetCDF(self):
-        t = tempfile.mkstemp(prefix="doms_")
-        print "Temp File: ", t
-        # dataset = Dataset(t.name, "w", format="NETCDF4")
 
-        # dataset.close()
-        print "Hello!!"
-        return self.toJson()
-        # return "HI"
+    def __packDataIntoDimensions(self, idVar, primaryIdVar, latVar, lonVar, values, primaryValueId=None):
+
+        idIndex = primaryValueId + 1 if primaryValueId is not None else 0
+
+        for value in values:
+            idVar.append(idIndex)
+            primaryIdVar.append(primaryValueId if primaryValueId is not None else -1)
+            latVar.append(value["y"])
+            lonVar.append(value["x"])
+            idIndex = idIndex + 1
+
+            if "matches" in value and len(value["matches"]) > 0:
+                idIndex = self.__packDataIntoDimensions(idVar, primaryIdVar, latVar, lonVar, value["matches"], idIndex)
+
+        return idIndex
+
+    def __packDimensionList(self, values, field, varList):
+        for value in values:
+            if field in value:
+                varList.append(value[field])
+            else:
+                varList.append(np.nan)
+            if "matches" in value and len(value["matches"]) > 0:
+                self.__packDimensionList(value["matches"], field, varList)
+
+    def __createDimension(self, dataset, values, name, type, arrayField):
+        dim = dataset.createDimension(name, size=None)
+        var = dataset.createVariable(name, type, (name,))
+
+        varList = []
+        self.__packDimensionList(values, arrayField, varList)
+
+        var[:] = varList
+
+
+    def toNetCDF(self):
+        t = tempfile.mkstemp(prefix="doms_", suffix=".nc")
+        tempFileName = t[1]
+
+        dataset = Dataset(tempFileName, "w", format="NETCDF4")
+
+        dataset.execution_id = self.__executionId
+        dataset.time_tolerance = self.__args["timeTolerance"]
+        dataset.start_time = self.__args["startTime"]
+        dataset.end_time = self.__args["endTime"]
+        dataset.depth_tolerance = self.__args["depthTolerance"]
+        dataset.platforms = self.__args["platforms"]
+        dataset.radius_tolerance = self.__args["radiusTolerance"]
+        dataset.bounding_box = self.__args["bbox"]
+        dataset.primary = self.__args["primary"]
+        dataset.secondary = ",".join(self.__args["matchup"])
+
+        dataset.time_to_complete = self.__details["timeToComplete"]
+        dataset.num_insitu_matched = self.__details["numInSituMatched"]
+        dataset.num_gridded_checked = self.__details["numGriddedChecked"]
+        dataset.num_gridded_matched = self.__details["numGriddedMatched"]
+        dataset.num_insitu_checked = self.__details["numInSituChecked"]
+
+        idList = []
+        primaryIdList = []
+        latList = []
+        lonList = []
+        self.__packDataIntoDimensions(idList, primaryIdList, latList, lonList, self.results())
+
+        idDim = dataset.createDimension("id", size=None)
+        primaryIdDim = dataset.createDimension("primary_id", size=None)
+
+        idVar = dataset.createVariable("id", "i4", ("id",))
+        primaryIdVar = dataset.createVariable("primary_id", "i4", ("primary_id",))
+
+        idVar[:] = idList
+        primaryIdVar[:] = primaryIdList
+
+        self.__createDimension(dataset, self.results(), "lat", "f4", "y")
+        self.__createDimension(dataset, self.results(), "lon", "f4", "x")
+
+        self.__createDimension(dataset, self.results(), "sea_water_temperature_depth", "f4", "sea_water_temperature_depth")
+        self.__createDimension(dataset, self.results(), "sea_water_temperature", "f4", "sea_water_temperature")
+        self.__createDimension(dataset, self.results(), "sea_water_salinity_depth", "f4", "sea_water_salinity_depth")
+        self.__createDimension(dataset, self.results(), "sea_water_salinity", "f4", "sea_water_salinity")
+
+        self.__createDimension(dataset, self.results(), "wind_speed", "f4", "wind_speed")
+        self.__createDimension(dataset, self.results(), "wind_direction", "f4", "wind_direction")
+        self.__createDimension(dataset, self.results(), "wind_u", "f4", "wind_u")
+        self.__createDimension(dataset, self.results(), "wind_v", "f4", "wind_v")
+
+        dataset.close()
+
+        f = open(tempFileName, "rb")
+        data = f.read()
+        f.close()
+        os.unlink(tempFileName)
+        return data
+
