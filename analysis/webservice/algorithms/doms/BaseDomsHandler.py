@@ -9,6 +9,7 @@ import os
 import json
 import config
 import numpy as np
+import geo
 
 EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
 
@@ -77,19 +78,17 @@ class DomsQueryResults(NexusResults):
         pass
 
 
-    def __packDataIntoDimensions(self, idVar, primaryIdVar, latVar, lonVar, values, primaryValueId=None):
+    def __packDataIntoDimensions(self, idVar, primaryIdVar, values, primaryValueId=None):
 
         idIndex = primaryValueId + 1 if primaryValueId is not None else 0
 
         for value in values:
             idVar.append(idIndex)
             primaryIdVar.append(primaryValueId if primaryValueId is not None else -1)
-            latVar.append(value["y"])
-            lonVar.append(value["x"])
             idIndex = idIndex + 1
 
             if "matches" in value and len(value["matches"]) > 0:
-                idIndex = self.__packDataIntoDimensions(idVar, primaryIdVar, latVar, lonVar, value["matches"], idIndex)
+                idIndex = self.__packDataIntoDimensions(idVar, primaryIdVar, value["matches"], idIndex)
 
         return idIndex
 
@@ -118,16 +117,40 @@ class DomsQueryResults(NexusResults):
 
         dataset = Dataset(tempFileName, "w", format="NETCDF4")
 
-        dataset.execution_id = self.__executionId
-        dataset.time_tolerance = self.__args["timeTolerance"]
-        dataset.start_time = self.__args["startTime"]
-        dataset.end_time = self.__args["endTime"]
+        dataset.matchID = self.__executionId
+        dataset.Matchup_TimeWindow = self.__args["timeTolerance"]
+        dataset.Matchup_TimeWindow_Units = "hours"
+
+        dataset.time_coverage_start = datetime.fromtimestamp(self.__args["startTime"] / 1000).strftime('%Y%m%d %H:%M:%S')
+        dataset.time_coverage_end = datetime.fromtimestamp(self.__args["endTime"] / 1000).strftime('%Y%m%d %H:%M:%S')
         dataset.depth_tolerance = self.__args["depthTolerance"]
         dataset.platforms = self.__args["platforms"]
-        dataset.radius_tolerance = self.__args["radiusTolerance"]
+
+        dataset.Matchup_SearchRadius = self.__args["radiusTolerance"]
+        dataset.Matchup_SearchRadius_Units = "m"
+
         dataset.bounding_box = self.__args["bbox"]
         dataset.primary = self.__args["primary"]
         dataset.secondary = ",".join(self.__args["matchup"])
+
+        dataset.Matchup_ParameterPrimary = self.__args["parameter"] if "parameter" in self.__args else ""
+
+        dataset.time_coverage_resolution = "point"
+
+        bbox = geo.BoundingBox(asString=self.__args["bbox"])
+        dataset.geospatial_lat_max = bbox.north
+        dataset.geospatial_lat_min = bbox.south
+        dataset.geospatial_lon_max = bbox.east
+        dataset.geospatial_lon_min = bbox.west
+        dataset.geospatial_lat_resolution = "point"
+        dataset.geospatial_lon_resolution = "point"
+        dataset.geospatial_lat_units = "degrees_north"
+        dataset.geospatial_lon_units = "degrees_east"
+        dataset.geospatial_vertical_min = 0.0
+        dataset.geospatial_vertical_max = self.__args["radiusTolerance"]
+        dataset.geospatial_vertical_units = "m"
+        dataset.geospatial_vertical_resolution = "point"
+        dataset.geospatial_vertical_positive = "down"
 
         dataset.time_to_complete = self.__details["timeToComplete"]
         dataset.num_insitu_matched = self.__details["numInSituMatched"]
@@ -135,11 +158,14 @@ class DomsQueryResults(NexusResults):
         dataset.num_gridded_matched = self.__details["numGriddedMatched"]
         dataset.num_insitu_checked = self.__details["numInSituChecked"]
 
+        dataset.date_modified = datetime.now().strftime('%Y%m%d %H:%M:%S')
+        dataset.date_created = datetime.now().strftime('%Y%m%d %H:%M:%S')
+
+        self.__addNetCDFConstants(dataset)
+
         idList = []
         primaryIdList = []
-        latList = []
-        lonList = []
-        self.__packDataIntoDimensions(idList, primaryIdList, latList, lonList, self.results())
+        self.__packDataIntoDimensions(idList, primaryIdList, self.results())
 
         idDim = dataset.createDimension("id", size=None)
         primaryIdDim = dataset.createDimension("primary_id", size=None)
@@ -171,3 +197,26 @@ class DomsQueryResults(NexusResults):
         os.unlink(tempFileName)
         return data
 
+    def __addNetCDFConstants(self, dataset):
+
+        dataset.bnds = 2
+        dataset.Conventions = "CF-1.6, ACDD-1.3"
+        dataset.title = "DOMS satellite-insitu machup output file"
+        dataset.history = "Processing_Version = V1.0, Software_Name = DOMS, Software_Version = 1.03"
+        dataset.institution = "JPL, FSU, NCAR"
+        dataset.source = "doms.jpl.nasa.gov"
+        dataset.standard_name_vocabulary = "CF Standard Name Table v27","BODC controlled vocabulary"
+        dataset.cdm_data_type = "Point/Profile, Swath/Grid"
+        dataset.processing_level = "4"
+        dataset.platform = "Endeavor"
+        dataset.instrument = "Endeavor on-board sea-bird SBE 9/11 CTD"
+        dataset.project = "Distributed Oceanographic Matchup System (DOMS)"
+        dataset.keywords_vocabulary = "NASA Global Change Master Directory (GCMD) Science Keywords"
+        dataset.keywords = "Salinity, Upper Ocean, SPURS, CTD, Endeavor, Atlantic Ocean"
+        dataset.creator_name = "NASA PO.DAAC"
+        dataset.creator_email = "podaac@podaac.jpl.nasa.gov"
+        dataset.creator_url = "https://podaac.jpl.nasa.gov/"
+        dataset.publisher_name = "NASA PO.DAAC"
+        dataset.publisher_email = "podaac@podaac.jpl.nasa.gov"
+        dataset.publisher_url = "https://podaac.jpl.nasa.gov"
+        dataset.acknowledgment = "DOMS is a NASA/AIST-funded project.  Grant number ####."
