@@ -110,12 +110,14 @@ class ModularNexusHandlerWrapper(BaseHandler):
                 raise NexusProcessingException(reason="Unable to convert results to an Image.")
         elif request.get_content_type() == ContentTypes.CSV:
             self.set_header("Content-Type", "text/csv")
+            self.set_header("Content-Disposition", "filename=\"download.csv\"")
             try:
                 self.write(results.toCSV())
             except:
                 raise NexusProcessingException(reason="Unable to convert results to CSV.")
         elif request.get_content_type() == ContentTypes.NETCDF:
             self.set_header("Content-Type", "application/x-netcdf")
+            self.set_header("Content-Disposition", "filename=\"download.nc\"")
             try:
                 self.write(results.toNetCDF())
             except:
