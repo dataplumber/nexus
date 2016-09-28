@@ -107,6 +107,7 @@ class ModularNexusHandlerWrapper(BaseHandler):
             try:
                 self.write(results.toImage())
             except AttributeError:
+                traceback.print_exc(file=sys.stdout)
                 raise NexusProcessingException(reason="Unable to convert results to an Image.")
         elif request.get_content_type() == ContentTypes.CSV:
             self.set_header("Content-Type", "text/csv")

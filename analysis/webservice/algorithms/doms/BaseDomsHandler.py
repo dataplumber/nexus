@@ -19,6 +19,7 @@ try:
 except ImportError:
     import gdal
     from gdalnumeric import *
+
 from netCDF4 import Dataset
 from os import listdir
 from os.path import isfile, join
