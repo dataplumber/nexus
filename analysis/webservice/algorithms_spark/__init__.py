@@ -37,5 +37,11 @@ if module_exists("pyspark"):
         import TimeSeriesSpark
     except ImportError:
         pass
+
+    try:
+        import ClimMapSpark
+    except ImportError:
+        pass
+
 else:
     log.warn("pyspark not found. Skipping algorithms in %s" % os.path.dirname(__file__))
