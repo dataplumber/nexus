@@ -79,7 +79,7 @@ class ResultsStorage(AbstractResultsContainer):
         """
         self._session.execute(cql, (id,
                                     params["primary"],
-                                    string.join(params["matchup"], ","),
+                                    ",".join(params["matchup"]) if type(params["matchup"]) == list else params["matchup"],
                                     params["depthTolerance"],
                                     int(params["timeTolerance"]),
                                     params["radiusTolerance"],

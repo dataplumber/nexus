@@ -15,17 +15,26 @@ class PlotTypes:
     SCATTER = "scatter"
     MAP = "map"
 
+PARAMETER_TO_FIELD = {
+    "sst": "sea_water_temperature",
+    "sss": "sea_water_salinity"
+}
 
-def createScatterPlot(queue, id, params, stats, data):
-    print "Generating plot..."
+PARAMETER_TO_UNITS = {
+    "sst": "($^\circ$ C)",
+    "sss": "(g/L)"
+}
+
+def createScatterPlot(queue, id, params, stats, data, parameter):
     primary = params["primary"]
     secondary = params["matchup"][0]
 
-    x, y, z = createScatterTable(data, secondary)
+    print params
 
-    print "Done, returning..."
+    x, y, z = createScatterTable(data, secondary, parameter)
+
     try:
-        r = DomsScatterPlotQueryResults(x=x, y=y, z=z, primary=primary, secondary=secondary, args=params, details=stats,
+        r = DomsScatterPlotQueryResults(x=x, y=y, z=z, parameter=parameter, primary=primary, secondary=secondary, args=params, details=stats,
                                            bounds=None, count=None, computeOptions=None, executionId=id)
         queue.put(r)
     except:
@@ -33,25 +42,28 @@ def createScatterPlot(queue, id, params, stats, data):
         queue.put(None)
 
 
-def createScatterTable(results, secondary):
+def createScatterTable(results, secondary, parameter):
     x = []
     y = []
     z = []
 
+    field = PARAMETER_TO_FIELD[parameter] if parameter in PARAMETER_TO_FIELD else PARAMETER_TO_FIELD["sst"]
+
     for entry in results:
         for match in entry["matches"]:
             if match["source"] == secondary:
-                if "sea_water_temperature" in entry and "sea_water_temperature" in match:
-                    a = entry["sea_water_temperature"]
-                    b = match["sea_water_temperature"]
+                if field in entry and field in match:
+                    a = entry[field]
+                    b = match[field]
                     x.append(a)
                     y.append(b)
                     z.append(a - b)
 
+    print x, y, z
     return x, y, z
 
 
-def createMapPlot(queue, id, params, stats, data):
+def createMapPlot(queue, id, params, stats, data, parameter):
     primary = params["primary"]
     secondary = params["matchup"][0]
 
@@ -59,19 +71,21 @@ def createMapPlot(queue, id, params, stats, data):
     lons = []
     z = []
 
+    field = PARAMETER_TO_FIELD[parameter] if parameter in PARAMETER_TO_FIELD else PARAMETER_TO_FIELD["sst"]
+
     for entry in data:
         for match in entry["matches"]:
             if match["source"] == secondary:
-                if "sea_water_temperature" in entry and "sea_water_temperature" in match:
-                    a = entry["sea_water_temperature"]
-                    b = match["sea_water_temperature"]
+                if field in entry and field in match:
+                    a = entry[field]
+                    b = match[field]
                     z.append(a - b)
                 else:
                     z.append(1.0)
                 lats.append(entry["y"])
                 lons.append(entry["x"])
 
-    r = DomsMapPlotQueryResults(lats=lats, lons=lons, z=z, primary=primary, secondary=secondary, args=params,
+    r = DomsMapPlotQueryResults(lats=lats, lons=lons, z=z, parameter=parameter, primary=primary, secondary=secondary, args=params,
                                    details=stats, bounds=None, count=None, computeOptions=None, executionId=id)
     queue.put(r)
 
@@ -89,9 +103,9 @@ class DomsResultsPlotHandler(BaseDomsHandler.BaseDomsQueryHandler):
         BaseDomsHandler.BaseDomsQueryHandler.__init__(self)
 
 
-    def __runInSubprocess(self, func, id, params, stats, data):
+    def __runInSubprocess(self, func, id, params, stats, data, parameter):
         queue = Queue()
-        p = Process(target=func, args=(queue, id, params, stats, data))
+        p = Process(target=func, args=(queue, id, params, stats, data, parameter))
         p.start()
         p.join()  # this blocks until the process terminates
         result = queue.get()
@@ -99,6 +113,7 @@ class DomsResultsPlotHandler(BaseDomsHandler.BaseDomsQueryHandler):
 
     def calc(self, computeOptions, **args):
         id = computeOptions.get_argument("id", None)
+        parameter = computeOptions.get_argument('parameter', 'sst')
 
         with ResultsStorage.ResultsRetrieval() as storage:
             params, stats, data = storage.retrieveResults(id)
@@ -106,9 +121,9 @@ class DomsResultsPlotHandler(BaseDomsHandler.BaseDomsQueryHandler):
         plotType = computeOptions.get_argument("type", PlotTypes.SCATTER)
 
         if plotType == PlotTypes.SCATTER:
-            return self.__runInSubprocess(createScatterPlot, id, params, stats, data)
+            return self.__runInSubprocess(createScatterPlot, id, params, stats, data, parameter)
         elif plotType == PlotTypes.MAP:
-            return self.__runInSubprocess(createMapPlot, id, params, stats, data)
+            return self.__runInSubprocess(createMapPlot, id, params, stats, data, parameter)
         else:
             raise Exception("Unsupported plot type '%s' specified."%plotType)
 
@@ -121,11 +136,12 @@ class DomsResultsPlotHandler(BaseDomsHandler.BaseDomsQueryHandler):
 
 
 class DomsMapPlotQueryResults(BaseDomsHandler.DomsQueryResults):
-    def __init__(self, lats, lons, z, primary, secondary, args=None, bounds=None, count=None, details=None, computeOptions=None, executionId=None):
+    def __init__(self, lats, lons, z, parameter, primary, secondary, args=None, bounds=None, count=None, details=None, computeOptions=None, executionId=None):
         BaseDomsHandler.DomsQueryResults.__init__(self, results={"lats": lats, "lons": lons, "values": z}, args=args, details=details, bounds=bounds, count=count, computeOptions=computeOptions, executionId=executionId)
         self.__lats = lats
         self.__lons = lons
         self.__z = np.array(z)
+        self.__parameter = parameter
         self.__primary = primary
         self.__secondary = secondary
 
@@ -136,6 +152,8 @@ class DomsMapPlotQueryResults(BaseDomsHandler.DomsQueryResults):
         ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
 
         ax.set_title(string.upper("%s vs. %s" % (self.__primary, self.__secondary)))
+        #ax.set_ylabel('Latitude')
+        #ax.set_xlabel('Longitude')
 
         minLatA = np.min(self.__lats)
         maxLatA = np.max(self.__lats)
@@ -151,15 +169,7 @@ class DomsMapPlotQueryResults(BaseDomsHandler.DomsQueryResults):
         #m = Basemap(projection='mill', llcrnrlon=-180,llcrnrlat=-80,urcrnrlon=180,urcrnrlat=80,resolution='l')
         m = Basemap(projection='mill', llcrnrlon=minLon,llcrnrlat=minLat,urcrnrlon=maxLon,urcrnrlat=maxLat,resolution='l')
 
-        #values = np.zeros(len(self.__z))
-
-        #for i in range(0, len(self.__z)):
-        #    values[i] = ((self.__z[i] - np.min(self.__z)) / (np.max(self.__z) - np.min(self.__z)) * 20.0) + 10.0
-
         lats, lons = np.meshgrid(self.__lats, self.__lons)
-        #masked_array = np.ma.array (values, mask=np.isnan(values))
-        #z = masked_array
-
         masked_array = np.ma.array(self.__z, mask=np.isnan(self.__z))
         z = masked_array
 
@@ -180,10 +190,11 @@ class DomsMapPlotQueryResults(BaseDomsHandler.DomsQueryResults):
 
         im1.set_array(self.__z)
         cb = m.colorbar(im1)
-        cb.set_label("Difference ($^\circ$C)")
 
-        #ax.set_ylabel('Latitude')
-        #ax.set_xlabel('Longitude')
+        units = PARAMETER_TO_UNITS[self.__parameter] if self.__parameter in PARAMETER_TO_UNITS else PARAMETER_TO_UNITS["sst"]
+        cb.set_label("Difference %s"%units)
+
+
 
         sio = StringIO()
         plt.savefig(sio, format='png')
@@ -193,13 +204,14 @@ class DomsMapPlotQueryResults(BaseDomsHandler.DomsQueryResults):
 
 class DomsScatterPlotQueryResults(BaseDomsHandler.DomsQueryResults):
 
-    def __init__(self,  x, y, z, primary, secondary, args=None, bounds=None, count=None, details=None, computeOptions=None, executionId=None):
+    def __init__(self,  x, y, z, parameter, primary, secondary, args=None, bounds=None, count=None, details=None, computeOptions=None, executionId=None):
         BaseDomsHandler.DomsQueryResults.__init__(self, results=[x, y], args=args, details=details, bounds=bounds, count=count, computeOptions=computeOptions, executionId=executionId)
         self.__primary = primary
         self.__secondary = secondary
         self.__x = x
         self.__y = y
         self.__z = z
+        self.__parameter = parameter
 
 
     def toImage(self):
@@ -209,8 +221,10 @@ class DomsScatterPlotQueryResults(BaseDomsHandler.DomsQueryResults):
         fig, ax = plt.subplots()
 
         ax.set_title(string.upper("%s vs. %s"%(self.__primary, self.__secondary)))
-        ax.set_ylabel("%s ($^\circ$ C)"%self.__secondary)
-        ax.set_xlabel("%s ($^\circ$ C)"%self.__primary)
+
+        units = PARAMETER_TO_UNITS[self.__parameter] if self.__parameter in PARAMETER_TO_UNITS else PARAMETER_TO_UNITS["sst"]
+        ax.set_ylabel("%s %s"%(self.__secondary, units))
+        ax.set_xlabel("%s %s"%(self.__primary, units))
 
         masked_array = np.ma.array(self.__z, mask=np.isnan(self.__z))
         z = masked_array
@@ -225,7 +239,7 @@ class DomsScatterPlotQueryResults(BaseDomsHandler.DomsQueryResults):
 
         im1.set_array(values)
         cb = fig.colorbar(im1)
-        #cb.set_label("Difference ($^\circ$C)")
+        cb.set_label("Difference %s"%units)
 
         sio = StringIO()
         plt.savefig(sio, format='png')

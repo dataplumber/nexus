@@ -179,12 +179,12 @@ class DomsCSVFormatter:
 
         cols = []
 
-        cols.append(primaryValue["id"])
-        cols.append(primaryValue["source"])
+        cols.append("\"%s\""%primaryValue["id"])
+        cols.append("\"%s\""%primaryValue["source"])
         cols.append(str(primaryValue["x"]))
         cols.append(str(primaryValue["y"]))
-        cols.append(datetime.fromtimestamp(primaryValue["time"] / 1000).strftime('%Y%m%d %H:%M:%S') if "time" in primaryValue else "")
-        cols.append(primaryValue["platform"])
+        cols.append("\"%s\""%datetime.fromtimestamp(primaryValue["time"] / 1000).strftime('%Y%m%d %H:%M:%S') if "time" in primaryValue else "")
+        cols.append("\"%s\""%primaryValue["platform"])
         cols.append(str(DomsCSVFormatter.__pickOne(primaryValue["sea_water_salinity_depth"] if "sea_water_salinity_depth" in primaryValue else None,
                                                    primaryValue["sea_water_temperature_depth"] if "sea_water_temperature_depth" in primaryValue else None)))
 
@@ -197,12 +197,12 @@ class DomsCSVFormatter:
 
 
         for value in primaryValue["matches"]:
-            cols.append(value["id"])
-            cols.append(value["source"])
+            cols.append("\"%s\""%value["id"])
+            cols.append("\"%s\""%value["source"])
             cols.append(str(value["x"]))
             cols.append(str(value["y"]))
-            cols.append(datetime.fromtimestamp(value["time"] / 1000).strftime('%Y%m%d %H:%M:%S') if "time" in value else "")
-            cols.append(value["platform"])
+            cols.append("\"%s\""%datetime.fromtimestamp(value["time"] / 1000).strftime('%Y%m%d %H:%M:%S') if "time" in value else "")
+            cols.append("\"%s\""%value["platform"])
             cols.append(str(DomsCSVFormatter.__pickOne(
                 value["sea_water_salinity_depth"] if "sea_water_salinity_depth" in value else None,
                 value["sea_water_temperature_depth"] if "sea_water_temperature_depth" in value else None)))
