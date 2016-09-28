@@ -26,6 +26,9 @@ class RequestParameters(object):
     OUTPUT = "output"
     START_TIME = "startTime"
     END_TIME = "endTime"
+    START_YEAR = "startYear"
+    END_YEAR = "endYear"
+    CLIM_MONTH = "month"
     START_ROW = "start"
     ROW_COUNT = "numRows"
     APPLY_LOW_PASS = "lowPassFilter"
@@ -88,6 +91,15 @@ class StatsComputeOptions(object):
         raise Exception("Please implement")
 
     def get_end_time(self):
+        raise Exception("Please implement")
+
+    def get_start_year(self):
+        raise Exception("Please implement")
+
+    def get_end_year(self):
+        raise Exception("Please implement")
+
+    def get_clim_month(self):
         raise Exception("Please implement")
 
     def get_start_row(self):
@@ -221,6 +233,15 @@ class NexusRequestObject(StatsComputeOptions):
 
     def get_end_time(self):
         return self.get_int_arg(RequestParameters.END_TIME, -1)
+
+    def get_start_year(self):
+        return self.get_int_arg(RequestParameters.START_YEAR, 0)
+
+    def get_end_year(self):
+        return self.get_int_arg(RequestParameters.END_YEAR, -1)
+
+    def get_clim_month(self):
+        return self.get_int_arg(RequestParameters.CLIM_MONTH, -1)
 
     def get_start_datetime(self):
         time_str = self.get_argument(RequestParameters.START_TIME)
