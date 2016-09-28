@@ -9,12 +9,15 @@ class SparkAlg(NexusHandler):
     def __init__(self):
         NexusHandler.__init__(self, skipCassandra=False, skipSolr=False)
 
-    def _setQueryParams(self, ds, bounds, start_time, end_time):
+    def _setQueryParams(self, ds, bounds, start_time=None, end_time=None,
+                        start_year=None, end_year=None, clim_month=None):
         self._ds = ds
         self._minLat, self._maxLat, self._minLon, self._maxLon = bounds
         self._startTime = start_time
         self._endTime = end_time
-
+        self._startYear = start_year
+        self._endYear = end_year
+        self._climMonth = clim_month
 
     def _find_native_resolution(self):
         if type(self._ds) in (list,tuple):
@@ -167,17 +170,17 @@ class SparkAlg(NexusHandler):
             t1 = time()
             print 'NEXUS call start at time %f' % t1
             sys.stdout.flush()
-            nexus_tiles = tile_service.fetch_data_for_tiles(*tiles)
-            nexus_tiles = tile_service.mask_tiles_to_bbox(min_lat, max_lat,
-                                                          min_lon, max_lon,
-                                                          nexus_tiles)
+            nexus_tiles = list(tile_service.fetch_data_for_tiles(*tiles))
+            nexus_tiles = list(tile_service.mask_tiles_to_bbox(min_lat, max_lat,
+                                                               min_lon, max_lon,
+                                                               nexus_tiles))
             t2 = time()
             print 'NEXUS call end at time %f' % t2
             print 'Seconds in NEXUS call: ', t2-t1
             sys.stdout.flush()
 
         print 'Returning %d tiles' % len(nexus_tiles)
-        return list(nexus_tiles)
+        return nexus_tiles
 
     @staticmethod
     def _prune_tiles(nexus_tiles):
