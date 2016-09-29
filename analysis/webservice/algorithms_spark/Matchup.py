@@ -3,20 +3,26 @@ Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 
+import json
 import logging
+import threading
 import time
 from datetime import datetime
+from itertools import chain
+from math import cos, radians
 
 import numpy as np
 import requests
 import utm
-import threading
-import functools
+from nexustiles.nexustiles import NexusTileService
 from pytz import timezone, UTC
 from scipy import spatial
 from shapely import wkt
 from shapely.geometry import Point
+from shapely.geos import ReadingError
+
 from webservice.NexusHandler import SparkHandler, nexus_handler
+from webservice.algorithms.doms import config as edge_endpoints
 from webservice.algorithms.doms import values as doms_values
 from webservice.algorithms.doms.BaseDomsHandler import DomsQueryResults
 from webservice.algorithms.doms.ResultsStorage import ResultsStorage
@@ -324,10 +330,6 @@ class DomsPoint(object):
 
     @staticmethod
     def from_edge_point(edge_point):
-        from shapely import wkt
-        from shapely.geos import ReadingError
-        from shapely.geometry import Point
-
         point = DomsPoint()
 
         try:
@@ -373,11 +375,11 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
     # Broadcast parameters
     primary_b = sc.broadcast(primary_ds_name)
     matchup_b = sc.broadcast(matchup_ds_names)
-    depth_min_b = sc.broadcast(depth_min)
-    depth_max_b = sc.broadcast(depth_max)
+    depth_min_b = sc.broadcast(float(depth_min))
+    depth_max_b = sc.broadcast(float(depth_max))
     tt_b = sc.broadcast(time_tolerance)
-    dt_b = sc.broadcast(depth_tolerance)
-    rt_b = sc.broadcast(radius_tolerance)
+    dt_b = sc.broadcast(float(depth_tolerance))
+    rt_b = sc.broadcast(float(radius_tolerance))
     platforms_b = sc.broadcast(platforms)
     bounding_wkt_b = sc.broadcast(bounding_wkt)
     parameter_b = sc.broadcast(parameter)
@@ -409,48 +411,54 @@ def determine_parllelism(num_tiles):
     return num_partitions
 
 
-def spark_matchup_driver_2(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_names, parameter, time_tolerance,
-                           depth_tolerance, radius_tolerance, platforms):
-    # Query for count of insitu points in search domain from each matchup source
-    # Parallelize range from 0 to in situ count step size = page size
-    # Map int from range -> (cKDTree of edge points, list of edge points in tree)
-    # Cache rdd
+def add_meters_to_lon_lat(lon, lat, meters):
+    """
+    Uses a simple approximation of
+    1 degree latitude = 111,111 meters
+    1 degree longitude = 111,111 meters * cosine(latitude)
+    :param lon: longitude to add meters to
+    :param lat: latitude to add meters to
+    :param meters: meters to add to the longitude and latitude values
+    :return: (longitude, latitude) increased by given meters
+    """
+    longitude = lon + ((meters / 111111) * cos(radians(lat)))
+    latitude = lat + (meters / 111111)
 
-    # Query for tile ids in search domain
-    # parallelize tile ids
-    # map tile id -> (cKDTree of tile, tile)
-
-    pass
+    return longitude, latitude
 
 
 def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b, dt_b, rt_b, platforms_b,
                               bounding_wkt_b, depth_min_b, depth_max_b):
-    from itertools import chain
-    from datetime import datetime
-    from shapely.geos import ReadingError
-    from shapely import wkt
-    from nexustiles.nexustiles import NexusTileService
-
+    the_time = datetime.now()
     tile_ids = list(tile_ids)
     if len(tile_ids) == 0:
         return []
     tile_service = NexusTileService()
 
-    # Query edge for all points in the current partition of tiles
+    # Determine the spatial temporal extents of this partition of tiles
     tiles_bbox = tile_service.get_bounding_box(tile_ids)
     tiles_min_time = tile_service.get_min_time(tile_ids)
     tiles_max_time = tile_service.get_max_time(tile_ids)
 
-    # TODO rt_b is in meters. Need to figure out how to increase lat/lon bbox by meters
-    matchup_min_lon = tiles_bbox.bounds[0]  # - rt_b.value
-    matchup_min_lat = tiles_bbox.bounds[1]  # - rt_b.value
-    matchup_max_lon = tiles_bbox.bounds[2]  # + rt_b.value
-    matchup_max_lat = tiles_bbox.bounds[3]  # + rt_b.value
+    # Increase spatial extents by the radius tolerance
+    matchup_min_lon, matchup_min_lat = add_meters_to_lon_lat(tiles_bbox.bounds[0], tiles_bbox.bounds[1],
+                                                             -1 * rt_b.value)
+    matchup_max_lon, matchup_max_lat = add_meters_to_lon_lat(tiles_bbox.bounds[2], tiles_bbox.bounds[3], rt_b.value)
 
+    # Don't go outside of the search domain
+    search_min_x, search_min_y, search_max_x, search_max_y = wkt.loads(bounding_wkt_b.value).bounds
+    matchup_min_lon = max(matchup_min_lon, search_min_x)
+    matchup_min_lat = max(matchup_min_lat, search_min_y)
+    matchup_max_lon = min(matchup_max_lon, search_max_x)
+    matchup_max_lat = min(matchup_max_lat, search_max_y)
+
+    # Increase temporal extents by the time tolerance
     matchup_min_time = tiles_min_time - tt_b.value
     matchup_max_time = tiles_max_time + tt_b.value
+    print "%s Time to determine spatial-temporal extents for partition %s to %s" % (
+        str(datetime.now() - the_time), tile_ids[0], tile_ids[-1])
 
-    # Query edge for points
+    # Query edge for all points within the spatial-temporal extents of this partition
     the_time = datetime.now()
     edge_session = requests.Session()
     edge_results = []
@@ -542,9 +550,6 @@ def match_tile_to_point_generator(tile_service, tile_id, m_tree, edge_results, s
 
 def query_edge(dataset, variable, startTime, endTime, bbox, platform, depth_min, depth_max, itemsPerPage=1000,
                startIndex=0, stats=True, session=None):
-    import json
-    from webservice.algorithms.doms import config as edge_endpoints
-
     try:
         startTime = datetime.utcfromtimestamp(startTime).strftime('%Y-%m-%dT%H:%M:%SZ')
     except TypeError:
