@@ -25,6 +25,11 @@ from webservice.webmodel import NexusProcessingException
 EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
 
 
+def iso_time_to_epoch(str_time):
+    return (datetime.strptime(str_time, "%Y-%m-%dT%H:%M:%SZ").replace(
+        tzinfo=UTC) - EPOCH).total_seconds()
+
+
 # TODO Better handling of time tolerance and depth tolerance
 @nexus_handler
 class Matchup(SparkHandler):
@@ -218,8 +223,7 @@ class Matchup(SparkHandler):
             "x": domspoint.longitude,
             "y": domspoint.latitude,
             "point": "Point(%s %s)" % (domspoint.longitude, domspoint.latitude),
-            "time": (datetime.strptime(domspoint.time, "%Y-%m-%dT%H:%M:%SZ").replace(
-                tzinfo=UTC) - EPOCH).total_seconds(),
+            "time": iso_time_to_epoch(domspoint.time),
             "fileurl": domspoint.file_url,
             "id": domspoint.data_id,
             "source": domspoint.source,
@@ -374,6 +378,8 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
                 tt_b=tt_b,
                 dt_b=dt_b, rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b),
         preservesPartitioning=True) \
+        .filter(lambda p_m_tuple: abs(
+            iso_time_to_epoch(p_m_tuple[0].time) - iso_time_to_epoch(p_m_tuple[1].time) <= time_tolerance)) \
         .combineByKey(lambda value: [value],  # Create 1 element list
                       lambda value_list, value: value_list + [value],  # Add 1 element to list
                       lambda value_list_a, value_list_b: value_list_a + value_list_b)  # Add two lists together
