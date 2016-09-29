@@ -30,7 +30,6 @@ def iso_time_to_epoch(str_time):
         tzinfo=UTC) - EPOCH).total_seconds()
 
 
-# TODO Better handling of time tolerance and depth tolerance
 @nexus_handler
 class Matchup(SparkHandler):
     name = "Matchup"
@@ -68,10 +67,20 @@ class Matchup(SparkHandler):
             "type": "comma-delimited float",
             "description": "Minimum (Western) Longitude, Minimum (Southern) Latitude, Maximum (Eastern) Longitude, Maximum (Northern) Latitude"
         },
+        "depthMin": {
+            "name": "Minimum Depth",
+            "type": "float",
+            "description": "Minimum depth of measurements allowed to be considered for matchup"
+        },
+        "depthMax": {
+            "name": "Maximum Depth",
+            "type": "float",
+            "description": "Maximum depth of measurements allowed to be considered for matchup"
+        },
         "tt": {
             "name": "Time Tolerance",
             "type": "long",
-            "description": "Tolerance in time (seconds) when comparing two measurements."
+            "description": "Tolerance in time (seconds) when comparing two measurements"
         },
         "dt": {
             "name": "Depth Tolerance",
@@ -125,6 +134,9 @@ class Matchup(SparkHandler):
             raise NexusProcessingException(
                 reason="'endTime' argument is required. Can be int value seconds from epoch or string format YYYY-MM-DDTHH:mm:ssZ",
                 code=400)
+
+        depth_min = request.get_decimal_arg('depthMin', default=0.0)
+        depth_max = request.get_decimal_arg('depthMax', default=5.0)
         time_tolerance = request.get_int_arg('tt', default=86400)
         depth_tolerance = request.get_decimal_arg('dt', default=5.0)
         radius_tolerance = request.get_decimal_arg('rt', default=1000.0)
@@ -150,10 +162,9 @@ class Matchup(SparkHandler):
 
         # Call spark_matchup
         self.log.debug("Calling Spark Driver")
-        spark_result = spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name,
-                                            matchup_ds_names,
-                                            parameter_s, time_tolerance, depth_tolerance, radius_tolerance,
-                                            platforms, sc=self._sc)
+        spark_result = spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name, matchup_ds_names,
+                                            parameter_s, depth_min, depth_max, time_tolerance, depth_tolerance,
+                                            radius_tolerance, platforms, sc=self._sc)
         end = int(round(time.time() * 1000))
 
         self.log.debug("Building and saving results")
@@ -355,13 +366,15 @@ class DomsPoint(object):
         return point
 
 
-def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_names, parameter, time_tolerance,
-                         depth_tolerance, radius_tolerance, platforms, sc=None):
+def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_names, parameter, depth_min, depth_max,
+                         time_tolerance, depth_tolerance, radius_tolerance, platforms, sc=None):
     from functools import partial
 
     # Broadcast parameters
     primary_b = sc.broadcast(primary_ds_name)
     matchup_b = sc.broadcast(matchup_ds_names)
+    depth_min_b = sc.broadcast(depth_min)
+    depth_max_b = sc.broadcast(depth_max)
     tt_b = sc.broadcast(time_tolerance)
     dt_b = sc.broadcast(depth_tolerance)
     rt_b = sc.broadcast(radius_tolerance)
@@ -374,12 +387,11 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
 
     # Map Partitions ( list(tile_id) )
     rdd = rdd.mapPartitions(
-        partial(match_satellite_to_insitu, primary_b=primary_b, matchup_b=matchup_b, parameter_b=parameter_b,
-                tt_b=tt_b,
-                dt_b=dt_b, rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b),
-        preservesPartitioning=True) \
+        partial(match_satellite_to_insitu, primary_b=primary_b, matchup_b=matchup_b, parameter_b=parameter_b, tt_b=tt_b,
+                dt_b=dt_b, rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b, depth_min_b=depth_min_b,
+                depth_max_b=depth_max_b), preservesPartitioning=True) \
         .filter(lambda p_m_tuple: abs(
-            iso_time_to_epoch(p_m_tuple[0].time) - iso_time_to_epoch(p_m_tuple[1].time) <= time_tolerance)) \
+        iso_time_to_epoch(p_m_tuple[0].time) - iso_time_to_epoch(p_m_tuple[1].time) <= time_tolerance)) \
         .combineByKey(lambda value: [value],  # Create 1 element list
                       lambda value_list, value: value_list + [value],  # Add 1 element to list
                       lambda value_list_a, value_list_b: value_list_a + value_list_b)  # Add two lists together
@@ -412,7 +424,7 @@ def spark_matchup_driver_2(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_n
 
 
 def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b, dt_b, rt_b, platforms_b,
-                              bounding_wkt_b):
+                              bounding_wkt_b, depth_min_b, depth_max_b):
     from itertools import chain
     from datetime import datetime
     from shapely.geos import ReadingError
@@ -435,7 +447,6 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
     matchup_max_lon = tiles_bbox.bounds[2]  # + rt_b.value
     matchup_max_lat = tiles_bbox.bounds[3]  # + rt_b.value
 
-    # TODO in situ points are no longer guaranteed to be within the tolerance window for an individual tile. Add filter?
     matchup_min_time = tiles_min_time - tt_b.value
     matchup_max_time = tiles_max_time + tt_b.value
 
@@ -448,7 +459,7 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
             bbox = ','.join(
                 [str(matchup_min_lon), str(matchup_min_lat), str(matchup_max_lon), str(matchup_max_lat)])
             edge_response = query_edge(insitudata_name, parameter_b.value, matchup_min_time, matchup_max_time, bbox,
-                                       dt_b.value, platforms_b.value, session=edge_session)
+                                       platforms_b.value, depth_min_b.value, depth_max_b.value, session=edge_session)
             if edge_response['totalResults'] == 0:
                 continue
             r = edge_response['results']
@@ -529,9 +540,8 @@ def match_tile_to_point_generator(tile_service, tile_id, m_tree, edge_results, s
                 yield p_doms_point, m_doms_point
 
 
-def query_edge(dataset, variable, startTime, endTime, bbox, maxDepth, platform, itemsPerPage=1000, startIndex=0,
-               stats=True,
-               session=None):
+def query_edge(dataset, variable, startTime, endTime, bbox, platform, depth_min, depth_max, itemsPerPage=1000,
+               startIndex=0, stats=True, session=None):
     import json
     from webservice.algorithms.doms import config as edge_endpoints
 
@@ -557,7 +567,8 @@ def query_edge(dataset, variable, startTime, endTime, bbox, maxDepth, platform, 
               "startTime": startTime,
               "endTime": endTime,
               "bbox": bbox,
-              "maxDepth": maxDepth,
+              "minDepth": depth_min,
+              "maxDepth": depth_max,
               "platform": platform,
               "itemsPerPage": itemsPerPage, "startIndex": startIndex, "stats": str(stats).lower()}
 
