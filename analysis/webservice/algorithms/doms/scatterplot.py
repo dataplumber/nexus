@@ -1,0 +1,138 @@
+from webservice.NexusHandler import nexus_handler
+import BaseDomsHandler
+import ResultsStorage
+import numpy as np
+import string
+from cStringIO import StringIO
+
+from multiprocessing import Process, Queue
+import traceback
+import sys
+
+from mpl_toolkits.basemap import Basemap
+import matplotlib.pyplot as plt
+#import matplotlib
+#matplotlib.use('GTKAgg')
+
+
+
+
+PARAMETER_TO_FIELD = {
+    "sst": "sea_water_temperature",
+    "sss": "sea_water_salinity"
+}
+
+PARAMETER_TO_UNITS = {
+    "sst": "($^\circ$ C)",
+    "sss": "(g/L)"
+}
+
+
+
+def render(queue, x, y, z, primary, secondary, parameter):
+    fig, ax = plt.subplots()
+
+    ax.set_title(string.upper("%s vs. %s" % (primary, secondary)))
+
+    units = PARAMETER_TO_UNITS[parameter] if parameter in PARAMETER_TO_UNITS else PARAMETER_TO_UNITS[
+        "sst"]
+    ax.set_ylabel("%s %s" % (secondary, units))
+    ax.set_xlabel("%s %s" % (primary, units))
+
+    masked_array = np.ma.array(z, mask=np.isnan(z))
+    z = masked_array
+
+    values = np.zeros(len(z))
+    for i in range(0, len(z)):
+        values[i] = ((z[i] - np.min(z)) / (np.max(z) - np.min(z)) * 15.0) + 5
+
+    im1 = ax.scatter(x, y, values)
+
+    im1.set_array(values)
+    cb = fig.colorbar(im1)
+    cb.set_label("Difference %s" % units)
+
+    sio = StringIO()
+    plt.savefig(sio, format='png')
+    queue.put(sio.getvalue())
+    print "Done"
+
+
+class DomsScatterPlotQueryResults(BaseDomsHandler.DomsQueryResults):
+
+    def __init__(self,  x, y, z, parameter, primary, secondary, args=None, bounds=None, count=None, details=None, computeOptions=None, executionId=None, plot=None):
+        BaseDomsHandler.DomsQueryResults.__init__(self, results=[x, y], args=args, details=details, bounds=bounds, count=count, computeOptions=computeOptions, executionId=executionId)
+        self.__primary = primary
+        self.__secondary = secondary
+        self.__x = x
+        self.__y = y
+        self.__z = z
+        self.__parameter = parameter
+        self.__plot = plot
+
+    def toImage(self):
+        return self.__plot
+
+
+
+
+def renderAsync(x, y, z, primary, secondary, parameter):
+    queue = Queue()
+    p = Process(target=render, args=(queue, x, y, z, primary, secondary, parameter))
+    p.start()
+    p.join()
+    result = queue.get()
+    return result
+
+
+
+def createScatterPlot(id, parameter):
+
+    with ResultsStorage.ResultsRetrieval() as storage:
+        params, stats, data = storage.retrieveResults(id)
+
+    primary = params["primary"]
+    secondary = params["matchup"][0]
+
+    x, y, z = createScatterTable(data, secondary, parameter)
+
+    plot = renderAsync(x, y, z, primary, secondary, parameter)
+
+    r = DomsScatterPlotQueryResults(x=x, y=y, z=z, parameter=parameter, primary=primary, secondary=secondary,
+                                    args=params, details=stats,
+                                    bounds=None, count=None, computeOptions=None, executionId=id, plot=plot)
+    return r
+    """
+    try:
+        r = DomsScatterPlotQueryResults(x=x, y=y, z=z, parameter=parameter, primary=primary, secondary=secondary, args=params, details=stats,
+                                           bounds=None, count=None, computeOptions=None, executionId=id, plot=plot)
+        queue.put(r)
+    except:
+        traceback.print_exc(file=sys.stdout)
+        queue.put(None)
+        """
+
+
+def createScatterTable(results, secondary, parameter):
+    x = []
+    y = []
+    z = []
+
+    field = PARAMETER_TO_FIELD[parameter] if parameter in PARAMETER_TO_FIELD else PARAMETER_TO_FIELD["sst"]
+
+    for entry in results:
+        for match in entry["matches"]:
+            if match["source"] == secondary:
+                if field in entry and field in match:
+                    a = entry[field]
+                    b = match[field]
+                    x.append(a)
+                    y.append(b)
+                    z.append(a - b)
+
+    return x, y, z
+
+
+
+
+
