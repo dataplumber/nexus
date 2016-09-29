@@ -8,11 +8,12 @@ from cStringIO import StringIO
 import traceback
 import sys
 
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Manager
+import signal
 from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
-#import matplotlib
-#matplotlib.use('GTKAgg')
+import matplotlib
+matplotlib.use('Agg')
 
 
 PARAMETER_TO_FIELD = {
@@ -39,10 +40,11 @@ def __square(minLon, maxLon, minLat, maxLat):
     return minLon, maxLon, minLat, maxLat
 
 
-def render(queue, lats, lons, z, primary, secondary, parameter):
+def render(d, lats, lons, z, primary, secondary, parameter):
 
     fig = plt.figure()
     ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+
 
     ax.set_title(string.upper("%s vs. %s" % (primary, secondary)))
     # ax.set_ylabel('Latitude')
@@ -61,14 +63,16 @@ def render(queue, lats, lons, z, primary, secondary, parameter):
 
     minLon, maxLon, minLat, maxLat = __square(minLon, maxLon, minLat, maxLat)
 
+
     # m = Basemap(projection='mill', llcrnrlon=-180,llcrnrlat=-80,urcrnrlon=180,urcrnrlat=80,resolution='l')
     m = Basemap(projection='mill', llcrnrlon=minLon, llcrnrlat=minLat, urcrnrlon=maxLon, urcrnrlat=maxLat,
                 resolution='l')
 
-    lats, lons = np.meshgrid(lats, lons)
+    #lats, lons = np.meshgrid(lats, lons)
 
     masked_array = np.ma.array(z, mask=np.isnan(z))
     z = masked_array
+
 
     values = np.zeros(len(z))
     for i in range(0, len(z)):
@@ -94,7 +98,7 @@ def render(queue, lats, lons, z, primary, secondary, parameter):
 
     sio = StringIO()
     plt.savefig(sio, format='png')
-    queue.put(sio.getvalue())
+    d['plot'] = sio.getvalue()
 
 
 class DomsMapPlotQueryResults(BaseDomsHandler.DomsQueryResults):
@@ -118,12 +122,12 @@ class DomsMapPlotQueryResults(BaseDomsHandler.DomsQueryResults):
 
 
 def renderAsync(x, y, z, primary, secondary, parameter):
-    queue = Queue()
-    p = Process(target=render, args=(queue, x, y, z, primary, secondary, parameter))
+    manager = Manager()
+    d = manager.dict()
+    p = Process(target=render, args=(d, x, y, z, primary, secondary, parameter))
     p.start()
     p.join()
-    result = queue.get()
-    return result
+    return d['plot']
 
 
 
