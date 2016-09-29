@@ -5,14 +5,13 @@ import numpy as np
 import string
 from cStringIO import StringIO
 
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Manager
 import traceback
 import sys
 
-from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
-#import matplotlib
-#matplotlib.use('GTKAgg')
+import matplotlib
+matplotlib.use('Agg')
 
 
 
@@ -29,7 +28,7 @@ PARAMETER_TO_UNITS = {
 
 
 
-def render(queue, x, y, z, primary, secondary, parameter):
+def render(d, x, y, z, primary, secondary, parameter):
     fig, ax = plt.subplots()
 
     ax.set_title(string.upper("%s vs. %s" % (primary, secondary)))
@@ -54,9 +53,7 @@ def render(queue, x, y, z, primary, secondary, parameter):
 
     sio = StringIO()
     plt.savefig(sio, format='png')
-    queue.put(sio.getvalue())
-    print "Done"
-
+    d['plot'] = sio.getvalue()
 
 class DomsScatterPlotQueryResults(BaseDomsHandler.DomsQueryResults):
 
@@ -77,12 +74,12 @@ class DomsScatterPlotQueryResults(BaseDomsHandler.DomsQueryResults):
 
 
 def renderAsync(x, y, z, primary, secondary, parameter):
-    queue = Queue()
-    p = Process(target=render, args=(queue, x, y, z, primary, secondary, parameter))
+    manager = Manager()
+    d = manager.dict()
+    p = Process(target=render, args=(d, x, y, z, primary, secondary, parameter))
     p.start()
     p.join()
-    result = queue.get()
-    return result
+    return d['plot']
 
 
 
@@ -102,15 +99,6 @@ def createScatterPlot(id, parameter):
                                     args=params, details=stats,
                                     bounds=None, count=None, computeOptions=None, executionId=id, plot=plot)
     return r
-    """
-    try:
-        r = DomsScatterPlotQueryResults(x=x, y=y, z=z, parameter=parameter, primary=primary, secondary=secondary, args=params, details=stats,
-                                           bounds=None, count=None, computeOptions=None, executionId=id, plot=plot)
-        queue.put(r)
-    except:
-        traceback.print_exc(file=sys.stdout)
-        queue.put(None)
-        """
 
 
 def createScatterTable(results, secondary, parameter):
