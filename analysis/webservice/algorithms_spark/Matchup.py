@@ -441,8 +441,8 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
         for insitudata_name in matchup_b.value.split(','):
             bbox = ','.join(
                 [str(matchup_min_lon), str(matchup_min_lat), str(matchup_max_lon), str(matchup_max_lat)])
-            edge_response = query_edge(insitudata_name, matchup_min_time, matchup_max_time, bbox, dt_b.value,
-                                       platforms_b.value, session=edge_session)
+            edge_response = query_edge(insitudata_name, parameter_b.value, matchup_min_time, matchup_max_time, bbox,
+                                       dt_b.value, platforms_b.value, session=edge_session)
             if edge_response['totalResults'] == 0:
                 continue
             r = edge_response['results']
@@ -523,7 +523,8 @@ def match_tile_to_point_generator(tile_service, tile_id, m_tree, edge_results, s
                 yield p_doms_point, m_doms_point
 
 
-def query_edge(dataset, startTime, endTime, bbox, maxDepth, platform, itemsPerPage=1000, startIndex=0, stats=True,
+def query_edge(dataset, variable, startTime, endTime, bbox, maxDepth, platform, itemsPerPage=1000, startIndex=0,
+               stats=True,
                session=None):
     import json
     from webservice.algorithms.doms import config as edge_endpoints
@@ -546,7 +547,8 @@ def query_edge(dataset, startTime, endTime, bbox, maxDepth, platform, itemsPerPa
         # Assume we were passed a list
         pass
 
-    params = {"startTime": startTime,
+    params = {"variable": variable,
+              "startTime": startTime,
               "endTime": endTime,
               "bbox": bbox,
               "maxDepth": maxDepth,
