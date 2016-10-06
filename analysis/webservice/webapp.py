@@ -129,9 +129,17 @@ class ModularNexusHandlerWrapper(BaseHandler):
 
 if __name__ == "__main__":
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt="%Y-%m-%dT%H:%M:%S", stream=sys.stdout)
+
+    from multiprocessing.util import get_logger, log_to_stderr
+
+    log_to_stderr(level=logging.DEBUG)
+    get_logger().setLevel(logging.DEBUG)
+
+    logging.getLogger('requests.packages.urllib3.connectionpool').setLevel(logging.DEBUG)
+
     log = logging.getLogger(__name__)
 
     webconfig = ConfigParser.RawConfigParser()
