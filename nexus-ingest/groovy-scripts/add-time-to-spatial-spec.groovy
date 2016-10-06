@@ -10,7 +10,7 @@ def sectionSpec = ''
 
 for (i = 0; i < 240; i++) {
     sectionSpec <<= 'time:' + i + ':' + (i+1) + ','
-    sectionSpec <<= payload.join(';time:' + i + ':' + (i+1) + ',')
+    sectionSpec <<= payload
     sectionSpec <<= ';'
 }
 
