@@ -6,7 +6,7 @@ import solr
 
 import threading
 
-INIT_LOCK = threading.Lock()
+SOLR_CON_LOCK = threading.Lock()
 thread_local = threading.local()
 
 
@@ -17,10 +17,10 @@ class SolrProxy(object):
         self.solrCore = config.get("solr", "core")
         self.logger = logging.getLogger('nexus')
 
-        with INIT_LOCK:
+        with SOLR_CON_LOCK:
             solrcon = getattr(thread_local, 'solrcon', None)
             if solrcon is None:
-                solrcon = solr.Solr('http://%s/solr/%s' % (self.solrUrl, self.solrCore), debug=True)
+                solrcon = solr.Solr('http://%s/solr/%s' % (self.solrUrl, self.solrCore))
                 thread_local.solrcon = solrcon
 
             self.solrcon = solrcon
@@ -388,7 +388,8 @@ class SolrProxy(object):
 
         args = (args[0],) + (fl,) + (args[2:4]) + (s,)
 
-        response = self.solrcon.select(*args, **params)
+        with SOLR_CON_LOCK:
+            response = self.solrcon.select(*args, **params)
 
         return response
 

@@ -367,25 +367,27 @@ class DomsPoint(object):
 
         return point
 
-
+from threading import Lock
+DRIVER_LOCK = Lock()
 def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_names, parameter, depth_min, depth_max,
                          time_tolerance, depth_tolerance, radius_tolerance, platforms, sc=None):
     from functools import partial
 
-    # Broadcast parameters
-    primary_b = sc.broadcast(primary_ds_name)
-    matchup_b = sc.broadcast(matchup_ds_names)
-    depth_min_b = sc.broadcast(float(depth_min))
-    depth_max_b = sc.broadcast(float(depth_max))
-    tt_b = sc.broadcast(time_tolerance)
-    dt_b = sc.broadcast(float(depth_tolerance))
-    rt_b = sc.broadcast(float(radius_tolerance))
-    platforms_b = sc.broadcast(platforms)
-    bounding_wkt_b = sc.broadcast(bounding_wkt)
-    parameter_b = sc.broadcast(parameter)
+    with DRIVER_LOCK:
+        # Broadcast parameters
+        primary_b = sc.broadcast(primary_ds_name)
+        matchup_b = sc.broadcast(matchup_ds_names)
+        depth_min_b = sc.broadcast(float(depth_min))
+        depth_max_b = sc.broadcast(float(depth_max))
+        tt_b = sc.broadcast(time_tolerance)
+        dt_b = sc.broadcast(float(depth_tolerance))
+        rt_b = sc.broadcast(float(radius_tolerance))
+        platforms_b = sc.broadcast(platforms)
+        bounding_wkt_b = sc.broadcast(bounding_wkt)
+        parameter_b = sc.broadcast(parameter)
 
-    # Parallelize list of tile ids
-    rdd = sc.parallelize(tile_ids, determine_parllelism(len(tile_ids)))
+        # Parallelize list of tile ids
+        rdd = sc.parallelize(tile_ids, determine_parllelism(len(tile_ids)))
 
     # Map Partitions ( list(tile_id) )
     rdd = rdd.mapPartitions(
