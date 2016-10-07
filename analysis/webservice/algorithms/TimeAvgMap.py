@@ -17,7 +17,7 @@ from netCDF4 import Dataset
 #from mpl_toolkits.basemap import Basemap
 
 
-@nexus_handler
+# @nexus_handler
 class TimeAvgMapHandlerImpl(NexusHandler):
 
     name = "Time Average Map"

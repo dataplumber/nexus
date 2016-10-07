@@ -7,7 +7,7 @@ import traceback
 import logging
 from cStringIO import StringIO
 from datetime import datetime
-from multiprocessing import Pool, Manager
+from multiprocessing.dummy import Pool, Manager
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt

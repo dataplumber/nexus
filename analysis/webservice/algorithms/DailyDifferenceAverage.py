@@ -5,7 +5,7 @@ California Institute of Technology.  All rights reserved
 import sys
 import traceback
 from datetime import datetime, timedelta
-from multiprocessing import Pool, Manager
+from multiprocessing.dummy import Pool, Manager
 
 import numpy as np
 import pytz

@@ -13,7 +13,7 @@ from nexustiles.nexustiles import NexusTileService
 from webservice.webmodel import NexusProcessingException
 from pyspark import SparkContext,SparkConf
 
-@nexus_handler
+# @nexus_handler
 class CorrMapSparkHandlerImpl(SparkAlg):
     name = "Correlation Map Spark"
     path = "/corrMapSpark"

@@ -3,8 +3,9 @@ import traceback
 from datetime import datetime
 from multiprocessing.pool import ThreadPool
 
-import geo
 import requests
+
+import geo
 import values
 from webservice.webmodel import NexusProcessingException
 
