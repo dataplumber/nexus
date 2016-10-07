@@ -4,6 +4,11 @@ from datetime import datetime
 
 import solr
 
+import threading
+
+INIT_LOCK = threading.Lock()
+thread_local = threading.local()
+
 
 class SolrProxy(object):
     def __init__(self, config):
@@ -11,7 +16,14 @@ class SolrProxy(object):
         self.solrUrl = config.get("solr", "host")
         self.solrCore = config.get("solr", "core")
         self.logger = logging.getLogger('nexus')
-        self.solrcon = solr.Solr('http://%s/solr/%s' % (self.solrUrl, self.solrCore))
+
+        with INIT_LOCK:
+            solrcon = getattr(thread_local, 'solrcon', None)
+            if solrcon is None:
+                solrcon = solr.Solr('http://%s/solr/%s' % (self.solrUrl, self.solrCore), debug=True)
+                thread_local.solrcon = solrcon
+
+            self.solrcon = solrcon
 
     def find_tile_by_id(self, tile_id):
 

@@ -6,7 +6,7 @@ from webservice.NexusHandler import NexusHandler, nexus_handler
 from webservice.webmodel import NexusResults
 
 
-@nexus_handler
+# @nexus_handler
 class ChunkSearchHandlerImpl(NexusHandler):
     name = "Data Tile Search"
     path = "/tiles"

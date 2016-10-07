@@ -7,7 +7,7 @@ import traceback
 import logging
 from cStringIO import StringIO
 from datetime import datetime
-from multiprocessing import Pool, Manager
+from multiprocessing.dummy import Pool, Manager
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -322,6 +322,7 @@ def pool_worker(work_queue, done_queue):
             args = work[1:]
             result = calculator.__getattribute__(scifunction)(*args)
             done_queue.put(result)
+
     except Exception as e:
         e_str = traceback.format_exc(e)
         done_queue.put({'error': e_str})

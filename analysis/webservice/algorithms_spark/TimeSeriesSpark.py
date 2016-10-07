@@ -23,7 +23,7 @@ from webservice.webmodel import NexusResults, NoDataException
 SENTINEL = 'STOP'
 
 
-@nexus_handler
+# @nexus_handler
 class TimeSeriesHandlerImpl(SparkAlg):
     name = "Time Series Spark"
     path = "/timeSeriesSpark"

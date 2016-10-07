@@ -21,4 +21,9 @@ class DelayHandlerImpl(CalcHandler):
 
     def calc(self, computeOptions, **args):
         time.sleep(10)
-        return {}, None, None
+
+        class SimpleResult(object):
+            def toJson(self):
+                return ""
+
+        return SimpleResult()

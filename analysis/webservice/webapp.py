@@ -7,13 +7,14 @@ import importlib
 import json
 import logging
 import sys
-import threading
 import traceback
+from multiprocessing.pool import ThreadPool
 
 import matplotlib
 import pkg_resources
 import tornado.web
 from tornado.options import define, options, parse_command_line
+
 from webservice import NexusHandler
 from webservice.webmodel import NexusRequestObject, NexusProcessingException
 
@@ -31,34 +32,29 @@ class ContentTypes(object):
 class BaseHandler(tornado.web.RequestHandler):
     path = r"/"
 
-    def initialize(self):
+    def initialize(self, thread_pool):
         self.logger = logging.getLogger('nexus')
+        self.request_thread_pool = thread_pool
 
     @tornado.web.asynchronous
     def get(self):
-        class T(threading.Thread):
 
-            def __init__(self, context):
-                threading.Thread.__init__(self)
-                self.context = context
-                self.logger = logging.getLogger(__name__)
+        self.request_thread_pool.apply_async(self.run)
 
-            def run(self):
-                try:
-                    self.context.set_header("Access-Control-Allow-Origin", "*")
-                    reqObject = NexusRequestObject(self.context)
-                    results = self.context.do_get(reqObject)
-                    self.context.async_callback(results)
-                except NexusProcessingException as e:
-                    self.logger.error("Error processing request", exc_info=True)
-                    self.context.async_onerror_callback(e.reason, e.code)
-                except Exception as e:
-                    self.logger.error("Error processing request", exc_info=True)
-                    self.context.async_onerror_callback(str(e), 500)
-
-        t = T(self).start()
+    def run(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        reqObject = NexusRequestObject(self)
+        try:
+            result = self.do_get(reqObject)
+            self.async_callback(result)
+        except NexusProcessingException as e:
+            self.async_onerror_callback(e.reason, e.code)
+        except Exception as e:
+            self.async_onerror_callback(str(e), 500)
 
     def async_onerror_callback(self, reason, code=500):
+        self.logger.error("Error processing request", exc_info=True)
+
         self.set_header("Content-Type", "application/json")
         self.set_status(code)
 
@@ -70,7 +66,7 @@ class BaseHandler(tornado.web.RequestHandler):
         self.write(json.dumps(response, indent=5))
         self.finish()
 
-    def async_callback(self, results):
+    def async_callback(self, result):
         self.finish()
 
     ''' Override me for standard handlers! '''
@@ -80,7 +76,8 @@ class BaseHandler(tornado.web.RequestHandler):
 
 
 class ModularNexusHandlerWrapper(BaseHandler):
-    def initialize(self, clazz=None, algorithm_config=None, sc=None):
+    def initialize(self, thread_pool, clazz=None, algorithm_config=None, sc=None):
+        BaseHandler.initialize(self, thread_pool)
         self.__algorithm_config = algorithm_config
         self.__clazz = clazz
         self.__sc = sc
@@ -129,16 +126,9 @@ class ModularNexusHandlerWrapper(BaseHandler):
 
 if __name__ == "__main__":
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt="%Y-%m-%dT%H:%M:%S", stream=sys.stdout)
-
-    from multiprocessing.util import get_logger, log_to_stderr
-
-    log_to_stderr(level=logging.DEBUG)
-    get_logger().setLevel(logging.DEBUG)
-
-    logging.getLogger('requests.packages.urllib3.connectionpool').setLevel(logging.DEBUG)
 
     log = logging.getLogger(__name__)
 
@@ -174,6 +164,10 @@ if __name__ == "__main__":
     log.info("Running Nexus Initializers")
     NexusHandler.executeInitializers(algorithm_config)
 
+    max_request_threads = webconfig.getint("global", "server.max_simultaneous_requests")
+    log.info("Initializing request ThreadPool to %s" % max_request_threads)
+    request_thread_pool = ThreadPool(processes=max_request_threads)
+
     for clazzWrapper in NexusHandler.AVAILABLE_HANDLERS:
         if issubclass(clazzWrapper.clazz(), NexusHandler.SparkHandler):
             from pyspark import SparkContext, SparkConf
@@ -188,11 +182,11 @@ if __name__ == "__main__":
 
             handlers.append(
                 (clazzWrapper.path(), ModularNexusHandlerWrapper,
-                 dict(clazz=clazzWrapper, algorithm_config=algorithm_config, sc=sc)))
+                 dict(clazz=clazzWrapper, algorithm_config=algorithm_config, sc=sc, thread_pool=request_thread_pool)))
         else:
             handlers.append(
                 (clazzWrapper.path(), ModularNexusHandlerWrapper,
-                 dict(clazz=clazzWrapper, algorithm_config=algorithm_config)))
+                 dict(clazz=clazzWrapper, algorithm_config=algorithm_config, thread_pool=request_thread_pool)))
 
 
     class VersionHandler(tornado.web.RequestHandler):

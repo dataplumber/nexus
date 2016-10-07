@@ -10,7 +10,7 @@ from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMET
 from webservice.webmodel import NexusProcessingException
 from nexustiles.model.nexusmodel import get_approximate_value_for_lat_lon
 
-@nexus_handler
+# @nexus_handler
 class LongitudeLatitudeMapHandlerImpl(NexusHandler):
     name = "Correlation Map"
     path = "/correlationMap"
