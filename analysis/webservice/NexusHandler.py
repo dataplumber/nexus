@@ -243,7 +243,8 @@ class NexusHandler(CalcHandler):
         resultsList = self._resultsMapToList(resultsMap)
         return resultsList
 
-
+from threading import Lock
+SPARK_CONTEXT_LOCK = Lock()
 class SparkHandler(NexusHandler):
     class SparkJobContext(object):
 
@@ -283,9 +284,10 @@ class SparkHandler(NexusHandler):
             def wrapped(*args, **kwargs1):
                 try:
                     with SparkHandler.SparkJobContext(self.spark_job_stack) as job_context:
-                        # TODO Pool and Job are forced to a 1-to-1 relationship
-                        calc_func.im_self._sc.setLocalProperty("spark.scheduler.pool", job_context.job_name)
-                        calc_func.im_self._sc.setJobGroup(job_context.job_name, "a spark job")
+                        with SPARK_CONTEXT_LOCK:
+                            # TODO Pool and Job are forced to a 1-to-1 relationship
+                            calc_func.im_self._sc.setLocalProperty("spark.scheduler.pool", job_context.job_name)
+                            calc_func.im_self._sc.setJobGroup(job_context.job_name, "a spark job")
                         return calc_func(*args, **kwargs1)
                 except SparkHandler.SparkJobContext.MaxConcurrentJobsReached:
                     raise NexusProcessingException(code=503,
