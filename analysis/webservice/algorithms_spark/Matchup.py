@@ -169,14 +169,16 @@ class Matchup(SparkHandler):
 
         return bounding_polygon, primary_ds_name, matchup_ds_names, parameter_s, \
                    start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch, \
-                   depth_min, depth_max, time_tolerance, depth_tolerance, radius_tolerance
+                   depth_min, depth_max, time_tolerance, depth_tolerance, radius_tolerance, \
+                   platforms
 
     def calc(self, request, **args):
         start = int(round(time.time() * 1000))
         # TODO Assuming Satellite primary
         bounding_polygon, primary_ds_name, matchup_ds_names, parameter_s, \
             start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch, \
-            depth_min, depth_max, time_tolerance, depth_tolerance, radius_tolerance = self.parse_arguments(request)
+            depth_min, depth_max, time_tolerance, depth_tolerance, radius_tolerance, \
+            platforms = self.parse_arguments(request)
 
         with ResultsStorage() as resultsStorage:
 
