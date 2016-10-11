@@ -102,6 +102,13 @@ class Matchup(SparkHandler):
             "name": "Platforms",
             "type": "comma-delimited integer",
             "description": "Platforms to include for matchup consideration"
+        },
+        "matchOnce": {
+            "name": "Match Once",
+            "type": "boolean",
+            "description": "True/False flag used to determine if more than one match per primary point is returned. "
+                           + "If true, only the nearest point will be returned for each primary point. "
+                           + "If false, all points within the tolerances will be returned for each primary point. Default: False"
         }
     }
     singleton = True
@@ -164,13 +171,15 @@ class Matchup(SparkHandler):
         except:
             raise NexusProcessingException(reason="platforms must be a comma-delimited list of integers", code=400)
 
+        match_once = request.get_boolean_arg("matchOnce", default=False)
+
         start_seconds_from_epoch = long((start_time - EPOCH).total_seconds())
         end_seconds_from_epoch = long((end_time - EPOCH).total_seconds())
 
         return bounding_polygon, primary_ds_name, matchup_ds_names, parameter_s, \
                start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch, \
                depth_min, depth_max, time_tolerance, depth_tolerance, radius_tolerance, \
-               platforms
+               platforms, match_once
 
     def calc(self, request, **args):
         start = int(round(time.time() * 1000))
@@ -178,7 +187,7 @@ class Matchup(SparkHandler):
         bounding_polygon, primary_ds_name, matchup_ds_names, parameter_s, \
         start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch, \
         depth_min, depth_max, time_tolerance, depth_tolerance, radius_tolerance, \
-        platforms = self.parse_arguments(request)
+        platforms, match_once = self.parse_arguments(request)
 
         with ResultsStorage() as resultsStorage:
 
@@ -198,7 +207,7 @@ class Matchup(SparkHandler):
         try:
             spark_result = spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name,
                                                 matchup_ds_names, parameter_s, depth_min, depth_max, time_tolerance,
-                                                depth_tolerance, radius_tolerance, platforms, sc=self._sc)
+                                                depth_tolerance, radius_tolerance, platforms, match_once, sc=self._sc)
         except Exception as e:
             self.log.exception(e)
             raise NexusProcessingException(reason="An unknown error occurred while computing matches", code=500)
@@ -406,8 +415,9 @@ DRIVER_LOCK = Lock()
 
 
 def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_names, parameter, depth_min, depth_max,
-                         time_tolerance, depth_tolerance, radius_tolerance, platforms, sc=None):
+                         time_tolerance, depth_tolerance, radius_tolerance, platforms, match_once, sc=None):
     from functools import partial
+    from scipy.spatial.distance import cdist
 
     with DRIVER_LOCK:
         # Broadcast parameters
@@ -426,16 +436,33 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
         rdd = sc.parallelize(tile_ids, determine_parllelism(len(tile_ids)))
 
     # Map Partitions ( list(tile_id) )
-    rdd = rdd.mapPartitions(
+    rdd_filtered = rdd.mapPartitions(
         partial(match_satellite_to_insitu, primary_b=primary_b, matchup_b=matchup_b, parameter_b=parameter_b, tt_b=tt_b,
                 dt_b=dt_b, rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b, depth_min_b=depth_min_b,
                 depth_max_b=depth_max_b), preservesPartitioning=True) \
         .filter(lambda p_m_tuple: abs(
-        iso_time_to_epoch(p_m_tuple[0].time) - iso_time_to_epoch(p_m_tuple[1].time) <= time_tolerance)) \
-        .combineByKey(lambda value: [value],  # Create 1 element list
-                      lambda value_list, value: value_list + [value],  # Add 1 element to list
-                      lambda value_list_a, value_list_b: value_list_a + value_list_b)  # Add two lists together
-    result_as_map = rdd.collectAsMap()
+        iso_time_to_epoch(p_m_tuple[0].time) - iso_time_to_epoch(p_m_tuple[1].time) <= time_tolerance))
+
+    if match_once:
+        # Only the 'nearest' point for each primary should be returned. Add an extra map/reduce which calculates
+        # the distance and finds the minimum
+
+        # Method used for calculating the distance between 2 DomsPoints
+        def dist(primary, matchup):
+            return cdist(np.array([[primary.sh_point.x, primary.sh_point.y]]),
+                         np.array([[matchup.sh_point.x, matchup.sh_point.y]]), 'minkowski').item()
+
+        rdd_filtered = rdd_filtered\
+            .map(lambda (primary, matchup): tuple([primary, tuple([matchup, dist(primary, matchup)])])) \
+            .reduceByKey(lambda match_1, match_2: match_1 if match_1[1] < match_2[1] else match_2) \
+            .mapValues(lambda x: [x[0]])
+    else:
+        rdd_filtered = rdd_filtered\
+            .combineByKey(lambda value: [value],  # Create 1 element list
+                          lambda value_list, value: value_list + [value],  # Add 1 element to list
+                          lambda value_list_a, value_list_b: value_list_a + value_list_b)  # Add two lists together
+
+    result_as_map = rdd_filtered.collectAsMap()
 
     return result_as_map
 
