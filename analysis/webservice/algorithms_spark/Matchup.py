@@ -88,11 +88,6 @@ class Matchup(SparkHandler):
             "type": "long",
             "description": "Tolerance in time (seconds) when comparing two measurements"
         },
-        "dt": {
-            "name": "Depth Tolerance",
-            "type": "float",
-            "description": "Tolerance in depth when comparing two measurements"
-        },
         "rt": {
             "name": "Radius Tolerance",
             "type": "float",
@@ -159,7 +154,6 @@ class Matchup(SparkHandler):
                 reason="Depth Min should be less than Depth Max", code=400)
 
         time_tolerance = request.get_int_arg('tt', default=86400)
-        depth_tolerance = request.get_decimal_arg('dt', default=5.0)
         radius_tolerance = request.get_decimal_arg('rt', default=1000.0)
         platforms = request.get_argument('platforms', None)
         if platforms is None:
@@ -178,7 +172,7 @@ class Matchup(SparkHandler):
 
         return bounding_polygon, primary_ds_name, matchup_ds_names, parameter_s, \
                start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch, \
-               depth_min, depth_max, time_tolerance, depth_tolerance, radius_tolerance, \
+               depth_min, depth_max, time_tolerance, radius_tolerance, \
                platforms, match_once
 
     def calc(self, request, **args):
@@ -186,7 +180,7 @@ class Matchup(SparkHandler):
         # TODO Assuming Satellite primary
         bounding_polygon, primary_ds_name, matchup_ds_names, parameter_s, \
         start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch, \
-        depth_min, depth_max, time_tolerance, depth_tolerance, radius_tolerance, \
+        depth_min, depth_max, time_tolerance, radius_tolerance, \
         platforms, match_once = self.parse_arguments(request)
 
         with ResultsStorage() as resultsStorage:
@@ -207,7 +201,7 @@ class Matchup(SparkHandler):
         try:
             spark_result = spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name,
                                                 matchup_ds_names, parameter_s, depth_min, depth_max, time_tolerance,
-                                                depth_tolerance, radius_tolerance, platforms, match_once, sc=self._sc)
+                                                radius_tolerance, platforms, match_once, sc=self._sc)
         except Exception as e:
             self.log.exception(e)
             raise NexusProcessingException(reason="An unknown error occurred while computing matches", code=500)
@@ -416,7 +410,7 @@ DRIVER_LOCK = Lock()
 
 
 def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_names, parameter, depth_min, depth_max,
-                         time_tolerance, depth_tolerance, radius_tolerance, platforms, match_once, sc=None):
+                         time_tolerance, radius_tolerance, platforms, match_once, sc=None):
     from functools import partial
     from scipy.spatial.distance import cdist
 
@@ -427,7 +421,6 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
         depth_min_b = sc.broadcast(float(depth_min))
         depth_max_b = sc.broadcast(float(depth_max))
         tt_b = sc.broadcast(time_tolerance)
-        dt_b = sc.broadcast(float(depth_tolerance))
         rt_b = sc.broadcast(float(radius_tolerance))
         platforms_b = sc.broadcast(platforms)
         bounding_wkt_b = sc.broadcast(bounding_wkt)
@@ -439,7 +432,7 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
     # Map Partitions ( list(tile_id) )
     rdd_filtered = rdd.mapPartitions(
         partial(match_satellite_to_insitu, primary_b=primary_b, matchup_b=matchup_b, parameter_b=parameter_b, tt_b=tt_b,
-                dt_b=dt_b, rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b, depth_min_b=depth_min_b,
+                rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b, depth_min_b=depth_min_b,
                 depth_max_b=depth_max_b), preservesPartitioning=True) \
         .filter(lambda p_m_tuple: abs(
         iso_time_to_epoch(p_m_tuple[0].time) - iso_time_to_epoch(p_m_tuple[1].time) <= time_tolerance))
@@ -493,7 +486,7 @@ def add_meters_to_lon_lat(lon, lat, meters):
     return longitude, latitude
 
 
-def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b, dt_b, rt_b, platforms_b,
+def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b, rt_b, platforms_b,
                               bounding_wkt_b, depth_min_b, depth_max_b):
     the_time = datetime.now()
     tile_ids = list(tile_ids)
