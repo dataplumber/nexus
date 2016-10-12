@@ -146,10 +146,10 @@ class Matchup(SparkHandler):
                 reason="'endTime' argument is required. Can be int value seconds from epoch or string format YYYY-MM-DDTHH:mm:ssZ",
                 code=400)
 
-        depth_min = request.get_decimal_arg('depthMin', default=0.0)
-        depth_max = request.get_decimal_arg('depthMax', default=5.0)
+        depth_min = request.get_decimal_arg('depthMin', default=None)
+        depth_max = request.get_decimal_arg('depthMax', default=None)
 
-        if depth_min >= depth_max:
+        if depth_min is not None and depth_max is not None and depth_min >= depth_max:
             raise NexusProcessingException(
                 reason="Depth Min should be less than Depth Max", code=400)
 
@@ -222,12 +222,14 @@ class Matchup(SparkHandler):
             "platforms": platforms
         }
 
+        total_keys = len(spark_result.keys())
+        total_values = sum(len(v) for v in spark_result.itervalues())
         details = {
             "timeToComplete": (end - start),
             "numInSituRecords": 0,
-            "numInSituMatched": 0,
+            "numInSituMatched": total_values,
             "numGriddedChecked": 0,
-            "numGriddedMatched": 0
+            "numGriddedMatched": total_keys
         }
 
         matches = Matchup.convert_to_matches(spark_result)
