@@ -216,11 +216,15 @@ class Matchup(SparkHandler):
             "endTime": end_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
             "bbox": request.get_argument('b'),
             "timeTolerance": time_tolerance,
-            "depthMin": float(depth_min),
-            "depthMax": float(depth_max),
             "radiusTolerance": float(radius_tolerance),
             "platforms": platforms
         }
+
+        if depth_min is not None:
+            args["depthMin"] = float(depth_min)
+
+        if depth_max is not None:
+            args["depthMax"] = float(depth_max)
 
         total_keys = len(spark_result.keys())
         total_values = sum(len(v) for v in spark_result.itervalues())
@@ -420,8 +424,8 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
         # Broadcast parameters
         primary_b = sc.broadcast(primary_ds_name)
         matchup_b = sc.broadcast(matchup_ds_names)
-        depth_min_b = sc.broadcast(float(depth_min))
-        depth_max_b = sc.broadcast(float(depth_max))
+        depth_min_b = sc.broadcast(float(depth_min) if depth_min is not None else None)
+        depth_max_b = sc.broadcast(float(depth_max) if depth_max is not None else None)
         tt_b = sc.broadcast(time_tolerance)
         rt_b = sc.broadcast(float(radius_tolerance))
         platforms_b = sc.broadcast(platforms)
