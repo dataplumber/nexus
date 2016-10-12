@@ -96,7 +96,8 @@ class DomsCSVFormatter:
 
         rows.append("%s = \"%s\"" % ("time_coverage_start", datetime.fromtimestamp(params["startTime"] / 1000).strftime('%Y%m%d %H:%M:%S')))
         rows.append("%s = \"%s\"" % ("time_coverage_end", datetime.fromtimestamp(params["endTime"] / 1000).strftime('%Y%m%d %H:%M:%S')))
-        rows.append("%s = \"%s\"" % ("depth_tolerance", params["depthTolerance"]))
+        rows.append("%s = \"%s\"" % ("depth_min", params["depthMin"]))
+        rows.append("%s = \"%s\"" % ("depth_max", params["depthMax"]))
         rows.append("%s = \"%s\"" % ("platforms", params["platforms"]))
 
         rows.append("%s = \"%s\"" % ("Matchup_SearchRadius", params["radiusTolerance"]))
@@ -260,7 +261,8 @@ class DomsNetCDFFormatter:
 
         dataset.time_coverage_start = datetime.fromtimestamp(params["startTime"] / 1000).strftime('%Y%m%d %H:%M:%S')
         dataset.time_coverage_end = datetime.fromtimestamp(params["endTime"] / 1000).strftime('%Y%m%d %H:%M:%S')
-        dataset.depth_tolerance = params["depthTolerance"]
+        dataset.depth_min = params["depthMin"]
+        dataset.depth_max = params["depthMax"]
         dataset.platforms = params["platforms"]
 
         dataset.Matchup_SearchRadius = params["radiusTolerance"]

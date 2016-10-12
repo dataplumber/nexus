@@ -7,6 +7,7 @@ import ConfigParser
 import logging
 import pkg_resources
 
+from cassandra import InvalidRequest
 from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
 from webservice.NexusHandler import nexus_initializer
@@ -90,6 +91,26 @@ class DomsInitializer:
             );
         """
         session.execute(cql)
+        self.alterDomsParamsTable(session)
+
+    def alterDomsParamsTable(self, session):
+        log = logging.getLogger(__name__)
+        log.info("Altering doms_params table")
+        cql = """
+                    Alter TABLE doms_params ADD depth_min float;
+                """
+        try:
+            session.execute(cql)
+        except InvalidRequest:
+            pass
+
+        cql = """
+        Alter TABLE doms_params ADD depth_max float;
+        """
+        try:
+            session.execute(cql)
+        except InvalidRequest:
+            pass
 
     def createDomsDataTable(self, session):
         log = logging.getLogger(__name__)

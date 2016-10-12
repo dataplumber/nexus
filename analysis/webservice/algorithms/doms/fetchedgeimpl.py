@@ -77,10 +77,15 @@ def __fetchJson(url, params, trycount=1, maxtries=5):
         return __fetchJson(url, params, trycount + 1, maxtries)
 
 
-def __doQuery(endpoint, startTime, endTime, bbox, depthTolerance=1000, itemsPerPage=10, startIndex=0, platforms=None,
+def __doQuery(endpoint, startTime, endTime, bbox, depth_min=None, depth_max=None, itemsPerPage=10, startIndex=0, platforms=None,
               pageCallback=None):
     params = {"startTime": startTime, "endTime": endTime, "bbox": bbox, "itemsPerPage": itemsPerPage,
-              "startIndex": startIndex, "maxDepth": depthTolerance, "stats": "true"}
+              "startIndex": startIndex, "stats": "true"}
+
+    if depth_min is not None:
+        params['minDepth'] = depth_min
+    if depth_max is not None:
+        params['maxDepth'] = depth_max
 
     if platforms is not None:
         params["platform"] = platforms.split(",")
@@ -89,7 +94,7 @@ def __doQuery(endpoint, startTime, endTime, bbox, depthTolerance=1000, itemsPerP
     boundsConstrainer = geo.BoundsConstrainer(north=-90, south=90, west=180, east=-180)
 
     if resultsRaw["totalResults"] == 0 or len(resultsRaw["results"]) == 0:  # Double-sanity check
-        return [], 0, startIndex, itemsPerPage, boundsConstrainer
+        return [], resultsRaw["totalResults"], startIndex, itemsPerPage, boundsConstrainer
 
     try:
         results = []
@@ -124,16 +129,16 @@ def __doQuery(endpoint, startTime, endTime, bbox, depthTolerance=1000, itemsPerP
         # return [], 0, startIndex, itemsPerPage, boundsConstrainer
 
 
-def getCount(endpoint, startTime, endTime, bbox, depthTolerance, platforms=None):
+def getCount(endpoint, startTime, endTime, bbox, depth_min, depth_max, platforms=None):
     startIndex = 0
     pageResults, totalResults, pageStartIndex, itemsPerPageR, boundsConstrainer = __doQuery(endpoint, startTime,
                                                                                             endTime, bbox,
-                                                                                            depthTolerance, 0,
+                                                                                            depth_min, depth_max, 0,
                                                                                             startIndex, platforms)
     return totalResults, boundsConstrainer
 
 
-def fetch(endpoint, startTime, endTime, bbox, depthTolerance, platforms=None, pageCallback=None):
+def fetch(endpoint, startTime, endTime, bbox, depth_min, depth_max, platforms=None, pageCallback=None):
     results = []
     startIndex = 0
 
@@ -142,7 +147,7 @@ def fetch(endpoint, startTime, endTime, bbox, depthTolerance, platforms=None, pa
     # First isn't parellel so we can get the ttl results, forced items per page, etc...
     pageResults, totalResults, pageStartIndex, itemsPerPageR, boundsConstrainer = __doQuery(endpoint, startTime,
                                                                                             endTime, bbox,
-                                                                                            depthTolerance,
+                                                                                            depth_min, depth_max,
                                                                                             endpoint["itemsPerPage"],
                                                                                             startIndex, platforms,
                                                                                             pageCallback)
@@ -151,7 +156,7 @@ def fetch(endpoint, startTime, endTime, bbox, depthTolerance, platforms=None, pa
 
     pool = ThreadPool(processes=endpoint["fetchThreads"])
     mpResults = [pool.apply_async(__doQuery, args=(
-        endpoint, startTime, endTime, bbox, depthTolerance, itemsPerPageR, x, platforms, pageCallback)) for x in
+        endpoint, startTime, endTime, bbox, depth_min, depth_max, itemsPerPageR, x, platforms, pageCallback)) for x in
                  range(len(pageResults), totalResults, itemsPerPageR)]
     pool.close()
     pool.join()
@@ -168,8 +173,8 @@ def fetch(endpoint, startTime, endTime, bbox, depthTolerance, platforms=None, pa
         return results, mainBoundsConstrainer
 
 
-def getValues(endpoint, startTime, endTime, bbox, depthTolerance, platforms=None, placeholders=False):
-    results, boundsConstrainer = fetch(endpoint, startTime, endTime, bbox, depthTolerance, platforms)
+def getValues(endpoint, startTime, endTime, bbox, depth_min, depth_max, platforms=None, placeholders=False):
+    results, boundsConstrainer = fetch(endpoint, startTime, endTime, bbox, depth_min, depth_max, platforms)
 
     if placeholders:
         trimmedResults = []

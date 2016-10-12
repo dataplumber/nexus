@@ -27,13 +27,13 @@ class CombinedDomsMatchupQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
     def __init__(self):
         BaseDomsHandler.BaseDomsQueryHandler.__init__(self)
 
-    def fetchData(self, endpoints, startTime, endTime, bbox, depthTolerance, platforms):
+    def fetchData(self, endpoints, startTime, endTime, bbox, depth_min, depth_max, platforms):
 
         boundsConstrainer = geo.BoundsConstrainer(asString=bbox)
         threads = []
         for endpoint in endpoints:
             thread = workerthread.WorkerThread(datafetch.fetchData,
-                                               params=(endpoint, startTime, endTime, bbox, depthTolerance))
+                                               params=(endpoint, startTime, endTime, bbox, depth_min, depth_max))
             threads.append(thread)
         workerthread.wait(threads, startFirst=True, poll=0.01)
 
@@ -58,7 +58,8 @@ class CombinedDomsMatchupQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
         endTime = computeOptions.get_argument("e", None)
         bbox = computeOptions.get_argument("b", None)
         timeTolerance = computeOptions.get_float_arg("tt")
-        depthTolerance = computeOptions.get_float_arg("dt")
+        depth_min = computeOptions.get_float_arg("depthMin", default=None)
+        depth_max = computeOptions.get_float_arg("depthMax", default=None)
         radiusTolerance = computeOptions.get_float_arg("rt")
         platforms = computeOptions.get_argument("platforms", None)
 
@@ -74,7 +75,7 @@ class CombinedDomsMatchupQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
         if primarySpec is None:
             raise Exception("Specified primary dataset not found using identifier '%s'" % primary)
 
-        primaryData, bounds = self.fetchData([primarySpec], startTime, endTime, bbox, depthTolerance, platforms)
+        primaryData, bounds = self.fetchData([primarySpec], startTime, endTime, bbox, depth_min, depth_max, platforms)
 
         primaryContext = MatchupContext(primaryData)
 
@@ -84,7 +85,7 @@ class CombinedDomsMatchupQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
             matchupSpec = self.getDataSourceByName(matchupId)
 
             if matchupSpec is not None:  # Then it's in the in-situ configuration
-                proc = InsituDatasetProcessor(primaryContext, matchupSpec, startTime, endTime, bbox, depthTolerance,
+                proc = InsituDatasetProcessor(primaryContext, matchupSpec, startTime, endTime, bbox, depth_min, depth_max,
                                               platforms, timeTolerance, radiusTolerance)
                 proc.start()
             else:  # We assume it to be a Nexus tiled dataset
@@ -120,7 +121,8 @@ class CombinedDomsMatchupQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
             "endTime": endTime,
             "bbox": bbox,
             "timeTolerance": timeTolerance,
-            "depthTolerance": depthTolerance,
+            "depthMin": depth_min,
+            "depthMax": depth_max,
             "radiusTolerance": radiusTolerance,
             "platforms": platforms
         }
@@ -408,14 +410,15 @@ class MatchupContext:
 
 
 class InsituDatasetProcessor:
-    def __init__(self, primary, datasource, startTime, endTime, bbox, depthTolerance, platforms, timeTolerance,
+    def __init__(self, primary, datasource, startTime, endTime, bbox, depth_min, depth_max, platforms, timeTolerance,
                  radiusTolerance):
         self.primary = primary
         self.datasource = datasource
         self.startTime = startTime
         self.endTime = endTime
         self.bbox = bbox
-        self.depthTolerance = depthTolerance
+        self.depth_min = depth_min
+        self.depth_max = depth_max
         self.platforms = platforms
         self.timeTolerance = timeTolerance
         self.radiusTolerance = radiusTolerance
@@ -424,7 +427,7 @@ class InsituDatasetProcessor:
         def callback(pageData):
             self.primary.processInSitu(pageData, self.radiusTolerance, self.timeTolerance)
 
-        fetchedgeimpl.fetch(self.datasource, self.startTime, self.endTime, self.bbox, self.depthTolerance,
+        fetchedgeimpl.fetch(self.datasource, self.startTime, self.endTime, self.bbox, self.depth_min, self.depth_max,
                             self.platforms, pageCallback=callback)
 
 
