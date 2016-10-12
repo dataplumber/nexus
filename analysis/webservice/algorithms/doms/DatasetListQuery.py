@@ -57,6 +57,13 @@ class DomsDatasetListQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
         if datasetSpec is not None:
             return datasetSpec["metadataUrl"]
         else:
+
+            # KMG: NOT a good hack
+            if dataset == "JPL-L4_GHRSST-SSTfnd-MUR-GLOB-v02.0-fv04.1" or dataset == "JPL-L4_GHRSST-SSTfnd-MUR-GLOB-v02.0-fv04.1_CLIM":
+                dataset = "MUR-JPL-L4-GLOB-v4.1"
+            elif dataset == "SMAP_L2B_SSS":
+                dataset = "JPL_SMAP-SSS_L2_EVAL-V2"
+
             return "http://doms.jpl.nasa.gov/ws/metadata/dataset?shortName=%s&format=umm-json"%dataset
 
     def getMetadataForSource(self, dataset):
