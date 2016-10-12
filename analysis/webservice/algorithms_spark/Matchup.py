@@ -213,7 +213,8 @@ class Matchup(SparkHandler):
             "endTime": end_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
             "bbox": request.get_argument('b'),
             "timeTolerance": time_tolerance,
-            "depthTolerance": float(depth_tolerance),
+            "depthMin": float(depth_min),
+            "depthMax": float(depth_max),
             "radiusTolerance": float(radius_tolerance),
             "platforms": platforms
         }

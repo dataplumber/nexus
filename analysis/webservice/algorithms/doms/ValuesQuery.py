@@ -29,7 +29,8 @@ class DomsValuesQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
         endTime = computeOptions.get_end_datetime()
         bbox = computeOptions.get_argument("b", None)
         timeTolerance = computeOptions.get_float_arg("tt")
-        depthTolerance = computeOptions.get_float_arg("dt")
+        depth_min = computeOptions.get_float_arg("depthMin", default=None)
+        depth_max = computeOptions.get_float_arg("depthMax", default=None)
         radiusTolerance = computeOptions.get_float_arg("rt")
         platforms = computeOptions.get_argument("platforms", "")
 
@@ -37,7 +38,7 @@ class DomsValuesQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
         if source1 is None:
             raise Exception("Source '%s' not found"%source)
 
-        values, bounds = datafetch.getValues(source1, startTime.strftime('%Y-%m-%dT%H:%M:%SZ'), endTime.strftime('%Y-%m-%dT%H:%M:%SZ'), bbox, depthTolerance, platforms, placeholders=True)
+        values, bounds = datafetch.getValues(source1, startTime.strftime('%Y-%m-%dT%H:%M:%SZ'), endTime.strftime('%Y-%m-%dT%H:%M:%SZ'), bbox, depth_min, depth_max, platforms, placeholders=True)
         count = len(values)
 
         args = {
@@ -46,7 +47,8 @@ class DomsValuesQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
             "endTime": endTime,
             "bbox": bbox,
             "timeTolerance": timeTolerance,
-            "depthTolerance": depthTolerance,
+            "depthMin": depth_min,
+            "depthMax": depth_max,
             "radiusTolerance": radiusTolerance,
             "platforms": platforms
         }
