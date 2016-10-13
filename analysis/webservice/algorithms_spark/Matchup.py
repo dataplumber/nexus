@@ -335,15 +335,15 @@ class DomsPoint(object):
         elif parameter == 'wind':
             point.wind_u = nexus_point.data_val.item()
             try:
-                point.wind_v = tile.meta_data['wind_v'][nexus_point.index].item()
+                point.wind_v = tile.meta_data['wind_v'][tuple(nexus_point.index)].item()
             except (KeyError, IndexError):
                 pass
             try:
-                point.wind_direction = tile.meta_data['wind_direction'][nexus_point.index].item()
+                point.wind_direction = tile.meta_data['wind_dir'][tuple(nexus_point.index)].item()
             except (KeyError, IndexError):
                 pass
             try:
-                point.wind_speed = tile.meta_data['wind_speed'][nexus_point.index].item()
+                point.wind_speed = tile.meta_data['wind_speed'][tuple(nexus_point.index)].item()
             except (KeyError, IndexError):
                 pass
         else:
