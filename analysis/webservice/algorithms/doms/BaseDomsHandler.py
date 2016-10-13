@@ -178,26 +178,25 @@ class DomsCSVFormatter:
     @staticmethod
     def __packValues(primaryValue, rows):
 
-        cols = []
-
-        cols.append("\"%s\""%primaryValue["id"])
-        cols.append("\"%s\""%primaryValue["source"])
-        cols.append(str(primaryValue["x"]))
-        cols.append(str(primaryValue["y"]))
-        cols.append("\"%s\""%datetime.fromtimestamp(primaryValue["time"] / 1000).strftime('%Y%m%d %H:%M:%S') if "time" in primaryValue else "")
-        cols.append("\"%s\""%primaryValue["platform"])
-        cols.append(str(DomsCSVFormatter.__pickOne(primaryValue["sea_water_salinity_depth"] if "sea_water_salinity_depth" in primaryValue else None,
-                                                   primaryValue["sea_water_temperature_depth"] if "sea_water_temperature_depth" in primaryValue else None)))
-
-        cols.append(str(primaryValue["sea_water_salinity"] if "sea_water_salinity" in primaryValue else ""))
-        cols.append(str(primaryValue["sea_water_temperature"] if "sea_water_temperature" in primaryValue else ""))
-        cols.append(str(primaryValue["wind_speed"] if "wind_speed" in primaryValue else ""))
-        cols.append(str(primaryValue["wind_direction"] if "wind_direction" in primaryValue else ""))
-        cols.append(str(primaryValue["wind_u"] if "wind_u" in primaryValue else ""))
-        cols.append(str(primaryValue["wind_v"] if "wind_v" in primaryValue else ""))
-
-
         for value in primaryValue["matches"]:
+            cols = []
+
+            cols.append("\"%s\""%primaryValue["id"])
+            cols.append("\"%s\""%primaryValue["source"])
+            cols.append(str(primaryValue["x"]))
+            cols.append(str(primaryValue["y"]))
+            cols.append("\"%s\""%datetime.fromtimestamp(primaryValue["time"] / 1000).strftime('%Y%m%d %H:%M:%S') if "time" in primaryValue else "")
+            cols.append("\"%s\""%primaryValue["platform"])
+            cols.append(str(DomsCSVFormatter.__pickOne(primaryValue["sea_water_salinity_depth"] if "sea_water_salinity_depth" in primaryValue else None,
+                                                       primaryValue["sea_water_temperature_depth"] if "sea_water_temperature_depth" in primaryValue else None)))
+
+            cols.append(str(primaryValue["sea_water_salinity"] if "sea_water_salinity" in primaryValue else ""))
+            cols.append(str(primaryValue["sea_water_temperature"] if "sea_water_temperature" in primaryValue else ""))
+            cols.append(str(primaryValue["wind_speed"] if "wind_speed" in primaryValue else ""))
+            cols.append(str(primaryValue["wind_direction"] if "wind_direction" in primaryValue else ""))
+            cols.append(str(primaryValue["wind_u"] if "wind_u" in primaryValue else ""))
+            cols.append(str(primaryValue["wind_v"] if "wind_v" in primaryValue else ""))
+
             cols.append("\"%s\""%value["id"])
             cols.append("\"%s\""%value["source"])
             cols.append(str(value["x"]))
@@ -214,9 +213,9 @@ class DomsCSVFormatter:
             cols.append(str(value["wind_u"] if "wind_u" in value else ""))
             cols.append(str(value["wind_v"] if "wind_v" in value else ""))
 
-        cols = [v if v is not None else "" for v in cols]
+            cols = [v if v is not None else "" for v in cols]
 
-        rows.append(",".join(cols))
+            rows.append(",".join(cols))
 
 
 
