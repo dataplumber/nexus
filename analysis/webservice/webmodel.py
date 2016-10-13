@@ -169,6 +169,8 @@ class NexusRequestObject(StatsComputeOptions):
         if self.__validate_is_number(arg):
             return Decimal(arg)
         else:
+            if default is None:
+                return None
             return Decimal(default)
 
     def get_int_arg(self, name, default=0):
