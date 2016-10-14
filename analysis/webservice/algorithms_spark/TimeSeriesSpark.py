@@ -93,7 +93,8 @@ class TimeSeriesHandlerImpl(SparkAlg):
                                               min_lon, max_lon, ds, 
                                               start_time=0, end_time=-1,
                                               applySeasonalFilter=False, 
-                                              applyLowPass=False):
+                                              applyLowPass=False,
+                                              fill=-9999.):
 
         daysinrange = self._tile_service.find_days_in_range_asc(min_lat, 
                                                                 max_lat, 
@@ -106,6 +107,9 @@ class TimeSeriesHandlerImpl(SparkAlg):
             raise NoDataException(reason="No data found for selected timeframe")
 
         print 'Found %d days in range' % len(daysinrange)
+        for i,d in enumerate(daysinrange):
+            print i, datetime.utcfromtimestamp(d)
+        #print 'daysinrange=',daysinrange
 
         cwd = os.getcwd()
 
@@ -138,7 +142,7 @@ class TimeSeriesHandlerImpl(SparkAlg):
         sc = SparkContext(conf=sp_conf)
 
         nexus_tiles_spark = [(min_lat, max_lat, min_lon, max_lon, ds, 
-                              list(daysinrange_part), cwd)
+                              list(daysinrange_part), cwd, fill)
                              for daysinrange_part
                              in np.array_split(daysinrange, num_parts)]
 
@@ -156,7 +160,8 @@ class TimeSeriesHandlerImpl(SparkAlg):
         #filt.applyAllFiltersOnField(results, 'max', applySeasonal=applySeasonalFilter, applyLowPass=applyLowPass)
         #filt.applyAllFiltersOnField(results, 'min', applySeasonal=applySeasonalFilter, applyLowPass=applyLowPass)
 
-        self._create_nc_file_time1d(np.array(results), 'ts.nc', 'mean')
+        self._create_nc_file_time1d(np.array(results), 'ts.nc', 'mean',
+                                    fill=-9999.)
         return results, {}
 
     def calculateComparisonStats(self, results, suffix=""):
@@ -308,7 +313,7 @@ class TimeSeriesCalculator(SparkAlg):
     @staticmethod
     def calc_average_on_day(tile_in_spark):
         (min_lat, max_lat, min_lon, max_lon, dataset, 
-         timestamps, cwd) = tile_in_spark
+         timestamps, cwd, fill) = tile_in_spark
         os.chdir(cwd)
         start_time = timestamps[0]
         end_time = timestamps[-1]
@@ -346,9 +351,9 @@ class TimeSeriesCalculator(SparkAlg):
                                              for tile in ds1_nexus_tiles \
                                              if (tile.times[0] == timeinseconds)])
             if (len(tile_data_agg) == 0) or tile_data_agg.mask.all():
-                data_min = 0.
-                data_max = 0.
-                daily_mean = 0.
+                data_min = fill
+                data_max = fill
+                daily_mean = fill
                 data_count = 0
                 data_std = 0.
             else:

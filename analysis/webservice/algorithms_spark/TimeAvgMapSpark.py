@@ -54,20 +54,20 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
             t1 = time()
             print 'nexus call start at time %f' % t1
             sys.stdout.flush()
-            nexus_tiles = \
-                TimeAvgMapSparkHandlerImpl.query_by_parts(tile_service,
-                                                          min_lat, max_lat, 
-                                                          min_lon, max_lon, 
-                                                          ds, 
-                                                          t_start, 
-                                                          t_end,
-                                                          part_dim=2)
             #nexus_tiles = \
-            #    tile_service.get_tiles_bounded_by_box(min_lat, max_lat, 
-            #                                          min_lon, max_lon, 
-            #                                          ds=ds, 
-            #                                          start_time=t_start, 
-            #                                          end_time=t_end)
+            #    TimeAvgMapSparkHandlerImpl.query_by_parts(tile_service,
+            #                                              min_lat, max_lat, 
+            #                                              min_lon, max_lon, 
+            #                                              ds, 
+            #                                              t_start, 
+            #                                              t_end,
+            #                                              part_dim=2)
+            nexus_tiles = \
+                tile_service.get_tiles_bounded_by_box(min_lat, max_lat, 
+                                                      min_lon, max_lon, 
+                                                      ds=ds, 
+                                                      start_time=t_start, 
+                                                      end_time=t_end)
             t2 = time()
             print 'nexus call end at time %f' % t2
             print 'secs in nexus call: ', t2-t1
@@ -219,10 +219,12 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
                                         lambda x,val: (x[0]+val[0], 
                                                        x[1]+val[1]),
                                         lambda x,y: (x[0]+y[0], x[1]+y[1]))
+        fill = self._fill
         avg_tiles = \
             sum_count.map(lambda (bounds, (sum_tile, cnt_tile)):
                               (bounds, [[{'avg': (sum_tile[y,x]/cnt_tile[y,x]) 
-                                          if (cnt_tile[y,x] > 0) else 0., 
+                                          if (cnt_tile[y,x] > 0) 
+                                          else fill, 
                                           'cnt': cnt_tile[y,x]} 
                                          for x in 
                                          range(sum_tile.shape[1])] 
@@ -258,7 +260,7 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
                     sys.stdout.flush()
 
         # Store global map in a NetCDF file.
-        self._create_nc_file(a, 'tam.nc', 'val')
+        self._create_nc_file(a, 'tam.nc', 'val', fill=self._fill)
 
         # Create dict for JSON response
         results = [[{'avg': a[x,y], 'cnt': n[x,y]}
