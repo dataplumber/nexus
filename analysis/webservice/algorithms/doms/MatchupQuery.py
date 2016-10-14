@@ -1,31 +1,23 @@
-from webservice.NexusHandler import NexusHandler as BaseHandler
-from webservice.webmodel import StatsComputeOptions
-from webservice.NexusHandler import nexus_handler
-from webservice.NexusHandler import DEFAULT_PARAMETERS_SPEC
-from webservice.webmodel import NexusResults, NexusProcessingException
-from nexustiles.model.nexusmodel import get_approximate_value_for_lat_lon
-import BaseDomsHandler
+import math
+import uuid
 from datetime import datetime
-import ResultsStorage
 
+import numpy as np
+import utm
+from nexustiles.model.nexusmodel import get_approximate_value_for_lat_lon
+from scipy import spatial
+
+import BaseDomsHandler
+import ResultsStorage
 import datafetch
 import fetchedgeimpl
-import workerthread
 import geo
-import uuid
-import numpy as np
-from scipy import spatial
-import utm
-import calendar
-import requests
-import json
-from datetime import datetime
-import multiprocessing as mp
-import math
+import workerthread
+from webservice.NexusHandler import nexus_handler
+
 
 @nexus_handler
 class CombinedDomsMatchupQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
-
     name = "Experimental Combined DOMS In-Situ Matchup"
     path = "/domsmatchup"
     description = ""
@@ -35,14 +27,13 @@ class CombinedDomsMatchupQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
     def __init__(self):
         BaseDomsHandler.BaseDomsQueryHandler.__init__(self)
 
-
-    def fetchData(self, endpoints, startTime, endTime, bbox, depthTolerance, platforms):
-
+    def fetchData(self, endpoints, startTime, endTime, bbox, depth_min, depth_max, platforms):
 
         boundsConstrainer = geo.BoundsConstrainer(asString=bbox)
         threads = []
         for endpoint in endpoints:
-            thread = workerthread.WorkerThread(datafetch.fetchData, params=(endpoint, startTime, endTime, bbox, depthTolerance))
+            thread = workerthread.WorkerThread(datafetch.fetchData,
+                                               params=(endpoint, startTime, endTime, bbox, depth_min, depth_max))
             threads.append(thread)
         workerthread.wait(threads, startFirst=True, poll=0.01)
 
@@ -67,7 +58,8 @@ class CombinedDomsMatchupQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
         endTime = computeOptions.get_argument("e", None)
         bbox = computeOptions.get_argument("b", None)
         timeTolerance = computeOptions.get_float_arg("tt")
-        depthTolerance = computeOptions.get_float_arg("dt")
+        depth_min = computeOptions.get_float_arg("depthMin", default=None)
+        depth_max = computeOptions.get_float_arg("depthMax", default=None)
         radiusTolerance = computeOptions.get_float_arg("rt")
         platforms = computeOptions.get_argument("platforms", None)
 
@@ -81,35 +73,39 @@ class CombinedDomsMatchupQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
 
         primarySpec = self.getDataSourceByName(primary)
         if primarySpec is None:
-            raise Exception("Specified primary dataset not found using identifier '%s'"%primary)
+            raise Exception("Specified primary dataset not found using identifier '%s'" % primary)
 
-        primaryData, bounds = self.fetchData([primarySpec], startTime, endTime, bbox, depthTolerance, platforms)
-
+        primaryData, bounds = self.fetchData([primarySpec], startTime, endTime, bbox, depth_min, depth_max, platforms)
 
         primaryContext = MatchupContext(primaryData)
-
 
         matchupIds = matchup.split(",")
 
         for matchupId in matchupIds:
             matchupSpec = self.getDataSourceByName(matchupId)
 
-            if matchupSpec is not None: # Then it's in the in-situ configuration
-                proc = InsituDatasetProcessor(primaryContext, matchupSpec, startTime, endTime, bbox, depthTolerance, platforms, timeTolerance, radiusTolerance)
+            if matchupSpec is not None:  # Then it's in the in-situ configuration
+                proc = InsituDatasetProcessor(primaryContext, matchupSpec, startTime, endTime, bbox, depth_min, depth_max,
+                                              platforms, timeTolerance, radiusTolerance)
                 proc.start()
-            else: # We assume it to be a Nexus tiled dataset
+            else:  # We assume it to be a Nexus tiled dataset
 
                 '''
                 Single Threaded at the moment...
                 '''
-                daysinrange = self._tile_service.find_days_in_range_asc(bounds.south, bounds.north, bounds.west, bounds.east, matchupId, self.__parseDatetime(startTime) / 1000, self.__parseDatetime(endTime) / 1000)
+                daysinrange = self._tile_service.find_days_in_range_asc(bounds.south, bounds.north, bounds.west,
+                                                                        bounds.east, matchupId,
+                                                                        self.__parseDatetime(startTime) / 1000,
+                                                                        self.__parseDatetime(endTime) / 1000)
 
                 tilesByDay = {}
                 for dayTimestamp in daysinrange:
-                    ds1_nexus_tiles = self._tile_service.get_tiles_bounded_by_box_at_time(bounds.south, bounds.north, bounds.west, bounds.east, matchupId, dayTimestamp)
+                    ds1_nexus_tiles = self._tile_service.get_tiles_bounded_by_box_at_time(bounds.south, bounds.north,
+                                                                                          bounds.west, bounds.east,
+                                                                                          matchupId, dayTimestamp)
 
-                    #print "***", type(ds1_nexus_tiles)
-                    #print ds1_nexus_tiles[0].__dict__
+                    # print "***", type(ds1_nexus_tiles)
+                    # print ds1_nexus_tiles[0].__dict__
                     tilesByDay[dayTimestamp] = ds1_nexus_tiles
 
                 primaryContext.processGridded(tilesByDay, matchupId, radiusTolerance, timeTolerance)
@@ -125,7 +121,8 @@ class CombinedDomsMatchupQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
             "endTime": endTime,
             "bbox": bbox,
             "timeTolerance": timeTolerance,
-            "depthTolerance": depthTolerance,
+            "depthMin": depth_min,
+            "depthMax": depth_max,
             "radiusTolerance": radiusTolerance,
             "platforms": platforms
         }
@@ -139,15 +136,14 @@ class CombinedDomsMatchupQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
         }
 
         with ResultsStorage.ResultsStorage() as resultsStorage:
-            execution_id = resultsStorage.insertResults(results=matches, params=args, stats=details, startTime=start, completeTime=end, userEmail="")
+            execution_id = resultsStorage.insertResults(results=matches, params=args, stats=details, startTime=start,
+                                                        completeTime=end, userEmail="")
 
-        return BaseDomsHandler.DomsQueryResults(results=matches, args=args, details=details, bounds=None, count=None, computeOptions=None, executionId=execution_id)
-
-
+        return BaseDomsHandler.DomsQueryResults(results=matches, args=args, details=details, bounds=None, count=None,
+                                                computeOptions=None, executionId=execution_id)
 
 
 class MatchupContextMap:
-
     def __init__(self):
         pass
 
@@ -157,8 +153,8 @@ class MatchupContextMap:
     def delete(self, context):
         pass
 
-class MatchupContext:
 
+class MatchupContext:
     def __init__(self, primaryData):
         self.id = str(uuid.uuid4())
 
@@ -196,7 +192,8 @@ class MatchupContext:
 
     def processGridded(self, tilesByDay, source, xyTolerance, timeTolerance):
         for r in self.primary:
-            foundSatNodes = self.__getSatNodeForLatLonAndTime(tilesByDay, source, r["y"], r["x"], r["time"], xyTolerance)
+            foundSatNodes = self.__getSatNodeForLatLonAndTime(tilesByDay, source, r["y"], r["x"], r["time"],
+                                                              xyTolerance)
             self.griddedCount += 1
             self.griddedMatched += len(foundSatNodes)
             r["matches"].extend(foundSatNodes)
@@ -216,7 +213,6 @@ class MatchupContext:
                     if abs(match["time"] - s["time"]) <= (timeTolerance * 1000.0):
                         match["matches"].append(s)
 
-
     def __getValueForLatLon(self, chunks, lat, lon, arrayName="data"):
         value = get_approximate_value_for_lat_lon(chunks, lat, lon, arrayName)
         return value
@@ -227,7 +223,6 @@ class MatchupContext:
         elif value is not None:
             value = float(value)
         return value
-
 
     def __buildSwathIndexes(self, chunk):
         latlons = []
@@ -262,7 +257,6 @@ class MatchupContext:
             "indexes": indexes
         }
 
-
     def __getChunkIndexesForLatLon(self, chunk, lat, lon, xyTolerance):
         foundIndexes = []
         foundLatLons = []
@@ -282,7 +276,6 @@ class MatchupContext:
                 foundLatLons.append(latlons[i])
         return foundIndexes, foundLatLons
 
-
     def __getChunkValueAtIndex(self, chunk, index, arrayName=None):
 
         if arrayName is None or arrayName == "data":
@@ -291,9 +284,7 @@ class MatchupContext:
             data_val = chunk.meta_data[arrayName][0][index[0]][index[1]]
         return data_val.item() if (data_val is not np.ma.masked) and data_val.size == 1 else float('Nan')
 
-
-
-    def __getSatNodeForLatLonAndTime(self, chunksByDay,source, lat, lon, searchTime, xyTolerance):
+    def __getSatNodeForLatLonAndTime(self, chunksByDay, source, lat, lon, searchTime, xyTolerance):
         timeDiff = 86400 * 365 * 1000
         foundNodes = []
 
@@ -303,7 +294,7 @@ class MatchupContext:
                 for chunk in chunks:
                     indexes, latlons = self.__getChunkIndexesForLatLon(chunk, lat, lon, xyTolerance)
 
-                    #for index in indexes:
+                    # for index in indexes:
                     for i in range(0, len(indexes)):
                         index = indexes[i]
                         latlon = latlons[i]
@@ -323,9 +314,8 @@ class MatchupContext:
                             sst = value
                         elif "ASCATB" in source:
                             windU = value
-                        elif "SSS" in source: # SMAP
+                        elif "SSS" in source:  # SMAP
                             sss = value
-
 
                         if len(chunks) > 0 and "wind_dir" in chunks[0].meta_data:
                             windDirection = self.__checkNumber(self.__getChunkValueAtIndex(chunk, index, "wind_dir"))
@@ -353,19 +343,18 @@ class MatchupContext:
                         foundNodes.append(foundNode)
                 timeDiff = abs(ts - searchTime)
 
-
         return foundNodes
 
-    def __getSatNodeForLatLonAndTime__(self, chunksByDay,source, lat, lon, searchTime):
+    def __getSatNodeForLatLonAndTime__(self, chunksByDay, source, lat, lon, searchTime):
 
-        timeDiff = 86400*365*1000
+        timeDiff = 86400 * 365 * 1000
         foundNodes = []
 
         for ts in chunksByDay:
             chunks = chunksByDay[ts]
-            #print chunks
-            #ts = calendar.timegm(chunks.start.utctimetuple()) * 1000
-            if abs((ts*1000) - searchTime) < timeDiff:
+            # print chunks
+            # ts = calendar.timegm(chunks.start.utctimetuple()) * 1000
+            if abs((ts * 1000) - searchTime) < timeDiff:
                 value = self.__getValueForLatLon(chunks, lat, lon, arrayName="data")
                 value = self.__checkNumber(value)
 
@@ -406,9 +395,8 @@ class MatchupContext:
                     "depth": 0,
                     "sea_water_temperature_depth": 0,
                     "source": source,
-                    "id": "%s:%s:%s"%(ts, lat, lon)
+                    "id": "%s:%s:%s" % (ts, lat, lon)
                 }
-
 
                 isValidNode = True
                 if "ASCATB" in source and windSpeed is None:
@@ -421,32 +409,28 @@ class MatchupContext:
         return foundNodes
 
 
-
 class InsituDatasetProcessor:
-
-    def __init__(self, primary, datasource, startTime, endTime, bbox, depthTolerance, platforms, timeTolerance, radiusTolerance):
+    def __init__(self, primary, datasource, startTime, endTime, bbox, depth_min, depth_max, platforms, timeTolerance,
+                 radiusTolerance):
         self.primary = primary
         self.datasource = datasource
         self.startTime = startTime
         self.endTime = endTime
         self.bbox = bbox
-        self.depthTolerance = depthTolerance
+        self.depth_min = depth_min
+        self.depth_max = depth_max
         self.platforms = platforms
         self.timeTolerance = timeTolerance
         self.radiusTolerance = radiusTolerance
 
     def start(self):
-
         def callback(pageData):
             self.primary.processInSitu(pageData, self.radiusTolerance, self.timeTolerance)
 
-        fetchedgeimpl.fetch(self.datasource, self.startTime, self.endTime, self.bbox, self.depthTolerance, self.platforms, pageCallback=callback)
+        fetchedgeimpl.fetch(self.datasource, self.startTime, self.endTime, self.bbox, self.depth_min, self.depth_max,
+                            self.platforms, pageCallback=callback)
 
 
 class InsituPageProcessor:
-
     def __init__(self):
         pass
-
-
-

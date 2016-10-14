@@ -1,16 +1,8 @@
-
-from webservice.NexusHandler import nexus_handler
 import BaseDomsHandler
-import ResultsStorage
-import numpy as np
-import string
-from cStringIO import StringIO
-
-from multiprocessing import Process, Queue
-import traceback
-import sys
 import mapplot
 import scatterplot
+from webservice.NexusHandler import nexus_handler
+
 
 class PlotTypes:
     SCATTER = "scatter"
@@ -19,7 +11,6 @@ class PlotTypes:
 
 @nexus_handler
 class DomsResultsPlotHandler(BaseDomsHandler.BaseDomsQueryHandler):
-
     name = "DOMS Results Plotting"
     path = "/domsplot"
     description = ""
@@ -28,7 +19,6 @@ class DomsResultsPlotHandler(BaseDomsHandler.BaseDomsQueryHandler):
 
     def __init__(self):
         BaseDomsHandler.BaseDomsQueryHandler.__init__(self)
-
 
     def calc(self, computeOptions, **args):
         id = computeOptions.get_argument("id", None)
@@ -41,12 +31,4 @@ class DomsResultsPlotHandler(BaseDomsHandler.BaseDomsQueryHandler):
         elif plotType == PlotTypes.MAP:
             return mapplot.createMapPlot(id, parameter)
         else:
-            raise Exception("Unsupported plot type '%s' specified."%plotType)
-
-
-
-
-
-
-
-
+            raise Exception("Unsupported plot type '%s' specified." % plotType)

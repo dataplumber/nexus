@@ -2,11 +2,13 @@ import uuid
 
 import nexusproto.NexusContent_pb2 as nexusproto
 import numpy as np
-from cassandra.cqlengine import columns
-from cassandra.cqlengine import connection
+from cassandra.cqlengine import columns, connection, CQLEngineException
 from cassandra.cqlengine.models import Model
 from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
 from nexusproto.serialization import from_shaped_array
+from multiprocessing.synchronize import Lock
+
+INIT_LOCK = Lock()
 
 
 class NexusTileData(Model):
@@ -111,9 +113,14 @@ class CassandraProxy(object):
         self.__cass_keyspace = config.get("cassandra", "keyspace")
         self.__cass_local_DC = config.get("cassandra", "local_datacenter")
         self.__cass_protocol_version = int(config.get("cassandra", "protocol_version"))
-        self.__open()
+        with INIT_LOCK:
+            try:
+                connection.get_cluster()
+            except CQLEngineException:
+                self.__open()
 
     def __open(self):
+
         dc_policy = DCAwareRoundRobinPolicy(self.__cass_local_DC)
         token_policy = TokenAwarePolicy(dc_policy)
         connection.setup([host for host in self.__cass_url.split(',')], self.__cass_keyspace,

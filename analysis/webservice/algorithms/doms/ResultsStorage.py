@@ -73,14 +73,15 @@ class ResultsStorage(AbstractResultsContainer):
 
     def __insertParams(self, id, params):
         cql = """INSERT INTO doms_params
-                    (execution_id, primary_dataset, matchup_datasets, depth_tolerance, time_tolerance, radius_tolerance, start_time, end_time, platforms, bounding_box)
+                    (execution_id, primary_dataset, matchup_datasets, depth_min, depth_max, time_tolerance, radius_tolerance, start_time, end_time, platforms, bounding_box)
                  VALUES
-                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         self._session.execute(cql, (id,
                                     params["primary"],
                                     ",".join(params["matchup"]) if type(params["matchup"]) == list else params["matchup"],
-                                    params["depthTolerance"],
+                                    params["depthMin"] if "depthMin" in params.keys() else None,
+                                    params["depthMax"] if "depthMax" in params.keys() else None,
                                     int(params["timeTolerance"]),
                                     params["radiusTolerance"],
                                     self._parseDatetime(params["startTime"]),
@@ -242,7 +243,8 @@ class ResultsRetrieval(AbstractResultsContainer):
             params = {
                 "primary": row.primary_dataset,
                 "matchup": row.matchup_datasets.split(","),
-                "depthTolerance": row.depth_tolerance,
+                "depthMin": row.depth_min,
+                "depthMax": row.depth_max,
                 "timeTolerance": row.time_tolerance,
                 "radiusTolerance": row.radius_tolerance,
                 "startTime": row.start_time,

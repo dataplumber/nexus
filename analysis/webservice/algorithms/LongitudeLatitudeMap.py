@@ -15,7 +15,7 @@ from webservice.webmodel import NexusResults, NoDataException
 
 #TODO Need to update to use nexustiles
 
-@nexus_handler
+# @nexus_handler
 class LongitudeLatitudeMapHandlerImpl(NexusHandler):
 
     name = "Longitude/Latitude Time Average Map"

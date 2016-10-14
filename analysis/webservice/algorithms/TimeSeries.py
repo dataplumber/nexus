@@ -7,7 +7,7 @@ import traceback
 import logging
 from cStringIO import StringIO
 from datetime import datetime
-from multiprocessing import Pool, Manager
+from multiprocessing.dummy import Pool, Manager
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -294,7 +294,11 @@ class TimeSeriesCalculator(object):
         data_min = np.ma.min(tile_data_agg)
         data_max = np.ma.max(tile_data_agg)
         daily_mean = np.ma.mean(tile_data_agg).item()
-        data_count = np.ma.count(tile_data_agg).item()
+        data_count = np.ma.count(tile_data_agg)
+        try:
+            data_count = data_count.item()
+        except AttributeError:
+            pass
         data_std = np.ma.std(tile_data_agg)
 
         # Return Stats by day
@@ -318,6 +322,7 @@ def pool_worker(work_queue, done_queue):
             args = work[1:]
             result = calculator.__getattribute__(scifunction)(*args)
             done_queue.put(result)
+
     except Exception as e:
         e_str = traceback.format_exc(e)
         done_queue.put({'error': e_str})

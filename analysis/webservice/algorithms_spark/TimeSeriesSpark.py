@@ -2,31 +2,28 @@
 Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
-import sys
+import itertools
+import logging
 import os
 import traceback
-import logging
 from cStringIO import StringIO
 from datetime import datetime
-from multiprocessing import Pool, Manager
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
-import itertools
-from webservice.SparkAlg import SparkAlg
-from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMETERS_SPEC
 from nexustiles.nexustiles import NexusTileService
+from pyspark import SparkContext,SparkConf
 from scipy import stats
 
-from webservice import Filtering as filt
-from webservice.webmodel import NexusResults, NexusProcessingException, NoDataException
-from pyspark import SparkContext,SparkConf
+from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMETERS_SPEC
+from webservice.SparkAlg import SparkAlg
+from webservice.webmodel import NexusResults, NoDataException
 
 SENTINEL = 'STOP'
 
 
-@nexus_handler
+# @nexus_handler
 class TimeSeriesHandlerImpl(SparkAlg):
     name = "Time Series Spark"
     path = "/timeSeriesSpark"

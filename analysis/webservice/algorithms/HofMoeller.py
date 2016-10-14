@@ -95,7 +95,7 @@ class BaseHoffMoellerHandlerImpl(NexusHandler):
         return results
 
 
-@nexus_handler
+# @nexus_handler
 class LatitudeTimeHoffMoellerHandlerImpl(BaseHoffMoellerHandlerImpl):
     name = "Latitude/Time HofMoeller"
     path = "/latitudeTimeHofMoeller"

@@ -88,11 +88,6 @@ class Matchup(SparkHandler):
             "type": "long",
             "description": "Tolerance in time (seconds) when comparing two measurements"
         },
-        "dt": {
-            "name": "Depth Tolerance",
-            "type": "float",
-            "description": "Tolerance in depth when comparing two measurements"
-        },
         "rt": {
             "name": "Radius Tolerance",
             "type": "float",
@@ -102,6 +97,13 @@ class Matchup(SparkHandler):
             "name": "Platforms",
             "type": "comma-delimited integer",
             "description": "Platforms to include for matchup consideration"
+        },
+        "matchOnce": {
+            "name": "Match Once",
+            "type": "boolean",
+            "description": "True/False flag used to determine if more than one match per primary point is returned. "
+                           + "If true, only the nearest point will be returned for each primary point. "
+                           + "If false, all points within the tolerances will be returned for each primary point. Default: False"
         }
     }
     singleton = True
@@ -110,9 +112,7 @@ class Matchup(SparkHandler):
         SparkHandler.__init__(self, skipCassandra=True)
         self.log = logging.getLogger(__name__)
 
-    def calc(self, request, **args):
-        start = int(round(time.time() * 1000))
-        # TODO Assuming Satellite primary
+    def parse_arguments(self, request):
         # Parse input arguments
         self.log.debug("Parsing arguments")
         try:
@@ -127,7 +127,12 @@ class Matchup(SparkHandler):
         matchup_ds_names = request.get_argument('matchup', None)
         if matchup_ds_names is None:
             raise NexusProcessingException(reason="'matchup' argument is required", code=400)
+
         parameter_s = request.get_argument('parameter', 'sst')
+        if parameter_s not in ['sst', 'sss', 'wind']:
+            raise NexusProcessingException(
+                reason="Parameter %s not supported. Must be one of 'sst', 'sss', 'wind'." % parameter_s, code=400)
+
         try:
             start_time = request.get_start_datetime()
         except:
@@ -141,17 +146,42 @@ class Matchup(SparkHandler):
                 reason="'endTime' argument is required. Can be int value seconds from epoch or string format YYYY-MM-DDTHH:mm:ssZ",
                 code=400)
 
-        depth_min = request.get_decimal_arg('depthMin', default=0.0)
-        depth_max = request.get_decimal_arg('depthMax', default=5.0)
+        depth_min = request.get_decimal_arg('depthMin', default=None)
+        depth_max = request.get_decimal_arg('depthMax', default=None)
+
+        if depth_min is not None and depth_max is not None and depth_min >= depth_max:
+            raise NexusProcessingException(
+                reason="Depth Min should be less than Depth Max", code=400)
+
         time_tolerance = request.get_int_arg('tt', default=86400)
-        depth_tolerance = request.get_decimal_arg('dt', default=5.0)
         radius_tolerance = request.get_decimal_arg('rt', default=1000.0)
         platforms = request.get_argument('platforms', None)
         if platforms is None:
             raise NexusProcessingException(reason="'platforms' argument is required", code=400)
+        try:
+            p_validation = platforms.split(',')
+            p_validation = [int(p) for p in p_validation]
+            del p_validation
+        except:
+            raise NexusProcessingException(reason="platforms must be a comma-delimited list of integers", code=400)
+
+        match_once = request.get_boolean_arg("matchOnce", default=False)
 
         start_seconds_from_epoch = long((start_time - EPOCH).total_seconds())
         end_seconds_from_epoch = long((end_time - EPOCH).total_seconds())
+
+        return bounding_polygon, primary_ds_name, matchup_ds_names, parameter_s, \
+               start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch, \
+               depth_min, depth_max, time_tolerance, radius_tolerance, \
+               platforms, match_once
+
+    def calc(self, request, **args):
+        start = int(round(time.time() * 1000))
+        # TODO Assuming Satellite primary
+        bounding_polygon, primary_ds_name, matchup_ds_names, parameter_s, \
+        start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch, \
+        depth_min, depth_max, time_tolerance, radius_tolerance, \
+        platforms, match_once = self.parse_arguments(request)
 
         with ResultsStorage() as resultsStorage:
 
@@ -168,9 +198,14 @@ class Matchup(SparkHandler):
 
         # Call spark_matchup
         self.log.debug("Calling Spark Driver")
-        spark_result = spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name, matchup_ds_names,
-                                            parameter_s, depth_min, depth_max, time_tolerance, depth_tolerance,
-                                            radius_tolerance, platforms, sc=self._sc)
+        try:
+            spark_result = spark_matchup_driver(tile_ids, wkt.dumps(bounding_polygon), primary_ds_name,
+                                                matchup_ds_names, parameter_s, depth_min, depth_max, time_tolerance,
+                                                radius_tolerance, platforms, match_once, sc=self._sc)
+        except Exception as e:
+            self.log.exception(e)
+            raise NexusProcessingException(reason="An unknown error occurred while computing matches", code=500)
+
         end = int(round(time.time() * 1000))
 
         self.log.debug("Building and saving results")
@@ -181,17 +216,24 @@ class Matchup(SparkHandler):
             "endTime": end_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
             "bbox": request.get_argument('b'),
             "timeTolerance": time_tolerance,
-            "depthTolerance": float(depth_tolerance),
             "radiusTolerance": float(radius_tolerance),
             "platforms": platforms
         }
 
+        if depth_min is not None:
+            args["depthMin"] = float(depth_min)
+
+        if depth_max is not None:
+            args["depthMax"] = float(depth_max)
+
+        total_keys = len(spark_result.keys())
+        total_values = sum(len(v) for v in spark_result.itervalues())
         details = {
             "timeToComplete": (end - start),
             "numInSituRecords": 0,
-            "numInSituMatched": 0,
+            "numInSituMatched": total_values,
             "numGriddedChecked": 0,
-            "numGriddedMatched": 0
+            "numGriddedMatched": total_keys
         }
 
         matches = Matchup.convert_to_matches(spark_result)
@@ -293,15 +335,15 @@ class DomsPoint(object):
         elif parameter == 'wind':
             point.wind_u = nexus_point.data_val.item()
             try:
-                point.wind_v = tile.meta_data['wind_v'][nexus_point.index].item()
+                point.wind_v = tile.meta_data['wind_v'][tuple(nexus_point.index)].item()
             except (KeyError, IndexError):
                 pass
             try:
-                point.wind_direction = tile.meta_data['wind_direction'][nexus_point.index].item()
+                point.wind_direction = tile.meta_data['wind_dir'][tuple(nexus_point.index)].item()
             except (KeyError, IndexError):
                 pass
             try:
-                point.wind_speed = tile.meta_data['wind_speed'][nexus_point.index].item()
+                point.wind_speed = tile.meta_data['wind_speed'][tuple(nexus_point.index)].item()
             except (KeyError, IndexError):
                 pass
         else:
@@ -368,36 +410,59 @@ class DomsPoint(object):
         return point
 
 
+from threading import Lock
+
+DRIVER_LOCK = Lock()
+
+
 def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_names, parameter, depth_min, depth_max,
-                         time_tolerance, depth_tolerance, radius_tolerance, platforms, sc=None):
+                         time_tolerance, radius_tolerance, platforms, match_once, sc=None):
     from functools import partial
+    from scipy.spatial.distance import cdist
 
-    # Broadcast parameters
-    primary_b = sc.broadcast(primary_ds_name)
-    matchup_b = sc.broadcast(matchup_ds_names)
-    depth_min_b = sc.broadcast(float(depth_min))
-    depth_max_b = sc.broadcast(float(depth_max))
-    tt_b = sc.broadcast(time_tolerance)
-    dt_b = sc.broadcast(float(depth_tolerance))
-    rt_b = sc.broadcast(float(radius_tolerance))
-    platforms_b = sc.broadcast(platforms)
-    bounding_wkt_b = sc.broadcast(bounding_wkt)
-    parameter_b = sc.broadcast(parameter)
+    with DRIVER_LOCK:
+        # Broadcast parameters
+        primary_b = sc.broadcast(primary_ds_name)
+        matchup_b = sc.broadcast(matchup_ds_names)
+        depth_min_b = sc.broadcast(float(depth_min) if depth_min is not None else None)
+        depth_max_b = sc.broadcast(float(depth_max) if depth_max is not None else None)
+        tt_b = sc.broadcast(time_tolerance)
+        rt_b = sc.broadcast(float(radius_tolerance))
+        platforms_b = sc.broadcast(platforms)
+        bounding_wkt_b = sc.broadcast(bounding_wkt)
+        parameter_b = sc.broadcast(parameter)
 
-    # Parallelize list of tile ids
-    rdd = sc.parallelize(tile_ids, determine_parllelism(len(tile_ids)))
+        # Parallelize list of tile ids
+        rdd = sc.parallelize(tile_ids, determine_parllelism(len(tile_ids)))
 
     # Map Partitions ( list(tile_id) )
-    rdd = rdd.mapPartitions(
+    rdd_filtered = rdd.mapPartitions(
         partial(match_satellite_to_insitu, primary_b=primary_b, matchup_b=matchup_b, parameter_b=parameter_b, tt_b=tt_b,
-                dt_b=dt_b, rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b, depth_min_b=depth_min_b,
+                rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b, depth_min_b=depth_min_b,
                 depth_max_b=depth_max_b), preservesPartitioning=True) \
         .filter(lambda p_m_tuple: abs(
-        iso_time_to_epoch(p_m_tuple[0].time) - iso_time_to_epoch(p_m_tuple[1].time) <= time_tolerance)) \
-        .combineByKey(lambda value: [value],  # Create 1 element list
-                      lambda value_list, value: value_list + [value],  # Add 1 element to list
-                      lambda value_list_a, value_list_b: value_list_a + value_list_b)  # Add two lists together
-    result_as_map = rdd.collectAsMap()
+        iso_time_to_epoch(p_m_tuple[0].time) - iso_time_to_epoch(p_m_tuple[1].time) <= time_tolerance))
+
+    if match_once:
+        # Only the 'nearest' point for each primary should be returned. Add an extra map/reduce which calculates
+        # the distance and finds the minimum
+
+        # Method used for calculating the distance between 2 DomsPoints
+        def dist(primary, matchup):
+            return cdist(np.array([[primary.sh_point.x, primary.sh_point.y]]),
+                         np.array([[matchup.sh_point.x, matchup.sh_point.y]]), 'minkowski').item()
+
+        rdd_filtered = rdd_filtered\
+            .map(lambda (primary, matchup): tuple([primary, tuple([matchup, dist(primary, matchup)])])) \
+            .reduceByKey(lambda match_1, match_2: match_1 if match_1[1] < match_2[1] else match_2) \
+            .mapValues(lambda x: [x[0]])
+    else:
+        rdd_filtered = rdd_filtered\
+            .combineByKey(lambda value: [value],  # Create 1 element list
+                          lambda value_list, value: value_list + [value],  # Add 1 element to list
+                          lambda value_list_a, value_list_b: value_list_a + value_list_b)  # Add two lists together
+
+    result_as_map = rdd_filtered.collectAsMap()
 
     return result_as_map
 
@@ -427,7 +492,7 @@ def add_meters_to_lon_lat(lon, lat, meters):
     return longitude, latitude
 
 
-def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b, dt_b, rt_b, platforms_b,
+def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b, rt_b, platforms_b,
                               bounding_wkt_b, depth_min_b, depth_max_b):
     the_time = datetime.now()
     tile_ids = list(tile_ids)
