@@ -10,7 +10,8 @@ class SparkAlg(NexusHandler):
         NexusHandler.__init__(self, skipCassandra=False, skipSolr=False)
 
     def _setQueryParams(self, ds, bounds, start_time=None, end_time=None,
-                        start_year=None, end_year=None, clim_month=None):
+                        start_year=None, end_year=None, clim_month=None,
+                        fill=-9999.):
         self._ds = ds
         self._minLat, self._maxLat, self._minLon, self._maxLon = bounds
         self._startTime = start_time
@@ -18,6 +19,7 @@ class SparkAlg(NexusHandler):
         self._startYear = start_year
         self._endYear = end_year
         self._climMonth = clim_month
+        self._fill = fill
 
     def _find_native_resolution(self):
         if type(self._ds) in (list,tuple):
@@ -170,7 +172,8 @@ class SparkAlg(NexusHandler):
             t1 = time()
             print 'NEXUS call start at time %f' % t1
             sys.stdout.flush()
-            nexus_tiles = list(tile_service.fetch_data_for_tiles(*tiles))
+            nexus_tiles = list(tile_service._solr_docs_to_tiles(*tiles))
+            nexus_tiles = list(tile_service.fetch_data_for_tiles(*nexus_tiles))
             nexus_tiles = list(tile_service.mask_tiles_to_bbox(min_lat, max_lat,
                                                                min_lon, max_lon,
                                                                nexus_tiles))
@@ -194,7 +197,8 @@ class SparkAlg(NexusHandler):
     def _lon2ind(self,lon):
         return int((lon-self._minLonCent)/self._lonRes)
 
-    def _create_nc_file_time1d(self, a, fname, varname):
+    def _create_nc_file_time1d(self, a, fname, varname, varunits=None,
+                               fill=None):
         print 'a=',a
         print 'shape a = ', a.shape
         sys.stdout.flush()
@@ -202,13 +206,18 @@ class SparkAlg(NexusHandler):
         time_dim = len(a)
         rootgrp = Dataset(fname, "w", format="NETCDF4")
         rootgrp.createDimension("time", time_dim)
-        rootgrp.createVariable(varname, "f4", dimensions=("time",))
-        rootgrp.createVariable("time", "f4", dimensions=("time",))
-        rootgrp.variables[varname][:] = [d['mean'] for d in a]
-        rootgrp.variables["time"][:] = [d['time'] for d in a]
+        vals = rootgrp.createVariable(varname, "f4", dimensions=("time",),
+                                      fill_value=fill)
+        times = rootgrp.createVariable("time", "f4", dimensions=("time",))
+        vals[:] = [d['mean'] for d in a]
+        times[:] = [d['time'] for d in a]
+        if varunits is not None:
+            vals.units = varunits
+        times.units = 'seconds since 1970-01-01 00:00:00'
         rootgrp.close()
 
-    def _create_nc_file_latlon2d(self, a, fname, varname):
+    def _create_nc_file_latlon2d(self, a, fname, varname, varunits=None,
+                                 fill=None):
         print 'a=',a
         print 'shape a = ', a.shape
         sys.stdout.flush()
@@ -217,16 +226,21 @@ class SparkAlg(NexusHandler):
         rootgrp = Dataset(fname, "w", format="NETCDF4")
         rootgrp.createDimension("lat", lat_dim)
         rootgrp.createDimension("lon", lon_dim)
-        rootgrp.createVariable(varname, "f4",
-                               dimensions=("lat","lon",))
-        rootgrp.createVariable("lat", "f4", dimensions=("lat",))
-        rootgrp.createVariable("lon", "f4", dimensions=("lon",))
-        rootgrp.variables[varname][:,:] = a
-        rootgrp.variables["lat"][:] = np.linspace(self._minLatCent, 
-                                                  self._maxLatCent, lat_dim)
-        rootgrp.variables["lon"][:] = np.linspace(self._minLonCent,
-                                                  self._maxLonCent, lon_dim)
+        vals = rootgrp.createVariable(varname, "f4",
+                                      dimensions=("lat","lon",),
+                                      fill_value=fill)
+        lats = rootgrp.createVariable("lat", "f4", dimensions=("lat",))
+        lons = rootgrp.createVariable("lon", "f4", dimensions=("lon",))
+        vals[:,:] = a
+        lats[:] = np.linspace(self._minLatCent, 
+                              self._maxLatCent, lat_dim)
+        lons[:] = np.linspace(self._minLonCent,
+                              self._maxLonCent, lon_dim)
+        if varunits is not None:
+            vals.units = varunits
+        lats.units = "degrees north"
+        lons.units = "degrees east"
         rootgrp.close()
 
-    def _create_nc_file(self, a, fname, varname):
-        self._create_nc_file_latlon2d(a, fname, varname)
+    def _create_nc_file(self, a, fname, varname, **kwargs):
+        self._create_nc_file_latlon2d(a, fname, varname, **kwargs)
