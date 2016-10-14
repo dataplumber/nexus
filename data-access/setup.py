@@ -35,5 +35,6 @@ setuptools.setup(
         'Programming Language :: Python :: 2.7',
     ],
 
-    ext_modules=cythonize(["**/*.pyx"])
+    ext_modules=cythonize(["**/*.pyx"]),
+    zip_safe=False
 )
