@@ -2,10 +2,12 @@
 Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
+import traceback
+import logging
 import itertools
 from cStringIO import StringIO
 from datetime import datetime
-from multiprocessing.pool import ThreadPool
+from multiprocessing.dummy import Pool, Manager
 
 import matplotlib.pyplot as plt
 import mpld3
@@ -16,61 +18,66 @@ from matplotlib.ticker import FuncFormatter
 from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMETERS_SPEC
 from webservice.webmodel import NexusProcessingException, NexusResults
 
+SENTINEL = 'STOP'
+LATITUDE = 0
+LONGITUDE = 1
 
-def longitude_time_hofmoeller_stats(tile, index):
-    stat = {
-        'sequence': index,
-        'time': np.ma.min(tile.times),
-        'lons': []
-    }
+class LongitudeHofMoellerCalculator(object):
+    def longitude_time_hofmoeller_stats(self, tile, index):
+        stat = {
+            'sequence': index,
+            'time': np.ma.min(tile.times),
+            'lons': []
+        }
 
-    points = list(tile.nexus_point_generator())
-    data = sorted(points, key=lambda p: p.longitude)
-    points_by_lon = itertools.groupby(data, key=lambda p: p.longitude)
+        points = list(tile.nexus_point_generator())
+        data = sorted(points, key=lambda p: p.longitude)
+        points_by_lon = itertools.groupby(data, key=lambda p: p.longitude)
 
-    for lon, points_at_lon in points_by_lon:
-        values_at_lon = np.array([point.data_val for point in points_at_lon])
-        stat['lons'].append({
-            'longitude': float(lon),
-            'cnt': len(values_at_lon),
-            'avg': np.mean(values_at_lon).item(),
-            'max': np.max(values_at_lon).item(),
-            'min': np.min(values_at_lon).item(),
-            'std': np.std(values_at_lon).item()
-        })
+        for lon, points_at_lon in points_by_lon:
+            values_at_lon = np.array([point.data_val for point in points_at_lon])
+            stat['lons'].append({
+                'longitude': float(lon),
+                'cnt': len(values_at_lon),
+                'avg': np.mean(values_at_lon).item(),
+                'max': np.max(values_at_lon).item(),
+                'min': np.min(values_at_lon).item(),
+                'std': np.std(values_at_lon).item()
+            })
 
-    return stat
+        return stat
 
+class LatitudeHofMoellerCalculator(object):
+    def latitude_time_hofmoeller_stats(self, tile, index):
+        stat = {
+            'sequence': index,
+            'time': np.ma.min(tile.times),
+            'lats': []
+        }
 
-def latitude_time_hofmoeller_stats(tile, index):
-    stat = {
-        'sequence': index,
-        'time': np.ma.min(tile.times),
-        'lats': []
-    }
+        points = list(tile.nexus_point_generator())
+        data = sorted(points, key=lambda p: p.latitude)
+        points_by_lat = itertools.groupby(data, key=lambda p: p.latitude)
 
-    points = list(tile.nexus_point_generator())
-    data = sorted(points, key=lambda p: p.latitude)
-    points_by_lat = itertools.groupby(data, key=lambda p: p.latitude)
+        for lat, points_at_lat in points_by_lat:
+            values_at_lat = np.array([point.data_val for point in points_at_lat])
 
-    for lat, points_at_lat in points_by_lat:
-        values_at_lat = np.array([point.data_val for point in points_at_lat])
+            stat['lats'].append({
+                'latitude': float(lat),
+                'cnt': len(values_at_lat),
+                'avg': np.mean(values_at_lat).item(),
+                'max': np.max(values_at_lat).item(),
+                'min': np.min(values_at_lat).item(),
+                'std': np.std(values_at_lat).item()
+            })
 
-        stat['lats'].append({
-            'latitude': float(lat),
-            'cnt': len(values_at_lat),
-            'avg': np.mean(values_at_lat).item(),
-            'max': np.max(values_at_lat).item(),
-            'min': np.min(values_at_lat).item(),
-            'std': np.std(values_at_lat).item()
-        })
-
-    return stat
+        return stat
 
 
 class BaseHoffMoellerHandlerImpl(NexusHandler):
     def __init__(self):
         NexusHandler.__init__(self)
+        self.log = logging.getLogger(__name__)
 
     def applyDeseasonToHofMoellerByField(self, results, pivot="lats", field="avg", append=True):
         shape = (len(results), len(results[0][pivot]))
@@ -117,12 +124,42 @@ class LatitudeTimeHoffMoellerHandlerImpl(BaseHoffMoellerHandlerImpl):
             raise NexusProcessingException.NoDataException(reason="No data found for selected timeframe")
 
         maxprocesses = int(self.algorithm_config.get("multiprocessing", "maxprocesses"))
-        pool = ThreadPool(processes=maxprocesses)
-        results = [pool.apply_async(latitude_time_hofmoeller_stats, args=(tile, x)) for x, tile in enumerate(tiles)]
-        pool.close()
-        pool.join()
 
-        results = [p.get() for p in results]
+        results = []
+        if maxprocesses == 1:
+            calculator = LatitudeHofMoellerCalculator()
+            for x, tile in enumerate(tiles):
+                result = calculator.latitude_time_hofmoeller_stats(tile, x)
+                results.append(result)
+        else:
+            manager = Manager()
+            work_queue = manager.Queue()
+            done_queue = manager.Queue()
+            for x, tile in enumerate(tiles):
+                work_queue.put(
+                    ('latitude_time_hofmoeller_stats', tile, x))
+            [work_queue.put(SENTINEL) for _ in xrange(0, maxprocesses)]
+
+            # Start new processes to handle the work
+            pool = Pool(maxprocesses)
+            [pool.apply_async(pool_worker, (LATITUDE, work_queue, done_queue)) for _ in xrange(0, maxprocesses)]
+            pool.close()
+
+            # Collect the results
+            for x, tile in enumerate(tiles):
+                result = done_queue.get()
+                try:
+                    error_str = result['error']
+                    self.log.error(error_str)
+                    raise NexusProcessingException(reason="Error calculating latitude_time_hofmoeller_stats.")
+                except KeyError:
+                    pass
+
+                results.append(result)
+
+            pool.terminate()
+            manager.shutdown()
+
         results = sorted(results, key=lambda entry: entry["time"])
 
         results = self.applyDeseasonToHofMoeller(results)
@@ -131,7 +168,7 @@ class LatitudeTimeHoffMoellerHandlerImpl(BaseHoffMoellerHandlerImpl):
         return result
 
 
-@nexus_handler
+# @nexus_handler
 class LongitudeTimeHoffMoellerHandlerImpl(BaseHoffMoellerHandlerImpl):
     name = "Longitude/Time HofMoeller"
     path = "/longitudeTimeHofMoeller"
@@ -153,12 +190,42 @@ class LongitudeTimeHoffMoellerHandlerImpl(BaseHoffMoellerHandlerImpl):
             raise NexusProcessingException.NoDataException(reason="No data found for selected timeframe")
 
         maxprocesses = int(self.algorithm_config.get("multiprocessing", "maxprocesses"))
-        pool = ThreadPool(processes=maxprocesses)
-        results = [pool.apply_async(longitude_time_hofmoeller_stats, args=(tile, x)) for x, tile in enumerate(tiles)]
-        pool.close()
-        pool.join()
 
-        results = [p.get() for p in results]
+        results = []
+        if maxprocesses == 1:
+            calculator = LongitudeHofMoellerCalculator()
+            for x, tile in enumerate(tiles):
+                result = calculator.longitude_time_hofmoeller_stats(tile, x)
+                results.append(result)
+        else:
+            manager = Manager()
+            work_queue = manager.Queue()
+            done_queue = manager.Queue()
+            for x, tile in enumerate(tiles):
+                work_queue.put(
+                    ('longitude_time_hofmoeller_stats', tile, x))
+            [work_queue.put(SENTINEL) for _ in xrange(0, maxprocesses)]
+
+            # Start new processes to handle the work
+            pool = Pool(maxprocesses)
+            [pool.apply_async(pool_worker, (LONGITUDE, work_queue, done_queue)) for _ in xrange(0, maxprocesses)]
+            pool.close()
+
+            # Collect the results
+            for x, tile in enumerate(tiles):
+                result = done_queue.get()
+                try:
+                    error_str = result['error']
+                    self.log.error(error_str)
+                    raise NexusProcessingException(reason="Error calculating longitude_time_hofmoeller_stats.")
+                except KeyError:
+                    pass
+
+                results.append(result)
+
+            pool.terminate()
+            manager.shutdown()
+
         results = sorted(results, key=lambda entry: entry["time"])
 
         results = self.applyDeseasonToHofMoeller(results, pivot="lons")
@@ -272,3 +339,21 @@ class HoffMoellerResults(NexusResults):
             return self.createLongitudeHoffmueller(res, meta)
         else:
             raise Exception("Unsupported HoffMoeller Plot Type")
+
+def pool_worker(type, work_queue, done_queue):
+    try:
+
+        if type == LATITUDE:
+            calculator = LatitudeHofMoellerCalculator()
+        elif type == LONGITUDE:
+            calculator = LongitudeHofMoellerCalculator()
+
+        for work in iter(work_queue.get, SENTINEL):
+            scifunction = work[0]
+            args = work[1:]
+            result = calculator.__getattribute__(scifunction)(*args)
+            done_queue.put(result)
+
+    except Exception as e:
+        e_str = traceback.format_exc(e)
+        done_queue.put({'error': e_str})
