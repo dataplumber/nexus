@@ -441,7 +441,7 @@ def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_nam
                 rt_b=rt_b, platforms_b=platforms_b, bounding_wkt_b=bounding_wkt_b, depth_min_b=depth_min_b,
                 depth_max_b=depth_max_b), preservesPartitioning=True) \
         .filter(lambda p_m_tuple: abs(
-        iso_time_to_epoch(p_m_tuple[0].time) - iso_time_to_epoch(p_m_tuple[1].time) <= time_tolerance))
+        iso_time_to_epoch(p_m_tuple[0].time) - iso_time_to_epoch(p_m_tuple[1].time)) <= time_tolerance)
 
     if match_once:
         # Only the 'nearest' point for each primary should be returned. Add an extra map/reduce which calculates
