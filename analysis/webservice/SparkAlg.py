@@ -172,8 +172,7 @@ class SparkAlg(NexusHandler):
             t1 = time()
             print 'NEXUS call start at time %f' % t1
             sys.stdout.flush()
-            nexus_tiles = list(tile_service._solr_docs_to_tiles(*tiles))
-            nexus_tiles = list(tile_service.fetch_data_for_tiles(*nexus_tiles))
+            nexus_tiles = list(tile_service.fetch_data_for_tiles(*tiles))
             nexus_tiles = list(tile_service.mask_tiles_to_bbox(min_lat, max_lat,
                                                                min_lon, max_lon,
                                                                nexus_tiles))
