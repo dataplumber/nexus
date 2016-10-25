@@ -347,6 +347,11 @@ class TimeSeriesCalculator(SparkAlg):
             tile_data_agg = np.ma.array([tile.data.flatten() \
                                              for tile in ds1_nexus_tiles \
                                              if (tile.times[0] == timeinseconds)])
+            lats_agg = np.array([np.repeat(tile.latitudes,
+                                           len(tile.longitudes))
+                                 for tile in ds1_nexus_tiles 
+                                 if (tile.times[0] == 
+                                     timeinseconds)])
             if (len(tile_data_agg) == 0) or tile_data_agg.mask.all():
                 data_min = fill
                 data_max = fill
@@ -356,7 +361,10 @@ class TimeSeriesCalculator(SparkAlg):
             else:
                 data_min = np.ma.min(tile_data_agg)
                 data_max = np.ma.max(tile_data_agg)
-                daily_mean = np.ma.mean(tile_data_agg).item()
+                #daily_mean = np.ma.mean(tile_data_agg).item()
+                daily_mean = \
+                    np.ma.average(tile_data_agg,
+                                  weights=np.cos(np.radians(lats_agg))).item()
                 data_count = np.ma.count(tile_data_agg)
                 data_std = np.ma.std(tile_data_agg)
                 
