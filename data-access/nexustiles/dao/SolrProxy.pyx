@@ -163,6 +163,29 @@ class SolrProxy(object):
 
         return [results[0]]
 
+    def find_tile_by_polygon_and_most_recent_day_of_year(self, bounding_polygon, ds, day_of_year):
+
+        search = 'dataset_s:%s' % ds
+
+        minx, miny, maxx, maxy = bounding_polygon.bounds[0]
+
+        params = {
+            'fq': [
+                "tile_min_lon: %s" % minx,
+                "tile_min_lat: %s" % miny,
+                "tile_max_lon: %s" % maxx,
+                "tile_max_lat: %s" % maxy,
+                "tile_count_i:[1 TO *]",
+                "day_of_year_i:[* TO %s]" % day_of_year
+            ],
+            'rows': 1
+        }
+
+        results, start, found = self.do_query(
+            *(search, None, None, True, ('day_of_year_i desc',)), **params)
+
+        return [results[0]]
+
     def find_days_in_range_asc(self, min_lat, max_lat, min_lon, max_lon, ds, start_time, end_time, **kwargs):
 
         search = 'dataset_s:%s' % ds
