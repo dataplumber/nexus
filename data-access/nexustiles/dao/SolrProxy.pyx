@@ -145,36 +145,13 @@ class SolrProxy(object):
         l = sorted(l, key=lambda entry: entry["title"])
         return l
 
-    def find_tile_by_bbox_and_most_recent_day_of_year(self, min_lat, max_lat, min_lon, max_lon, ds, day_of_year):
-
-        search = 'dataset_s:%s' % ds
-
-        params = {
-            'fq': [
-                "geo:[%s,%s TO %s,%s]" % (min_lat, min_lon, max_lat, max_lon),
-                "tile_count_i:[1 TO *]",
-                "day_of_year_i:[* TO %s]" % day_of_year
-            ],
-            'rows': 1
-        }
-
-        results, start, found = self.do_query(
-            *(search, None, None, True, ('day_of_year_i desc',)), **params)
-
-        return [results[0]]
-
     def find_tile_by_polygon_and_most_recent_day_of_year(self, bounding_polygon, ds, day_of_year):
 
         search = 'dataset_s:%s' % ds
 
-        minx, miny, maxx, maxy = bounding_polygon.bounds[0]
-
         params = {
             'fq': [
-                "tile_min_lon: %s" % minx,
-                "tile_min_lat: %s" % miny,
-                "tile_max_lon: %s" % maxx,
-                "tile_max_lat: %s" % maxy,
+                "{!field f=geo}Intersects(%s)" % bounding_polygon.wkt,
                 "tile_count_i:[1 TO *]",
                 "day_of_year_i:[* TO %s]" % day_of_year
             ],
