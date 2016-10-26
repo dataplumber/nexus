@@ -27,7 +27,7 @@ class DatasetTilerIntegrationTest {
 
     private static SingleNodeApplication application;
 
-    private static int RECEIVE_TIMEOUT = Integer.MAX_VALUE;
+    private static int RECEIVE_TIMEOUT = 5000;
 
     private static String moduleName = "dataTiler";
 
@@ -144,6 +144,28 @@ class DatasetTilerIntegrationTest {
 
         assertEquals("phony_dim_0:0:76,phony_dim_1:0:1", result[0].toString())
         assertEquals("phony_dim_0:0:76,phony_dim_1:1:2", result[1].toString())
+    }
+
+    @Test
+    public void testSliceccmpByDesiredTiles() {
+        def tilesDesired = 1
+        def dimensions = "latitude,longitude"
+        def splitResult = true
+
+        def payload = new ClassPathResource("datasets/CCMP_Wind_Analysis_20160101_V02.0_L3.0_RSS.split.nc").getFile()
+
+        def streamName = "testDefault"
+
+
+        def processingChainUnderTest = "$moduleName --tilesDesired=$tilesDesired --dimensions=$dimensions --splitResult=$splitResult"
+
+        chain = chain(application, streamName, processingChainUnderTest)
+
+        chain.sendPayload(payload);
+        Object result = chain.receivePayload(RECEIVE_TIMEOUT)
+
+        assertTrue(result instanceof String)
+        assertEquals("longitude:0:87,latitude:0:38", result.toString())
     }
 
     /**
