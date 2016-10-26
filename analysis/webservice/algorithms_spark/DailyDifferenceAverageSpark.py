@@ -93,10 +93,12 @@ class DailyDifferenceAverageSparkImpl(SparkHandler):
         start_seconds_from_epoch = long((start_time - EPOCH).total_seconds())
         end_seconds_from_epoch = long((end_time - EPOCH).total_seconds())
 
-        return bounding_polygon, dataset, climatology, start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch
+        plot = request.get_boolean_arg("plot", default=False)
+
+        return bounding_polygon, dataset, climatology, start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch, plot
 
     def calc(self, request, **args):
-        bounding_polygon, dataset, climatology, start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch = self.parse_arguments(
+        bounding_polygon, dataset, climatology, start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch, plot = self.parse_arguments(
             request)
 
         self.log.debug("Querying for tiles in search domain")
@@ -120,8 +122,8 @@ class DailyDifferenceAverageSparkImpl(SparkHandler):
 
         averagebyday = spark_result
 
-        result = NexusResults(
-            results=[[{'time': dayms * 1000, 'mean': avg, 'ds': 0}] for dayms, avg in averagebyday],
+        result = DDAResult(
+            results=[[{'time': dayms, 'mean': avg, 'ds': 0}] for dayms, avg in averagebyday],
             stats={},
             meta=self.get_meta())
 
@@ -131,11 +133,6 @@ class DailyDifferenceAverageSparkImpl(SparkHandler):
 
         return result
 
-    def date_from_ms(self, dayms):
-        base_datetime = datetime(1970, 1, 1)
-        delta = timedelta(0, 0, 0, dayms)
-        return base_datetime + delta
-
     def get_meta(self):
         meta = {
             "title": "Sea Surface Temperature (SST) Anomalies",
@@ -143,6 +140,29 @@ class DailyDifferenceAverageSparkImpl(SparkHandler):
             "units": u'\u00B0C',
         }
         return meta
+
+
+class DDAResult(NexusResults):
+    def toImage(self):
+        from StringIO import StringIO
+        import matplotlib.pyplot as plt
+        from matplotlib.dates import date2num
+
+        times = [date2num(datetime.fromtimestamp(dayavglistdict[0]['time'], pytz.utc).date()) for dayavglistdict in
+                 self.results()]
+        means = [dayavglistdict[0]['mean'] for dayavglistdict in self.results()]
+        plt.plot_date(times, means, ls='solid')
+
+        plt.xlabel('Date')
+        plt.xticks(rotation=70)
+        plt.ylabel(u'Difference from 5-Day mean (\u00B0C)')
+        plt.title('Sea Surface Temperature (SST) Anomalies')
+        plt.grid(True)
+        plt.tight_layout()
+
+        sio = StringIO()
+        plt.savefig(sio, format='png')
+        return sio.getvalue()
 
 
 from threading import Lock
@@ -169,7 +189,7 @@ def spark_anomolies_driver(tile_ids, bounding_wkt, dataset, climatology, sc=None
         .mapPartitions(partial(calculate_diff, bounding_wkt=bounding_wkt_b, dataset=dataset_b,
                                climatology=climatology_b)) \
         .reduceByKey(add_tuple_elements) \
-        .mapValues(lambda x: x[0]/x[1]) \
+        .mapValues(lambda x: x[0] / x[1]) \
         .sortByKey() \
         .collect()
 
@@ -183,8 +203,8 @@ def generate_diff(data_tile, climatology_tile):
     diff_ct = np.ma.count(diff)
     diff_sum = np.ma.sum(diff)
     date_in_seconds = int((
-        datetime.combine(data_tile.min_time.date(), datetime.min.time()).replace(
-            tzinfo=pytz.UTC) - EPOCH).total_seconds())
+                              datetime.combine(data_tile.min_time.date(), datetime.min.time()).replace(
+                                  tzinfo=pytz.UTC) - EPOCH).total_seconds())
 
     print "%s Time to generate diff between %s and %s" % (
         str(datetime.now() - the_time), data_tile.tile_id, climatology_tile.tile_id)
