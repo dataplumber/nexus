@@ -11,7 +11,8 @@ class SparkAlg(NexusHandler):
 
     def _setQueryParams(self, ds, bounds, start_time=None, end_time=None,
                         start_year=None, end_year=None, clim_month=None,
-                        fill=-9999.):
+                        fill=-9999., spark_master=None, spark_nexecs=None,
+                        spark_nparts=None):
         self._ds = ds
         self._minLat, self._maxLat, self._minLon, self._maxLon = bounds
         self._startTime = start_time
@@ -20,6 +21,9 @@ class SparkAlg(NexusHandler):
         self._endYear = end_year
         self._climMonth = clim_month
         self._fill = fill
+        self._spark_master = spark_master
+        self._spark_nexecs = spark_nexecs
+        self._spark_nparts = spark_nparts
 
     def _find_native_resolution(self):
         if type(self._ds) in (list,tuple):

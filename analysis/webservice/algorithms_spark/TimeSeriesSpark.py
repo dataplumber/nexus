@@ -50,6 +50,7 @@ class TimeSeriesHandlerImpl(SparkAlg):
 
         resultsRaw = []
 
+        spark_master,spark_nexecs,spark_nparts = computeOptions.get_spark_cfg()
         for shortName in ds:
             results, meta = self.getTimeSeriesStatsForBoxSingleDataSet(computeOptions.get_min_lat(),
                                                                        computeOptions.get_max_lat(),
@@ -59,7 +60,10 @@ class TimeSeriesHandlerImpl(SparkAlg):
                                                                        computeOptions.get_start_time(),
                                                                        computeOptions.get_end_time(),
                                                                        computeOptions.get_apply_seasonal_cycle_filter(),
-                                                                       computeOptions.get_apply_low_pass_filter())
+                                                                       computeOptions.get_apply_low_pass_filter(),
+                                                                       spark_master=spark_master,
+                                                                       spark_nexecs=spark_nexecs,
+                                                                       spark_nparts=spark_nparts)
             resultsRaw.append([results, meta])
 
         results = self._mergeResults(resultsRaw)
@@ -91,7 +95,10 @@ class TimeSeriesHandlerImpl(SparkAlg):
                                               start_time=0, end_time=-1,
                                               applySeasonalFilter=False, 
                                               applyLowPass=False,
-                                              fill=-9999.):
+                                              fill=-9999.,
+                                              spark_master="local[1]",
+                                              spark_nexecs = 1,
+                                              spark_nparts = 1):
 
         daysinrange = self._tile_service.find_days_in_range_asc(min_lat, 
                                                                 max_lat, 
@@ -119,20 +126,9 @@ class TimeSeriesHandlerImpl(SparkAlg):
         #sp_conf.set("spark.yarn.executor.memoryOverhead", "4000")
         sp_conf.set("spark.executor.memory", "4g")
 
-        #num_parts = 1
-        #num_parts = 16
-        #num_parts = 32
-        #num_parts = 64
-        num_parts = 128
-        #num_execs = 1
-        #num_execs = 16
-        #num_execs = 32
-        num_execs = 64
         cores_per_exec = 1
-        sp_conf.setMaster("yarn-client")
-        #sp_conf.setMaster("local[16]")
-        #sp_conf.setMaster("local[1]")
-        sp_conf.set("spark.executor.instances", num_execs)
+        sp_conf.setMaster(spark_master)
+        sp_conf.set("spark.executor.instances", spark_nexecs)
         sp_conf.set("spark.executor.cores", cores_per_exec)
 
         #print sp_conf.getAll()
@@ -141,13 +137,13 @@ class TimeSeriesHandlerImpl(SparkAlg):
         nexus_tiles_spark = [(min_lat, max_lat, min_lon, max_lon, ds, 
                               list(daysinrange_part), cwd, fill)
                              for daysinrange_part
-                             in np.array_split(daysinrange, num_parts)]
+                             in np.array_split(daysinrange, spark_nparts)]
 
         #for tile in nexus_tiles_spark:
         #    print tile
         
         # Launch Spark computations
-        rdd = sc.parallelize(nexus_tiles_spark,num_parts)
+        rdd = sc.parallelize(nexus_tiles_spark,spark_nparts)
         results = rdd.map(TimeSeriesCalculator.calc_average_on_day).collect()
         #
         results = list(itertools.chain.from_iterable(results))

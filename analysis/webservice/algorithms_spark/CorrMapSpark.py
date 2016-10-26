@@ -149,13 +149,17 @@ class CorrMapSparkHandlerImpl(SparkAlg):
 
     def calc(self, computeOptions, **args):
 
+        spark_master,spark_nexecs,spark_nparts = computeOptions.get_spark_cfg()
         self._setQueryParams(computeOptions.get_dataset(),
                              (float(computeOptions.get_min_lat()),
                               float(computeOptions.get_max_lat()),
                               float(computeOptions.get_min_lon()),
                               float(computeOptions.get_max_lon())),
                              computeOptions.get_start_time(),
-                             computeOptions.get_end_time())
+                             computeOptions.get_end_time(),
+                             spark_master=spark_master,
+                             spark_nexecs=spark_nexecs,
+                             spark_nparts=spark_nparts)
 
         print 'ds = ',self._ds
         if not len(self._ds) == 2:
@@ -204,26 +208,18 @@ class CorrMapSparkHandlerImpl(SparkAlg):
         sp_conf.set("spark.executorEnv.PYTHONPATH", os.getcwd())
         sp_conf.set("spark.executor.memoryOverhead", "4g")
 
-        #num_parts = 1
-        num_parts = 16
-        #num_parts = 64
-        #num_parts = 128
-        #num_execs = 1
-        #num_execs = 8
-        num_execs = 16
-        #num_execs = 64
         cores_per_exec = 1
-        sp_conf.setMaster("yarn-client")
+        sp_conf.setMaster(self._spark_master)
         #sp_conf.setMaster("local[16]")
         #sp_conf.setMaster("local[1]")
-        sp_conf.set("spark.executor.instances", num_execs)
+        sp_conf.set("spark.executor.instances", self._spark_nexecs)
         sp_conf.set("spark.executor.cores", cores_per_exec)
 
         #print sp_conf.getAll()
         sc = SparkContext(conf=sp_conf)
         
         # Launch Spark computations
-        rdd = sc.parallelize(nexus_tile_specs,num_parts)
+        rdd = sc.parallelize(nexus_tile_specs,self._spark_nparts)
         corr_tiles = rdd.map(self._map).collect()
 
         r = np.zeros((nlats, nlons),dtype=np.float64,order='C')
