@@ -119,7 +119,7 @@ class TimeSeriesHandlerImpl(SparkAlg):
 
         # Configure Spark
         sp_conf = SparkConf()
-        sp_conf.setAppName("Spark Time Avg Map")
+        sp_conf.setAppName("Spark Time Series")
         sp_conf.set("spark.executorEnv.HOME",
                     os.path.join(os.getenv('HOME'), 'spark_exec_home'))
         sp_conf.set("spark.executorEnv.PYTHONPATH", cwd)
