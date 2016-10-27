@@ -43,5 +43,11 @@ if module_exists("pyspark"):
     except ImportError:
         pass
 
+    try:
+        import DailyDifferenceAverageSpark
+    except ImportError:
+        pass
+
+
 else:
     log.warn("pyspark not found. Skipping algorithms in %s" % os.path.dirname(__file__))

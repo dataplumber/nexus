@@ -9,6 +9,7 @@ from functools import wraps
 import numpy as np
 import numpy.ma as ma
 import pkg_resources
+import sys
 from pytz import timezone
 from shapely.geometry import MultiPolygon, box
 
@@ -38,6 +39,10 @@ def tile_data(default_fetch=True):
         return fetch_data_for_func
 
     return tile_data_decorator
+
+
+class NexusTileServiceException(Exception):
+    pass
 
 
 class NexusTileService(object):
@@ -71,10 +76,44 @@ class NexusTileService(object):
                                                  **kwargs)
 
     @tile_data()
-    def find_tile_by_bbox_and_most_recent_day_of_year(self, min_lat, max_lat, min_lon, max_lon, ds, day_of_year,
-                                                      **kwargs):
-        return self._solr.find_tile_by_bbox_and_most_recent_day_of_year(min_lat, max_lat, min_lon, max_lon, ds,
-                                                                        day_of_year)
+    def find_tile_by_bbox_and_most_recent_day_of_year(self, min_lat, max_lat, min_lon, max_lon, ds, day_of_year, **kwargs):
+        """
+        DEPRECATED: Prefer call to find_tile_by_polygon_and_most_recent_day_of_year instead.
+        """
+
+        polygon = box(min_lon, min_lat, max_lon, max_lat)
+        return self.find_tile_by_polygon_and_most_recent_day_of_year(polygon, ds, day_of_year)
+
+    @tile_data()
+    def find_tile_by_polygon_and_most_recent_day_of_year(self, bounding_polygon, ds, day_of_year, **kwargs):
+        """
+        Given a bounding polygon, dataset, and day of year, find tiles in that dataset with the same bounding
+        polygon and the closest day of year.
+
+        For example:
+            given a polygon minx=0, miny=0, maxx=1, maxy=1; dataset=MY_DS; and day of year=32
+            search for first tile in MY_DS with identical bbox and day_of_year <= 32 (sorted by day_of_year desc)
+
+        Valid matches:
+            minx=0, miny=0, maxx=1, maxy=1; dataset=MY_DS; day of year = 32
+            minx=0, miny=0, maxx=1, maxy=1; dataset=MY_DS; day of year = 30
+
+        Invalid matches:
+            minx=1, miny=0, maxx=2, maxy=1; dataset=MY_DS; day of year = 32
+            minx=0, miny=0, maxx=1, maxy=1; dataset=MY_OTHER_DS; day of year = 32
+            minx=0, miny=0, maxx=1, maxy=1; dataset=MY_DS; day of year = 30 if minx=0, miny=0, maxx=1, maxy=1; dataset=MY_DS; day of year = 32 also exists
+
+        :param bounding_polygon: The exact bounding polygon of tiles to search for
+        :param ds: The dataset name being searched
+        :param day_of_year: Tile day of year to search for, tile nearest to this day (without going over) will be returned
+        :return: List of one tile from ds with bounding_polygon on or before day_of_year or raise NexusTileServiceException if no tile found
+        """
+        try:
+            tile = self._solr.find_tile_by_polygon_and_most_recent_day_of_year(bounding_polygon, ds, day_of_year)
+        except IndexError:
+            raise NexusTileServiceException("No tile found."), None, sys.exc_info()[2]
+
+        return tile
 
     @tile_data()
     def find_all_tiles_in_box_at_time(self, min_lat, max_lat, min_lon, max_lon, dataset, time, **kwargs):
