@@ -112,6 +112,7 @@ class ClimMapSparkHandlerImpl(SparkAlg):
         :return:
         """
 
+        spark_master,spark_nexecs,spark_nparts = computeOptions.get_spark_cfg()
         self._setQueryParams(computeOptions.get_dataset()[0],
                              (float(computeOptions.get_min_lat()),
                               float(computeOptions.get_max_lat()),
@@ -119,7 +120,10 @@ class ClimMapSparkHandlerImpl(SparkAlg):
                               float(computeOptions.get_max_lon())),
                              start_year=computeOptions.get_start_year(),
                              end_year=computeOptions.get_end_year(),
-                             clim_month=computeOptions.get_clim_month())
+                             clim_month=computeOptions.get_clim_month(),
+                             spark_master=spark_master,
+                             spark_nexecs=spark_nexecs,
+                             spark_nparts=spark_nparts)
         self._startTime = timegm((self._startYear,1,1,0,0,0))
         self._endTime = timegm((self._endYear,12,31,23,59,59))
         
@@ -205,29 +209,18 @@ class ClimMapSparkHandlerImpl(SparkAlg):
         #sp_conf.set("spark.yarn.executor.memoryOverhead", "4000")
         sp_conf.set("spark.executor.memory", "4g")
 
-        #num_parts = 1
-        #num_parts = 16
-        #num_parts = 21
-        num_parts = 48
-        #num_parts = 64
-        #num_parts = 128
-        #num_parts = 1024
-        #num_execs = 1
-        num_execs = 16
-        #num_execs = 42
-        #num_execs = 64
         cores_per_exec = 1
-        sp_conf.setMaster("yarn-client")
+        sp_conf.setMaster(self._spark_master)
         #sp_conf.setMaster("local[16]")
         #sp_conf.setMaster("local[1]")
-        sp_conf.set("spark.executor.instances", num_execs)
+        sp_conf.set("spark.executor.instances", self._spark_nexecs)
         sp_conf.set("spark.executor.cores", cores_per_exec)
 
         #print sp_conf.getAll()
         sc = SparkContext(conf=sp_conf)
         
         # Launch Spark computations
-        rdd = sc.parallelize(nexus_tiles_spark,num_parts)
+        rdd = sc.parallelize(nexus_tiles_spark,self._spark_nparts)
         sum_count_part = rdd.map(self._map)
         sum_count = \
             sum_count_part.combineByKey(lambda val: val,
