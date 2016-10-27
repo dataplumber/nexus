@@ -3,7 +3,7 @@ Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import numpy as np
 import pytz
@@ -151,7 +151,7 @@ class DDAResult(NexusResults):
         times = [date2num(datetime.fromtimestamp(dayavglistdict[0]['time'], pytz.utc).date()) for dayavglistdict in
                  self.results()]
         means = [dayavglistdict[0]['mean'] for dayavglistdict in self.results()]
-        plt.plot_date(times, means, ls='solid')
+        plt.plot_date(times, means, '|g-')
 
         plt.xlabel('Date')
         plt.xticks(rotation=70)
@@ -166,9 +166,27 @@ class DDAResult(NexusResults):
 
 
 from threading import Lock
+from shapely.geometry import box
 import operator
 
 DRIVER_LOCK = Lock()
+
+
+class NoClimatologyTile(Exception):
+    pass
+
+
+class NoDatasetTile(Exception):
+    pass
+
+
+def determine_parllelism(num_tiles):
+    """
+    Try to stay at a maximum of 1500 tiles per partition; But don't go over 128 partitions.
+    Also, don't go below the default of 8
+    """
+    num_partitions = max(min(num_tiles // 1500, 128), 8)
+    return num_partitions
 
 
 def spark_anomolies_driver(tile_ids, bounding_wkt, dataset, climatology, sc=None):
@@ -180,7 +198,7 @@ def spark_anomolies_driver(tile_ids, bounding_wkt, dataset, climatology, sc=None
         climatology_b = sc.broadcast(climatology)
 
         # Parallelize list of tile ids
-        rdd = sc.parallelize(tile_ids)
+        rdd = sc.parallelize(tile_ids, determine_parllelism(len(tile_ids)))
 
     def add_tuple_elements(tuple1, tuple2):
         return tuple(map(operator.add, tuple1, tuple2))
@@ -196,24 +214,7 @@ def spark_anomolies_driver(tile_ids, bounding_wkt, dataset, climatology, sc=None
     return result
 
 
-def generate_diff(data_tile, climatology_tile):
-    the_time = datetime.now()
-    # Subtract climatology tile from data tile
-    diff = np.ma.subtract(data_tile.data, climatology_tile.data)
-    diff_ct = np.ma.count(diff)
-    diff_sum = np.ma.sum(diff)
-    date_in_seconds = int((
-                              datetime.combine(data_tile.min_time.date(), datetime.min.time()).replace(
-                                  tzinfo=pytz.UTC) - EPOCH).total_seconds())
-
-    print "%s Time to generate diff between %s and %s" % (
-        str(datetime.now() - the_time), data_tile.tile_id, climatology_tile.tile_id)
-
-    yield (date_in_seconds, (diff_sum, diff_ct))
-
-
 def calculate_diff(tile_ids, bounding_wkt, dataset, climatology):
-    from shapely.geometry import box
     from itertools import chain
 
     # Construct a list of generators that yield (day, sum, count)
@@ -225,34 +226,87 @@ def calculate_diff(tile_ids, bounding_wkt, dataset, climatology):
     tile_service = NexusTileService()
 
     for tile_id in tile_ids:
-        # Load the dataset tile
+        # Get the dataset tile
         try:
-            the_time = datetime.now()
-            dataset_tile = tile_service.mask_tiles_to_polygon(wkt.loads(bounding_wkt.value),
-                                                              tile_service.find_tile_by_id(tile_id))[0]
-            print "%s Time to load tile %s" % (str(datetime.now() - the_time), tile_id)
-        except IndexError:
+            dataset_tile = get_dataset_tile(tile_service, wkt.loads(bounding_wkt.value), tile_id)
+        except NoDatasetTile:
             # This should only happen if all measurements in a tile become masked after applying the bounding polygon
             continue
 
         tile_day_of_year = dataset_tile.min_time.timetuple().tm_yday
 
-        # Load the climatology tile
+        # Get the climatology tile
         try:
-            the_time = datetime.now()
-            climatology_tile = tile_service.mask_tiles_to_polygon(wkt.loads(bounding_wkt.value),
-                                                                  tile_service.find_tile_by_polygon_and_most_recent_day_of_year(
-                                                                      box(dataset_tile.bbox.min_lon,
-                                                                          dataset_tile.bbox.min_lat,
-                                                                          dataset_tile.bbox.max_lon,
-                                                                          dataset_tile.bbox.max_lat),
-                                                                      climatology.value,
-                                                                      tile_day_of_year))[0]
-            print "%s Time to load climatology tile %s" % (str(datetime.now() - the_time), tile_id)
-        except IndexError:
-            # This should only happen if all measurements in a tile become masked after applying the bounding polygon
+            climatology_tile = get_climatology_tile(tile_service, wkt.loads(bounding_wkt.value),
+                                                    box(dataset_tile.bbox.min_lon,
+                                                        dataset_tile.bbox.min_lat,
+                                                        dataset_tile.bbox.max_lon,
+                                                        dataset_tile.bbox.max_lat),
+                                                    climatology.value,
+                                                    tile_day_of_year)
+        except NoClimatologyTile:
             continue
 
         diff_generators.append(generate_diff(dataset_tile, climatology_tile))
 
     return chain(*diff_generators)
+
+
+def get_dataset_tile(tile_service, search_bounding_shape, tile_id):
+    the_time = datetime.now()
+
+    try:
+        # Load the dataset tile
+        dataset_tile = tile_service.find_tile_by_id(tile_id)[0]
+        # Mask it to the search domain
+        dataset_tile = tile_service.mask_tiles_to_polygon(search_bounding_shape, [dataset_tile])[0]
+    except IndexError:
+        raise NoDatasetTile()
+
+    print "%s Time to load dataset tile %s" % (str(datetime.now() - the_time), dataset_tile.tile_id)
+    return dataset_tile
+
+
+def get_climatology_tile(tile_service, search_bounding_shape, tile_bounding_shape, climatology_dataset,
+                         tile_day_of_year):
+    the_time = datetime.now()
+    try:
+        # Load the tile
+        climatology_tile = tile_service.find_tile_by_polygon_and_most_recent_day_of_year(
+            tile_bounding_shape,
+            climatology_dataset,
+            tile_day_of_year)[0]
+
+    except IndexError:
+        raise NoClimatologyTile()
+
+    if search_bounding_shape.contains(tile_bounding_shape):
+        # The tile is totally contained in the search area, we don't need to mask it.
+        pass
+    else:
+        # The tile is not totally contained in the search area,
+        #     we need to mask the data to the search domain.
+        try:
+            # Mask it to the search domain
+            climatology_tile = tile_service.mask_tiles_to_polygon(search_bounding_shape, [climatology_tile])[0]
+        except IndexError:
+            raise NoClimatologyTile()
+
+    print "%s Time to load climatology tile %s" % (str(datetime.now() - the_time), climatology_tile.tile_id)
+    return climatology_tile
+
+
+def generate_diff(data_tile, climatology_tile):
+    the_time = datetime.now()
+
+    diff = np.subtract(data_tile.data, climatology_tile.data)
+    diff_sum = np.nansum(diff)
+    diff_ct = diff.size - np.count_nonzero(np.isnan(diff))
+
+    date_in_seconds = int((datetime.combine(data_tile.min_time.date(), datetime.min.time()).replace(
+        tzinfo=pytz.UTC) - EPOCH).total_seconds())
+
+    print "%s Time to generate diff between %s and %s" % (
+        str(datetime.now() - the_time), data_tile.tile_id, climatology_tile.tile_id)
+
+    yield (date_in_seconds, (diff_sum, diff_ct))
