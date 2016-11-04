@@ -31,7 +31,14 @@ class SparkAlg(NexusHandler):
         else:
             ds = self._ds
         ntiles = 0
-        t_incr = 86400
+        ##################################################################
+        # Temporary workaround until we have dataset metadata to indicate
+        # temporal resolution.
+        if "monthly" in ds.lower():
+            t_incr = 2592000 # 30 days
+        else:
+            t_incr = 86400 # 1 day
+        ##################################################################
         t = self._endTime
         while ntiles == 0:
             nexus_tiles = self.query_by_parts(self._tile_service,
@@ -70,8 +77,15 @@ class SparkAlg(NexusHandler):
         else:
             ds = self._ds
         ntiles = 0
+        ##################################################################
+        # Temporary workaround until we have dataset metadata to indicate
+        # temporal resolution.
+        if "monthly" in ds.lower():
+            t_incr = 2592000 # 30 days
+        else:
+            t_incr = 86400 # 1 day
+        ##################################################################
         t = self._endTime
-        t_incr = 86400
         while ntiles == 0:
             nexus_tiles = self._tile_service.get_tiles_bounded_by_box(self._minLat, self._maxLat, self._minLon, self._maxLon, ds=ds, start_time=t-t_incr, end_time=t)
             ntiles = len(nexus_tiles)
