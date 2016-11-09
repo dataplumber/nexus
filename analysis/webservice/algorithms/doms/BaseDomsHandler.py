@@ -308,8 +308,8 @@ class DomsNetCDFFormatter:
         idDim = dataset.createDimension("id", size=None)
         primaryIdDim = dataset.createDimension("primary_id", size=None)
 
-        idVar = dataset.createVariable("id", "i4", ("id",))
-        primaryIdVar = dataset.createVariable("primary_id", "i4", ("primary_id",))
+        idVar = dataset.createVariable("id", "i4", ("id",), chunksizes=(2048,))
+        primaryIdVar = dataset.createVariable("primary_id", "i4", ("primary_id",), chunksizes=(2048,))
 
         idVar[:] = idList
         primaryIdVar[:] = primaryIdList
@@ -339,17 +339,13 @@ class DomsNetCDFFormatter:
     @staticmethod
     def __packDataIntoDimensions(idVar, primaryIdVar, values, primaryValueId=None):
 
-        idIndex = primaryValueId + 1 if primaryValueId is not None else 0
-
         for value in values:
-            idVar.append(idIndex)
+            id = hash(value["id"])
+            idVar.append(id)
             primaryIdVar.append(primaryValueId if primaryValueId is not None else -1)
-            idIndex = idIndex + 1
 
             if "matches" in value and len(value["matches"]) > 0:
-                idIndex = DomsNetCDFFormatter.__packDataIntoDimensions(idVar, primaryIdVar, value["matches"], idIndex)
-
-        return idIndex
+                DomsNetCDFFormatter.__packDataIntoDimensions(idVar, primaryIdVar, value["matches"], id)
 
     @staticmethod
     def __packDimensionList(values, field, varList):
@@ -364,12 +360,176 @@ class DomsNetCDFFormatter:
     @staticmethod
     def __createDimension(dataset, values, name, type, arrayField):
         dim = dataset.createDimension(name, size=None)
-        var = dataset.createVariable(name, type, (name,))
+        var = dataset.createVariable(name, type, (name,), chunksizes=(2048, ), fill_value=-32767.0)
 
         varList = []
         DomsNetCDFFormatter.__packDimensionList(values, arrayField, varList)
 
         var[:] = varList
+
+        if name == "lon":
+            DomsNetCDFFormatter.__enrichLonVariable(var)
+        elif name == "lat":
+            DomsNetCDFFormatter.__enrichLatVariable(var)
+        elif name == "time":
+            DomsNetCDFFormatter.__enrichTimeVariable(var)
+        elif name == "sea_water_salinity":
+            DomsNetCDFFormatter.__enrichSSSVariable(var)
+        elif name == "sea_water_salinity_depth":
+            DomsNetCDFFormatter.__enrichSSSDepthVariable(var)
+        elif name == "sea_water_temperature":
+            DomsNetCDFFormatter.__enrichSSTVariable(var)
+        elif name == "sea_water_temperature_depth":
+            DomsNetCDFFormatter.__enrichSSTDepthVariable(var)
+        elif name == "wind_direction":
+            DomsNetCDFFormatter.__enrichWindDirectionVariable(var)
+        elif name == "wind_speed":
+            DomsNetCDFFormatter.__enrichWindSpeedVariable(var)
+        elif name == "wind_u":
+            DomsNetCDFFormatter.__enrichWindUVariable(var)
+        elif name == "wind_v":
+            DomsNetCDFFormatter.__enrichWindVVariable(var)
+
+
+    @staticmethod
+    def __enrichSSSVariable(var):
+        var.long_name = "sea surface salinity"
+        var.standard_name = "sea_surface_salinity"
+        var.units = "1e-3"
+        var.valid_min = 30
+        var.valid_max = 40
+        var.scale_factor = 1.0
+        var.add_offset = 0.0
+        var.coordinates = "lon lat time"
+        var.grid_mapping = "crs"
+        var.comment = ""
+        var.cell_methods = ""
+        var.metadata_link = ""
+
+
+    @staticmethod
+    def __enrichSSSDepthVariable(var):
+        var.long_name = "sea surface salinity_depth"
+        var.standard_name = "sea_surface_salinity_depth"
+        var.units = "m"
+        var.scale_factor = 1.0
+        var.add_offset = 0.0
+        var.coordinates = "lon lat time"
+        var.grid_mapping = "crs"
+        var.comment = ""
+        var.cell_methods = ""
+        var.metadata_link = ""
+
+    @staticmethod
+    def __enrichSSTVariable(var):
+        var.long_name = "sea surface temperature"
+        var.standard_name = "sea_surface_temperature"
+        var.units = "c"
+        var.valid_min = -3
+        var.valid_max = 50
+        var.scale_factor = 1.0
+        var.add_offset = 0.0
+        var.coordinates = "lon lat time"
+        var.grid_mapping = "crs"
+        var.comment = ""
+        var.cell_methods = ""
+        var.metadata_link = ""
+
+    @staticmethod
+    def __enrichSSTDepthVariable(var):
+        var.long_name = "sea surface temperature_depth"
+        var.standard_name = "sea_surface_temperature_depth"
+        var.units = "m"
+        var.scale_factor = 1.0
+        var.add_offset = 0.0
+        var.coordinates = "lon lat time"
+        var.grid_mapping = "crs"
+        var.comment = ""
+        var.cell_methods = ""
+        var.metadata_link = ""
+
+    @staticmethod
+    def __enrichWindDirectionVariable(var):
+        var.long_name = "wind direction"
+        var.standard_name = "wind_direction"
+        var.units = "degrees"
+        var.scale_factor = 1.0
+        var.add_offset = 0.0
+        var.coordinates = "lon lat time"
+        var.grid_mapping = "crs"
+        var.comment = ""
+        var.cell_methods = ""
+        var.metadata_link = ""
+
+    @staticmethod
+    def __enrichWindSpeedVariable(var):
+        var.long_name = "wind speed"
+        var.standard_name = "wind_speed"
+        var.units = "km/h"
+        var.scale_factor = 1.0
+        var.add_offset = 0.0
+        var.coordinates = "lon lat time"
+        var.grid_mapping = "crs"
+        var.comment = ""
+        var.cell_methods = ""
+        var.metadata_link = ""
+
+    @staticmethod
+    def __enrichWindUVariable(var):
+        var.long_name = "wind u"
+        var.standard_name = "wind_u"
+        var.units = ""
+        var.scale_factor = 1.0
+        var.add_offset = 0.0
+        var.coordinates = "lon lat time"
+        var.grid_mapping = "crs"
+        var.comment = ""
+        var.cell_methods = ""
+        var.metadata_link = ""
+
+    @staticmethod
+    def __enrichWindVVariable(var):
+        var.long_name = "wind v"
+        var.standard_name = "wind_v"
+        var.units = ""
+        var.scale_factor = 1.0
+        var.add_offset = 0.0
+        var.coordinates = "lon lat time"
+        var.grid_mapping = "crs"
+        var.comment = ""
+        var.cell_methods = ""
+        var.metadata_link = ""
+
+    @staticmethod
+    def __enrichTimeVariable(var):
+        var.long_name = "Time"
+        var.standard_name = "time"
+        var.axis = "T"
+        var.units = "seconds since 1970-01-01 00:00:00 0:00"
+        var.calendar = "standard"
+        var.comment = "Nominal time of satellite corresponding to the start of the product time interval"
+
+
+
+    @staticmethod
+    def __enrichLonVariable(var):
+        var.long_name = "Longitude"
+        var.standard_name = "longitude"
+        var.axis = "X"
+        var.units = "degrees_east"
+        var.valid_min = -180.0
+        var.valid_max = 180.0
+        var.comment = "Data longitude for in-situ, midpoint beam for satellite measurements."
+
+    @staticmethod
+    def __enrichLatVariable(var):
+        var.long_name = "Latitude"
+        var.standard_name = "latitude"
+        var.axis = "Y"
+        var.units = "degrees_north"
+        var.valid_min = -90.0
+        var.valid_max = 90.0
+        var.comment = "Data latitude for in-situ, midpoint beam for satellite measurements."
 
     @staticmethod
     def __addNetCDFConstants(dataset):
