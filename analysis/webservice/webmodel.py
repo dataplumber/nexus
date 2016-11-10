@@ -310,8 +310,6 @@ class NexusRequestObject(StatsComputeOptions):
         nparts = int(nparts)
         if (nparts < 1) or (nparts > SparkConfig.MAX_NUM_PARTS):
             raise ValueError('Invalid number of Spark data partitions: %d (must be between 1 and %d)' % (nparts,SparkConfig.MAX_NUM_PARTS))
-        if master == "yarn":
-            master = "yarn-client"
         if master == "local":
             master = "local[%d]" % nexecs
         return master,nexecs,nparts
