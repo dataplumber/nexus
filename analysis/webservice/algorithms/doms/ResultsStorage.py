@@ -214,7 +214,8 @@ class ResultsRetrieval(AbstractResultsContainer):
             "y": row.y,
             "source": row.source_dataset,
             "device": row.device,
-            "platform": row.platform
+            "platform": row.platform,
+            "time": row.measurement_time
         }
         for key in row.measurement_values:
             value = row.measurement_values[key]
