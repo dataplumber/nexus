@@ -168,21 +168,23 @@ if __name__ == "__main__":
     log.info("Initializing request ThreadPool to %s" % max_request_threads)
     request_thread_pool = ThreadPool(processes=max_request_threads)
 
+    spark_context = None
     for clazzWrapper in NexusHandler.AVAILABLE_HANDLERS:
         if issubclass(clazzWrapper.clazz(), NexusHandler.SparkHandler):
-            from pyspark import SparkContext, SparkConf
+            if spark_context is None:
+                from pyspark import SparkContext, SparkConf
 
-            # Configure Spark
-            sp_conf = SparkConf()
-            sp_conf.setAppName(str(clazzWrapper.clazz()))
-            sp_conf.set("spark.scheduler.mode", "FAIR")
-            sp_conf.set("spark.executor.memory", "6g")
+                # Configure Spark
+                sp_conf = SparkConf()
+                sp_conf.setAppName("nexus-analysis")
+                sp_conf.set("spark.scheduler.mode", "FAIR")
+                sp_conf.set("spark.executor.memory", "6g")
 
-            sc = SparkContext(conf=sp_conf)
+                spark_context = SparkContext(conf=sp_conf)
 
             handlers.append(
                 (clazzWrapper.path(), ModularNexusHandlerWrapper,
-                 dict(clazz=clazzWrapper, algorithm_config=algorithm_config, sc=sc, thread_pool=request_thread_pool)))
+                 dict(clazz=clazzWrapper, algorithm_config=algorithm_config, sc=spark_context, thread_pool=request_thread_pool)))
         else:
             handlers.append(
                 (clazzWrapper.path(), ModularNexusHandlerWrapper,

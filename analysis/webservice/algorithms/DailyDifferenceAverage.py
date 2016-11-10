@@ -9,7 +9,7 @@ from multiprocessing.dummy import Pool, Manager
 
 import numpy as np
 import pytz
-from nexustiles.nexustiles import NexusTileService
+from nexustiles.nexustiles import NexusTileService, NexusTileServiceException
 
 from webservice.NexusHandler import NexusHandler, nexus_handler
 from webservice.webmodel import NexusResults, NexusProcessingException
@@ -195,7 +195,7 @@ class DailyDifferenceAverageCalculator(object):
                                                                                     dataset2, day_of_year)[0]
                 # Subtract ds2 tile from ds1 tile
                 diff = np.subtract(ds1_tile.data, ds2_tile.data)
-            except IndexError:
+            except NexusTileServiceException:
                 # This happens when there is data in ds1tile but all NaNs in ds2tile because the
                 # Solr query being used filters out results where stats_count = 0.
                 # Technically, this should never happen if ds2 is a climatology generated in part from ds1
