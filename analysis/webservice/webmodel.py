@@ -302,7 +302,7 @@ class NexusRequestObject(StatsComputeOptions):
             master,nexecs,nparts = arg.split(',')
         except:
             raise ValueError('Invalid spark configuration: %s' % arg)
-        if master not in ("local", "yarn"):
+        if master not in ("local", "yarn", "mesos"):
             raise ValueError('Invalid spark master: %s' % master)
         nexecs = int(nexecs)
         if (nexecs < 1) or (nexecs > SparkConfig.MAX_NUM_EXECS):

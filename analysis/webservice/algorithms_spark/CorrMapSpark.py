@@ -209,10 +209,14 @@ class CorrMapSparkHandlerImpl(SparkAlg):
         sp_conf.set("spark.executor.memoryOverhead", "4g")
 
         cores_per_exec = 1
-        sp_conf.setMaster(self._spark_master)
-        #sp_conf.setMaster("local[16]")
-        #sp_conf.setMaster("local[1]")
-        sp_conf.set("spark.executor.instances", self._spark_nexecs)
+        if spark_master == "mesos":
+            # For Mesos, the master is set from environment variable MASTER
+            # and number of executors is set from spark.cores.max.
+            sp_conf.set("spark.cores.max", spark_nexecs)
+        else:
+            # Master is "yarn" or "local[N]" (not Mesos)
+            sp_conf.setMaster(spark_master)
+            sp_conf.set("spark.executor.instances", spark_nexecs)
         sp_conf.set("spark.executor.cores", cores_per_exec)
 
         #print sp_conf.getAll()
