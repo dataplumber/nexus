@@ -207,6 +207,11 @@ class TestReadAscatbData(unittest.TestCase):
         environ['META'] = 'wind_dir'
         reload(self.module)
 
+        # with open('./ascat_longitude_more_than_180.bin', 'w') as f:
+        #     results = list(self.module.read_swath_data(None,
+        #                                                "NUMROWS:0:1,NUMCELLS:0:82;NUMROWS:1:2,NUMCELLS:0:82;file:///Users/greguska/Downloads/ascat_longitude_more_than_180.nc4"))
+        #     f.write(results[0])
+
         test_file = path.join(path.dirname(__file__), 'datafiles', 'not_empty_ascatb.nc4')
 
         results = list(self.module.read_swath_data(None,
