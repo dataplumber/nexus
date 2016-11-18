@@ -2,33 +2,117 @@
 Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
+import logging
 import math
+from datetime import datetime
 
 import numpy as np
+from pytz import timezone
 from scipy import stats
+from shapely.geometry import box
 
-from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMETERS_SPEC
-from webservice.webmodel import NexusResults, NoDataException
+from webservice.NexusHandler import NexusHandler, nexus_handler
+from webservice.webmodel import NexusResults, NoDataException, NexusProcessingException
+
+# TODO Need to update to use nexustiles
+
+SENTINEL = 'STOP'
+EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
 
 
-#from mpl_toolkits.basemap import Basemap
-
-#TODO Need to update to use nexustiles
-
-# @nexus_handler
+@nexus_handler
 class LongitudeLatitudeMapHandlerImpl(NexusHandler):
-
     name = "Longitude/Latitude Time Average Map"
     path = "/longitudeLatitudeMap"
     description = "Computes a Latitude/Longitude Time Average plot given an arbitrary geographical area and time range"
-    params = DEFAULT_PARAMETERS_SPEC
+    params = {
+        "ds": {
+            "name": "Dataset",
+            "type": "string",
+            "description": "One or more comma-separated dataset shortnames"
+        },
+        "minLat": {
+            "name": "Minimum Latitude",
+            "type": "float",
+            "description": "Minimum (Southern) bounding box Latitude"
+        },
+        "maxLat": {
+            "name": "Maximum Latitude",
+            "type": "float",
+            "description": "Maximum (Northern) bounding box Latitude"
+        },
+        "minLon": {
+            "name": "Minimum Longitude",
+            "type": "float",
+            "description": "Minimum (Western) bounding box Longitude"
+        },
+        "maxLon": {
+            "name": "Maximum Longitude",
+            "type": "float",
+            "description": "Maximum (Eastern) bounding box Longitude"
+        },
+        "startTime": {
+            "name": "Start Time",
+            "type": "string",
+            "description": "Starting time in format YYYY-MM-DDTHH:mm:ssZ or seconds since epoch (Jan 1st, 1970)"
+        },
+        "endTime": {
+            "name": "End Time",
+            "type": "string",
+            "description": "Ending time in format YYYY-MM-DDTHH:mm:ssZ or seconds since epoch (Jan 1st, 1970)"
+        }
+    }
     singleton = True
 
     def __init__(self):
-        NexusHandler.__init__(self)
+        NexusHandler.__init__(self, skipCassandra=True)
+        self.log = logging.getLogger(__name__)
+
+    def parse_arguments(self, request):
+        # Parse input arguments
+        self.log.debug("Parsing arguments")
+        try:
+            ds = request.get_dataset('ds', None)[0]
+        except:
+            raise NexusProcessingException(reason="'ds' argument is required", code=400)
+
+        try:
+            bounding_polygon = box(request.get_min_lon(), request.get_min_lat(), request.get_max_lon(),
+                                   request.get_max_lat())
+        except:
+            raise NexusProcessingException(
+                reason="'minLon', 'minLat', 'maxLon', and 'maxLat' arguments are required.",
+                code=400)
+
+        try:
+            start_time = request.get_start_datetime_ms()
+        except:
+            raise NexusProcessingException(
+                reason="'startTime' argument is required. Can be int value milliseconds from epoch or string format YYYY-MM-DDTHH:mm:ssZ",
+                code=400)
+        try:
+            end_time = request.get_end_datetime_ms()
+        except:
+            raise NexusProcessingException(
+                reason="'endTime' argument is required. Can be int value milliseconds from epoch or string format YYYY-MM-DDTHH:mm:ssZ",
+                code=400)
+
+        start_seconds_from_epoch = long((start_time - EPOCH).total_seconds())
+        end_seconds_from_epoch = long((end_time - EPOCH).total_seconds())
+
+        return ds, bounding_polygon, start_seconds_from_epoch, end_seconds_from_epoch
+
+    def calc(self, request, **args):
+
+        ds, bounding_polygon, start_seconds_from_epoch, end_seconds_from_epoch = self.parse_arguments(request)
+
+        tiles = self._tile_service.find_tiles_in_polygon(bounding_polygon, ds, start_seconds_from_epoch,
+                                                         end_seconds_from_epoch,
+                                                         fl=['id', 'tile_min_lon', 'tile_max_lon', 'tile_min_lat',
+                                                             'tile_max_lat'], fetch_data=False)
 
 
-    def calc(self, computeOptions, **args):
+
         minLat = computeOptions.get_min_lat()
         maxLat = computeOptions.get_max_lat()
         minLon = computeOptions.get_min_lon()
@@ -112,7 +196,6 @@ class LongitudeLatitudeMapHandlerImpl(NexusHandler):
 
 
 class LongitudeLatitudeMapResults(NexusResults):
-
     def __init__(self, results=None, meta=None, computeOptions=None):
         NexusResults.__init__(self, results=results, meta=meta, stats=None, computeOptions=computeOptions)
 

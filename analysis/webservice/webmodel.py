@@ -269,6 +269,22 @@ class NexusRequestObject(StatsComputeOptions):
             dt = datetime.utcfromtimestamp(int(time_str)).replace(tzinfo=UTC)
         return dt
 
+    def get_start_datetime_ms(self):
+        time_str = self.get_argument(RequestParameters.START_TIME)
+        try:
+            dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        except ValueError:
+            dt = datetime.utcfromtimestamp(int(time_str)/1000).replace(tzinfo=UTC)
+        return dt
+
+    def get_end_datetime_ms(self):
+        time_str = self.get_argument(RequestParameters.END_TIME)
+        try:
+            dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        except ValueError:
+            dt = datetime.utcfromtimestamp(int(time_str)/1000).replace(tzinfo=UTC)
+        return dt
+
     def get_start_row(self):
         return self.get_int_arg(RequestParameters.START_ROW, 0)
 
