@@ -56,11 +56,11 @@ class SparkAlg(NexusHandler):
                     print 'tile lats: ', tile.latitudes
                     print 'tile lons: ', tile.longitudes
                     if lat_res < 1e-10:
-                        lats = tile.latitudes.compressed()
+                        lats = tile.latitudes.data
                         if (len(lats) > 1):
                             lat_res = lats[1] - lats[0]
                     if lon_res < 1e-10:
-                        lons = tile.longitudes.compressed()
+                        lons = tile.longitudes.data
                         if (len(lons) > 1):
                             lon_res = lons[1] - lons[0]
                     if (lat_res >= 1e-10) and (lon_res >= 1e-10):
