@@ -76,7 +76,8 @@ class NexusTileService(object):
                                                  **kwargs)
 
     @tile_data()
-    def find_tile_by_bbox_and_most_recent_day_of_year(self, min_lat, max_lat, min_lon, max_lon, ds, day_of_year, **kwargs):
+    def find_tile_by_bbox_and_most_recent_day_of_year(self, min_lat, max_lat, min_lon, max_lon, ds, day_of_year,
+                                                      **kwargs):
         """
         DEPRECATED: Prefer call to find_tile_by_polygon_and_most_recent_day_of_year instead.
         """
@@ -134,6 +135,24 @@ class NexusTileService(object):
         else:
             tiles = self._solr.find_all_tiles_in_polygon_sorttimeasc(bounding_polygon, ds, start_time, end_time,
                                                                      **kwargs)
+        return tiles
+
+    @tile_data()
+    def find_tiles_by_exact_bounds(self, bounds, ds, start_time, end_time, **kwargs):
+        """
+        The method will return tiles with the exact given bounds within the time range. It differs from
+        find_tiles_in_polygon in that only tiles with exactly the given bounds will be returned as opposed to
+        doing a polygon intersection with the given bounds.
+
+        :param bounds: (minx, miny, maxx, maxy) bounds to search for
+        :param ds: Dataset name to search
+        :param start_time: Start time to search (seconds since epoch)
+        :param end_time: End time to search (seconds since epoch)
+        :param kwargs: fetch_data: True/False = whether or not to retrieve tile data
+        :return:
+        """
+        tiles = self._solr.find_tiles_by_exact_bounds(bounds[0], bounds[1], bounds[2], bounds[3], ds, start_time,
+                                                      end_time)
         return tiles
 
     @tile_data()
@@ -196,6 +215,26 @@ class NexusTileService(object):
         """
         max_time = self._solr.find_max_date_from_tiles(tile_ids)
         return long((max_time - EPOCH).total_seconds())
+
+    def get_distinct_bounding_boxes_in_polygon(self, bounding_polygon, ds, start_time, end_time):
+        """
+        Get a list of distinct tile bounding boxes from all tiles within the given polygon and time range.
+        :param bounding_polygon: The bounding polygon of tiles to search for
+        :param ds: The dataset name to search
+        :param start_time: The start time to search for tiles
+        :param end_time: The end time to search for tiles
+        :return: A list of distinct bounding boxes (as shapely polygons) for tiles in the search polygon
+        """
+        specs = self._solr.find_distinct_section_specs_in_polygon(bounding_polygon, ds, start_time, end_time)
+
+        boxes = []
+        for spec in specs:
+            doc = self._solr.find_all_tiles_in_polygon(bounding_polygon, ds,
+                                                       fq={"sectionSpec_s:\"%s\"" % spec},
+                                                       rows=1, limit=1)[0]
+
+            boxes.append(box(doc["tile_min_lon"], doc["tile_min_lat"], doc["tile_max_lon"], doc["tile_max_lat"]))
+        return boxes
 
     def mask_tiles_to_bbox(self, min_lat, max_lat, min_lon, max_lon, tiles):
 
