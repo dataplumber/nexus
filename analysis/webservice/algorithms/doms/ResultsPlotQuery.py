@@ -28,11 +28,13 @@ class DomsResultsPlotHandler(BaseDomsHandler.BaseDomsQueryHandler):
 
         plotType = computeOptions.get_argument("type", PlotTypes.SCATTER)
 
+        normAndCurve = computeOptions.get_boolean_arg("normandcurve", False)
+
         if plotType == PlotTypes.SCATTER:
             return scatterplot.createScatterPlot(id, parameter)
         elif plotType == PlotTypes.MAP:
             return mapplot.createMapPlot(id, parameter)
         elif plotType == PlotTypes.HISTOGRAM:
-            return histogramplot.createHistogramPlot(id, parameter)
+            return histogramplot.createHistogramPlot(id, parameter, normAndCurve)
         else:
             raise Exception("Unsupported plot type '%s' specified." % plotType)
