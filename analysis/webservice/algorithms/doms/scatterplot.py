@@ -1,13 +1,10 @@
-from webservice.NexusHandler import nexus_handler
+
 import BaseDomsHandler
 import ResultsStorage
-import numpy as np
 import string
 from cStringIO import StringIO
 
-from multiprocessing import Process, Queue, Manager
-import traceback
-import sys
+from multiprocessing import Process, Manager
 
 import matplotlib.pyplot as plt
 import matplotlib

@@ -1,14 +1,11 @@
-from webservice.NexusHandler import nexus_handler
+
 import BaseDomsHandler
 import ResultsStorage
-import numpy as np
 import string
 from cStringIO import StringIO
 import matplotlib.mlab as mlab
 
-from multiprocessing import Process, Queue, Manager
-import traceback
-import sys
+from multiprocessing import Process, Manager
 
 import matplotlib.pyplot as plt
 import matplotlib
@@ -44,9 +41,9 @@ class DomsHistogramPlotQueryResults(BaseDomsHandler.DomsQueryResults):
 def render(d, x, primary, secondary, parameter):
     fig, ax = plt.subplots()
     # the histogram of the data
-    n, bins, patches = plt.hist(x, 50, normed=1, facecolor='green', alpha=0.75)
+    n, bins, patches = plt.hist(x, 50, normed=0, facecolor='green', alpha=0.75)
 
-    mu, sigma = 0, 1
+    mu, sigma = 0, 15
     # add a 'best fit' line
     y = mlab.normpdf(bins, mu, sigma)
     l = plt.plot(bins, y, 'r--', linewidth=1)
@@ -55,8 +52,8 @@ def render(d, x, primary, secondary, parameter):
     ax.set_title(string.upper("%s vs. %s" % (primary, secondary)))
 
     units = PARAMETER_TO_UNITS[parameter] if parameter in PARAMETER_TO_UNITS else PARAMETER_TO_UNITS["sst"]
-    ax.set_ylabel("Difference %s" % (units))
-
+    ax.set_xlabel("Difference %s" % (units))
+    ax.set_ylabel("Frequency")
     plt.grid(True)
 
     sio = StringIO()
@@ -103,6 +100,10 @@ def createHistTable(results, secondary, parameter):
                 if field in entry and field in match:
                     a = entry[field]
                     b = match[field]
-                    x.append(abs(a - b))
+                    x.append((a - b))
 
+    f = open("/Users/kgill/repos/data/hist.txt", "w")
+    for v in x:
+        f.write("%f\n"%v)
+    f.close()
     return x
