@@ -276,8 +276,8 @@ class CorrMapSparkHandlerImpl(SparkAlg):
         #print 'sum_tiles = ',sum_tiles.collect()
 
         # For each pixel in each tile compute an array of Pearson 
-        # correlation coefficients.  The map funciton is called once 
-        # per tile.  The result of this array is a list of 3-tuples of
+        # correlation coefficients.  The map function is called once 
+        # per tile.  The result of this map operation is a list of 3-tuples of
         # (bounds, r, n) for each tile (r=Pearson correlation coefficient
         # and n=number of input values that went into each pixel with 
         # any masked values not included).
@@ -294,7 +294,9 @@ class CorrMapSparkHandlerImpl(SparkAlg):
         r = np.zeros((nlats, nlons),dtype=np.float64,order='C')
 
         # The tiles below are NOT Nexus objects.  They are tuples
-        # with the correlation map subset lat-lon bounding box.
+        # with the following for each correlation map subset:
+        # (1) lat-lon bounding box, (2) array of correlation r values, 
+        # and (3) array of count n values.
         for tile in corr_tiles:
             ((tile_min_lat, tile_max_lat, tile_min_lon, tile_max_lon),
              tile_data, tile_cnt) = tile
@@ -307,27 +309,6 @@ class CorrMapSparkHandlerImpl(SparkAlg):
                  tile_min_lon, tile_max_lon, y0, y1, x0, x1)
             sys.stdout.flush()
             r[y0:y1+1,x0:x1+1] = tile_data
-            
-
-        #     tile_data = np.ma.array([[tile_stats[y][x]['r'] for x in range(len(tile_stats[0]))] for y in range(len(tile_stats))])
-        #     tile_cnt = np.array([[tile_stats[y][x]['cnt'] for x in range(len(tile_stats[0]))] for y in range(len(tile_stats))])
-        #     tile_data.mask = ~(tile_cnt.astype(bool))
-        #     y0 = self._lat2ind(tile_min_lat)
-        #     y1 = self._lat2ind(tile_max_lat)
-        #     x0 = self._lon2ind(tile_min_lon)
-        #     x1 = self._lon2ind(tile_max_lon)
-        #     if np.any(np.logical_not(tile_data.mask)):
-        #         print 'writing tile lat %f-%f, lon %f-%f, map y %d-%d, map x %d-%d' % \
-        #             (tile_min_lat, tile_max_lat, 
-        #              tile_min_lon, tile_max_lon, y0, y1, x0, x1)
-        #         sys.stdout.flush()
-        #         r[y0:y1+1,x0:x1+1] = tile_data
-        #     else:
-        #         print 'All pixels masked in tile lat %f-%f, lon %f-%f, map y %d-%d, map x %d-%d' % \
-        #             (tile_min_lat, tile_max_lat, 
-        #              tile_min_lon, tile_max_lon, y0, y1, x0, x1)
-        #         sys.stdout.flush()
-                    
 
         # Store global map in a NetCDF file.
         self._create_nc_file(r, 'corrmap.nc', 'r')
