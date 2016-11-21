@@ -1,16 +1,14 @@
 
+from mpl_toolkits.basemap import Basemap
+
 import BaseDomsHandler
 import ResultsStorage
 import numpy as np
 import string
 from cStringIO import StringIO
 
-import traceback
-import sys
+from multiprocessing import Process, Manager
 
-from multiprocessing import Process, Queue, Manager
-import signal
-from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')
@@ -41,7 +39,6 @@ def __square(minLon, maxLon, minLat, maxLat):
 
 
 def render(d, lats, lons, z, primary, secondary, parameter):
-
     fig = plt.figure()
     ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
 
@@ -92,13 +89,16 @@ def render(d, lats, lons, z, primary, secondary, parameter):
     im1.set_array(z)
     cb = m.colorbar(im1)
 
-    units = PARAMETER_TO_UNITS[parameter] if parameter in PARAMETER_TO_UNITS else PARAMETER_TO_UNITS[
-        "sst"]
+    units = PARAMETER_TO_UNITS[parameter] if parameter in PARAMETER_TO_UNITS else PARAMETER_TO_UNITS["sst"]
     cb.set_label("Difference %s" % units)
 
     sio = StringIO()
     plt.savefig(sio, format='png')
-    d['plot'] = sio.getvalue()
+    plot = sio.getvalue()
+    if d is not None:
+        d['plot'] = plot
+    return plot
+
 
 
 class DomsMapPlotQueryResults(BaseDomsHandler.DomsQueryResults):
@@ -157,7 +157,8 @@ def createMapPlot(id, parameter):
                 lats.append(entry["y"])
                 lons.append(entry["x"])
 
-    plot = renderAsync(lats, lons, z, primary, secondary, parameter)
+    #plot = renderAsync(lats, lons, z, primary, secondary, parameter)
+    plot = render(None, lats, lons, z, primary, secondary, parameter)
     r = DomsMapPlotQueryResults(lats=lats, lons=lons, z=z, parameter=parameter, primary=primary, secondary=secondary,
                                 args=params,
                                 details=stats, bounds=None, count=None, computeOptions=None, executionId=id, plot=plot)

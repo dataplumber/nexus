@@ -1,12 +1,14 @@
 import BaseDomsHandler
 import mapplot
 import scatterplot
+import histogramplot
 from webservice.NexusHandler import nexus_handler
 
 
 class PlotTypes:
     SCATTER = "scatter"
     MAP = "map"
+    HISTOGRAM = "histogram"
 
 
 @nexus_handler
@@ -30,5 +32,7 @@ class DomsResultsPlotHandler(BaseDomsHandler.BaseDomsQueryHandler):
             return scatterplot.createScatterPlot(id, parameter)
         elif plotType == PlotTypes.MAP:
             return mapplot.createMapPlot(id, parameter)
+        elif plotType == PlotTypes.HISTOGRAM:
+            return histogramplot.createHistogramPlot(id, parameter)
         else:
             raise Exception("Unsupported plot type '%s' specified." % plotType)

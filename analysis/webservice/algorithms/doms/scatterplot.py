@@ -1,13 +1,10 @@
-from webservice.NexusHandler import nexus_handler
+
 import BaseDomsHandler
 import ResultsStorage
-import numpy as np
 import string
 from cStringIO import StringIO
 
-from multiprocessing import Process, Queue, Manager
-import traceback
-import sys
+from multiprocessing import Process, Manager
 
 import matplotlib.pyplot as plt
 import matplotlib
@@ -38,18 +35,7 @@ def render(d, x, y, z, primary, secondary, parameter):
     ax.set_ylabel("%s %s" % (secondary, units))
     ax.set_xlabel("%s %s" % (primary, units))
 
-    masked_array = np.ma.array(z, mask=np.isnan(z))
-    z = masked_array
-
-    values = np.zeros(len(z))
-    for i in range(0, len(z)):
-        values[i] = ((z[i] - np.min(z)) / (np.max(z) - np.min(z)) * 15.0) + 5
-
-    im1 = ax.scatter(x, y, values)
-
-    im1.set_array(values)
-    cb = fig.colorbar(im1)
-    cb.set_label("Difference %s" % units)
+    ax.scatter(x, y)
 
     sio = StringIO()
     plt.savefig(sio, format='png')
