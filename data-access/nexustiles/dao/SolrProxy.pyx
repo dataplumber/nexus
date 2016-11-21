@@ -1,10 +1,9 @@
 import logging
+import threading
 import time
 from datetime import datetime
 
 import solr
-
-import threading
 
 SOLR_CON_LOCK = threading.Lock()
 thread_local = threading.local()
@@ -12,7 +11,6 @@ thread_local = threading.local()
 
 class SolrProxy(object):
     def __init__(self, config):
-        self.config = config
         self.solrUrl = config.get("solr", "host")
         self.solrCore = config.get("solr", "core")
         self.logger = logging.getLogger('nexus')
@@ -373,17 +371,17 @@ class SolrProxy(object):
     def do_query_raw(self, *args, **params):
 
         # fl only works when passed as the second argument to solrcon.select
-        try:
+        if 'fl' in params.keys():
             fl = params['fl']
             del (params['fl'])
-        except KeyError:
+        else:
             fl = args[1]
 
         # sort only works when passed as the fourth argument to solrcon.select
-        try:
+        if 'sort' in params.keys():
             s = ','.join(params['sort'])
             del (params['sort'])
-        except KeyError:
+        else:
             s = args[4]
 
         args = (args[0],) + (fl,) + (args[2:4]) + (s,)
@@ -445,9 +443,10 @@ class SolrProxy(object):
         try:
             s = kwargs['sort'] if isinstance(kwargs['sort'], list) else [kwargs['sort']]
         except KeyError:
-            s = []
+            s = None
 
         try:
             additionalparams['sort'].extend(s)
         except KeyError:
-            additionalparams['sort'] = s
+            if s is not None:
+                additionalparams['sort'] = s
