@@ -315,4 +315,7 @@ class CorrMapSparkHandlerImpl(SparkAlg):
         # Store global map in a NetCDF file.
         self._create_nc_file(r, 'corrmap.nc', 'r')
 
+        # Stop the SparkContext.
+        sc.stop()
+
         return [[]], None, None

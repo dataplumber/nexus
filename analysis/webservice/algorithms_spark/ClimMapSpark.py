@@ -16,7 +16,7 @@ from nexustiles.nexustiles import NexusTileService
 from webservice.webmodel import NexusResults, NexusProcessingException, NoDataException
 from pyspark import SparkContext,SparkConf
 
-# @nexus_handler
+@nexus_handler
 class ClimMapSparkHandlerImpl(SparkAlg):
 
     name = "Climatology Map Spark"
@@ -275,6 +275,10 @@ class ClimMapSparkHandlerImpl(SparkAlg):
         # Create dict for JSON response
         results = [[{'avg': a[x,y], 'cnt': n[x,y]}
                     for x in range(a.shape[0])] for y in range(a.shape[1])]
+
+        # Stop the SparkContext.
+        sc.stop()
+
         return ClimMapSparkResults(results=results, meta={}, computeOptions=computeOptions)
 
 
