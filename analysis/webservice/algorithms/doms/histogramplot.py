@@ -109,8 +109,4 @@ def createHistTable(results, secondary, parameter):
                     b = match[field]
                     x.append((a - b))
 
-    f = open("/Users/kgill/repos/data/hist.txt", "w")
-    for v in x:
-        f.write("%f\n"%v)
-    f.close()
     return x
