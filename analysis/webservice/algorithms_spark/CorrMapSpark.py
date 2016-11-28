@@ -12,7 +12,6 @@ from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMET
 from nexustiles.nexustiles import NexusTileService
 from webservice.webmodel import NexusProcessingException
 from pyspark import SparkContext,SparkConf
-import operator
 
 # @nexus_handler
 class CorrMapSparkHandlerImpl(SparkAlg):
@@ -76,8 +75,6 @@ class CorrMapSparkHandlerImpl(SparkAlg):
                                                              ds[1], 
                                                              t_start,
                                                              t_end)
-            ds1tiles.sort(key=operator.attrgetter('times'))
-            ds2tiles.sort(key=operator.attrgetter('times'))
             t2 = time()
             print 'nexus call end at time %f' % t2
             print 'secs in nexus call: ', t2-t1
@@ -90,11 +87,16 @@ class CorrMapSparkHandlerImpl(SparkAlg):
             sys.stdout.flush()
             i1 = 0
             i2 = 0
+            time1 = 0
+            time2 = 0
             while i1 < len1 and i2 < len2:
                 tile1 = ds1tiles[i1]
                 tile2 = ds2tiles[i2]
                 #print 'tile1.data = ',tile1.data
                 #print 'tile2.data = ',tile2.data
+                #print 'i1, i2, t1, t2 times: ', i1, i2, tile1.times[0], tile2.times[0]
+                assert tile1.times[0] >= time1, 'DS1 time out of order!'
+                assert tile2.times[0] >= time2, 'DS2 time out of order!'
                 time1 = tile1.times[0]
                 time2 = tile2.times[0]
                 #print 'i1=%d,i2=%d,time1=%d,time2=%d'%(i1,i2,time1,time2)
@@ -312,5 +314,8 @@ class CorrMapSparkHandlerImpl(SparkAlg):
 
         # Store global map in a NetCDF file.
         self._create_nc_file(r, 'corrmap.nc', 'r')
+
+        # Stop the SparkContext.
+        sc.stop()
 
         return [[]], None, None

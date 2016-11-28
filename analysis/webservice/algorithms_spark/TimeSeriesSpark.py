@@ -161,6 +161,9 @@ class TimeSeriesHandlerImpl(SparkAlg):
 
         self._create_nc_file_time1d(np.array(results), 'ts.nc', 'mean',
                                     fill=-9999.)
+        # Stop the SparkContext.
+        sc.stop()
+
         return results, {}
 
     def calculateComparisonStats(self, results, suffix=""):

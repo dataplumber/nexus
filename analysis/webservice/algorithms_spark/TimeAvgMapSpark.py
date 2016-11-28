@@ -265,6 +265,10 @@ class TimeAvgMapSparkHandlerImpl(SparkAlg):
         # Create dict for JSON response
         results = [[{'avg': a[x, y], 'cnt': n[x, y]}
                     for x in range(a.shape[0])] for y in range(a.shape[1])]
+
+        # Stop the SparkContext.
+        sc.stop()
+
         return TimeAvgMapSparkResults(results=results, meta={}, computeOptions=computeOptions)
 
 

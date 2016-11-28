@@ -65,6 +65,14 @@ def render(d, lats, lons, z, primary, secondary, parameter):
     m = Basemap(projection='mill', llcrnrlon=minLon, llcrnrlat=minLat, urcrnrlon=maxLon, urcrnrlat=maxLat,
                 resolution='l')
 
+
+    m.drawparallels(np.arange(minLat, maxLat, (maxLat - minLat) / 5.0), labels=[1, 0, 0, 0], fontsize=10)
+    m.drawmeridians(np.arange(minLon, maxLon, (maxLon - minLon) / 5.0), labels=[0, 0, 0, 1], fontsize=10)
+
+    m.drawcoastlines()
+    m.drawmapboundary(fill_color='#99ffff')
+    m.fillcontinents(color='#cc9966', lake_color='#99ffff')
+
     #lats, lons = np.meshgrid(lats, lons)
 
     masked_array = np.ma.array(z, mask=np.isnan(z))
@@ -79,12 +87,6 @@ def render(d, lats, lons, z, primary, secondary, parameter):
 
     im1 = m.scatter(x, y, values)
 
-    m.drawparallels(np.arange(minLat, maxLat, (maxLat - minLat) / 5.0), labels=[1, 0, 0, 0], fontsize=10)
-    m.drawmeridians(np.arange(minLon, maxLon, (maxLon - minLon) / 5.0), labels=[0, 0, 0, 1], fontsize=10)
-
-    m.drawcoastlines()
-    m.drawmapboundary(fill_color='#99ffff')
-    m.fillcontinents(color='#cc9966', lake_color='#99ffff')
 
     im1.set_array(z)
     cb = m.colorbar(im1)
@@ -148,17 +150,21 @@ def createMapPlot(id, parameter):
     for entry in data:
         for match in entry["matches"]:
             if match["source"] == secondary:
+
                 if field in entry and field in match:
                     a = entry[field]
                     b = match[field]
-                    z.append(a - b)
+                    z.append((a - b))
+                    z.append((a - b))
                 else:
+                    z.append(1.0)
                     z.append(1.0)
                 lats.append(entry["y"])
                 lons.append(entry["x"])
+                lats.append(match["y"])
+                lons.append(match["x"])
 
-    #plot = renderAsync(lats, lons, z, primary, secondary, parameter)
-    plot = render(None, lats, lons, z, primary, secondary, parameter)
+    plot = renderAsync(lats, lons, z, primary, secondary, parameter)
     r = DomsMapPlotQueryResults(lats=lats, lons=lons, z=z, parameter=parameter, primary=primary, secondary=secondary,
                                 args=params,
                                 details=stats, bounds=None, count=None, computeOptions=None, executionId=id, plot=plot)
