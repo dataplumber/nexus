@@ -15,6 +15,13 @@ class TestService(unittest.TestCase):
 
     def test_get_distinct_bounding_boxes_in_polygon(self):
         boxes = self.tile_service.get_distinct_bounding_boxes_in_polygon(box(-180, -90, 180, 90),
+                                                                         "MXLDEPTH_ECCO_version4_release1",
+                                                                         1, time.time())
+        for b in boxes:
+            print b.bounds
+
+    def test_get_distinct_bounding_boxes_in_polygon_mur(self):
+        boxes = self.tile_service.get_distinct_bounding_boxes_in_polygon(box(-180, -90, 180, 90),
                                                                          "JPL-L4_GHRSST-SSTfnd-MUR-GLOB-v02.0-fv04.1",
                                                                          1, time.time())
         for b in boxes:
@@ -26,6 +33,14 @@ class TestService(unittest.TestCase):
                                                              1, time.time())
         for tile in tiles:
             print tile.get_summary()
+
+    def test_sorted_box(self):
+
+        tiles = self.tile_service.get_tiles_bounded_by_box(-42.68, -40.2, 175.01, 180.0,
+                                                   "JPL-L4_GHRSST-SSTfnd-MUR-GLOB-v02.0-fv04.1",
+                                                   1, time.time())
+        for tile in tiles:
+            print tile.min_time
 
 
 # from nexustiles.model.nexusmodel import get_approximate_value_for_lat_lon

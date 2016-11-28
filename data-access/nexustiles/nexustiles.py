@@ -225,16 +225,24 @@ class NexusTileService(object):
         :param end_time: The end time to search for tiles
         :return: A list of distinct bounding boxes (as shapely polygons) for tiles in the search polygon
         """
-        specs = self._solr.find_distinct_section_specs_in_polygon(bounding_polygon, ds, start_time, end_time)
+        specs = self._solr.find_distinct_bounding_boxes_in_polygon(bounding_polygon, ds, start_time, end_time)
 
-        boxes = []
+        boxes = set()
         for spec in specs:
-            doc = self._solr.find_all_tiles_in_polygon(bounding_polygon, ds,
-                                                       fq={"sectionSpec_s:\"%s\"" % spec},
-                                                       rows=1, limit=1)[0]
+            try:
+                doc = self._solr.find_all_tiles_in_polygon(bounding_polygon, ds,
+                                                           fq=[
+                                                               "tile_min_lon:\"%s\"" % spec[0],
+                                                               "tile_min_lat:\"%s\"" % spec[1],
+                                                               "tile_max_lon:\"%s\"" % spec[2],
+                                                               "tile_max_lat:\"%s\"" % spec[3],
+                                                           ],
+                                                           rows=1, limit=1)[0]
+            except IndexError:
+                continue
 
-            boxes.append(box(doc["tile_min_lon"], doc["tile_min_lat"], doc["tile_max_lon"], doc["tile_max_lat"]))
-        return boxes
+            boxes.add((doc["tile_min_lon"], doc["tile_min_lat"], doc["tile_max_lon"], doc["tile_max_lat"]))
+        return [box(*b) for b in boxes]
 
     def mask_tiles_to_bbox(self, min_lat, max_lat, min_lon, max_lon, tiles):
 

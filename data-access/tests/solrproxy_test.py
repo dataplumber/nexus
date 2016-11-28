@@ -20,9 +20,9 @@ class TestQuery(unittest.TestCase):
         self.proxy = SolrProxy(config)
 
     def test_find_distinct_section_specs_in_polygon(self):
-        result = self.proxy.find_distinct_section_specs_in_polygon(box(-180, -90, 180, 90),
-                                                                   "JPL-L4_GHRSST-SSTfnd-MUR-GLOB-v02.0-fv04.1",
-                                                                   1, time.time())
+        result = self.proxy.find_distinct_bounding_boxes_in_polygon(box(-180, -90, 180, 90),
+                                                                   "MXLDEPTH_ECCO_version4_release1",
+                                                                    1, time.time())
 
         print len(result)
         for r in sorted(result):

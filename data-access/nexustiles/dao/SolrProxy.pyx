@@ -1,6 +1,9 @@
 import logging
 import threading
 import time
+import itertools
+from decimal import Decimal
+from shapely.geometry import box
 from datetime import datetime
 
 import solr
@@ -18,7 +21,7 @@ class SolrProxy(object):
         with SOLR_CON_LOCK:
             solrcon = getattr(thread_local, 'solrcon', None)
             if solrcon is None:
-                solrcon = solr.Solr('http://%s/solr/%s' % (self.solrUrl, self.solrCore), debug=True)
+                solrcon = solr.Solr('http://%s/solr/%s' % (self.solrUrl, self.solrCore))
                 thread_local.solrcon = solrcon
 
             self.solrcon = solrcon
@@ -289,7 +292,7 @@ class SolrProxy(object):
             *(search, None, None, False, None),
             **additionalparams)
 
-    def find_distinct_section_specs_in_polygon(self, bounding_polygon, ds, start_time=0, end_time=-1, **kwargs):
+    def find_distinct_bounding_boxes_in_polygon(self, bounding_polygon, ds, start_time=0, end_time=-1, **kwargs):
 
         search = 'dataset_s:%s' % ds
 
@@ -300,7 +303,7 @@ class SolrProxy(object):
             ],
             'rows': 0,
             'facet': 'true',
-            'facet.field': 'sectionSpec_s',
+            'facet.field': ['tile_min_lon', 'tile_min_lat', 'tile_max_lon', 'tile_max_lat'],
             'facet.limit': -1,
             'facet.mincount': 1
         }
@@ -324,7 +327,14 @@ class SolrProxy(object):
 
         response = self.do_query_raw(*(search, None, None, False, None), **additionalparams)
 
-        specs = response.facet_counts["facet_fields"]["sectionSpec_s"]
+        tile_min_lons = [float(x) for x in response.facet_counts["facet_fields"]["tile_min_lon"].keys()]
+        tile_min_lats = [float(x) for x in response.facet_counts["facet_fields"]["tile_min_lat"].keys()]
+        tile_max_lons = [float(x) for x in response.facet_counts["facet_fields"]["tile_max_lon"].keys()]
+        tile_max_lats = [float(x) for x in response.facet_counts["facet_fields"]["tile_max_lat"].keys()]
+
+        specs = set(itertools.product(tile_min_lons, tile_min_lats, tile_max_lons, tile_max_lats))
+        specs = set([(min_lon, min_lat, max_lon, max_lat) for min_lon, min_lat, max_lon, max_lat in specs if
+                     min_lon < max_lon and min_lat < max_lat])
 
         return specs
 
