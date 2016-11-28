@@ -76,15 +76,6 @@ class NexusTileService(object):
                                                  **kwargs)
 
     @tile_data()
-    def find_tile_by_bbox_and_most_recent_day_of_year(self, min_lat, max_lat, min_lon, max_lon, ds, day_of_year, **kwargs):
-        """
-        DEPRECATED: Prefer call to find_tile_by_polygon_and_most_recent_day_of_year instead.
-        """
-
-        polygon = box(min_lon, min_lat, max_lon, max_lat)
-        return self.find_tile_by_polygon_and_most_recent_day_of_year(polygon, ds, day_of_year)
-
-    @tile_data()
     def find_tile_by_polygon_and_most_recent_day_of_year(self, bounding_polygon, ds, day_of_year, **kwargs):
         """
         Given a bounding polygon, dataset, and day of year, find tiles in that dataset with the same bounding
