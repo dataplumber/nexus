@@ -5,19 +5,17 @@ California Institute of Technology.  All rights reserved
 import logging
 import math
 from datetime import datetime
+from multiprocessing.dummy import Pool
 
-import numpy as np
 from pytz import timezone
-from scipy import stats
 from shapely.geometry import box
 
 from webservice.NexusHandler import NexusHandler, nexus_handler
-from webservice.webmodel import NexusResults, NoDataException, NexusProcessingException
-
-# TODO Need to update to use nexustiles
+from webservice.webmodel import NexusResults, NexusProcessingException
 
 SENTINEL = 'STOP'
 EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
+tile_service = None
 
 
 @nexus_handler
@@ -72,7 +70,7 @@ class LongitudeLatitudeMapHandlerImpl(NexusHandler):
         # Parse input arguments
         self.log.debug("Parsing arguments")
         try:
-            ds = request.get_dataset('ds', None)[0]
+            ds = request.get_dataset()[0]
         except:
             raise NexusProcessingException(reason="'ds' argument is required", code=400)
 
@@ -106,154 +104,130 @@ class LongitudeLatitudeMapHandlerImpl(NexusHandler):
 
         ds, bounding_polygon, start_seconds_from_epoch, end_seconds_from_epoch = self.parse_arguments(request)
 
-        tiles = self._tile_service.find_tiles_in_polygon(bounding_polygon, ds, start_seconds_from_epoch,
-                                                         end_seconds_from_epoch,
-                                                         fl=['id', 'tile_min_lon', 'tile_max_lon', 'tile_min_lat',
-                                                             'tile_max_lat'], fetch_data=False)
+        boxes = self._tile_service.get_distinct_bounding_boxes_in_polygon(bounding_polygon, ds,
+                                                                          start_seconds_from_epoch,
+                                                                          end_seconds_from_epoch)
+
+        point_avg_over_time = lat_lon_map_driver(bounding_polygon, start_seconds_from_epoch, end_seconds_from_epoch, ds,
+                                                 [a_box.bounds for a_box in boxes])
+
+        kwargs = {
+            "minLon": bounding_polygon.bounds[0],
+            "minLat": bounding_polygon.bounds[1],
+            "maxLon": bounding_polygon.bounds[2],
+            "maxLat": bounding_polygon.bounds[3],
+            "ds": ds,
+            "startTime": datetime.utcfromtimestamp(start_seconds_from_epoch).strftime('%Y-%m-%dT%H:%M:%SZ'),
+            "endTime": datetime.utcfromtimestamp(end_seconds_from_epoch).strftime('%Y-%m-%dT%H:%M:%SZ')
+        }
+        return LongitudeLatitudeMapResults(
+            results=LongitudeLatitudeMapHandlerImpl.results_to_dicts(point_avg_over_time), meta=None,
+            **kwargs)
+
+    @staticmethod
+    def results_to_dicts(results):
+
+        # ((lon, lat), (slope, intercept, r_value, p_value, std_err, mean, pmax, pmin, pstd, pcnt))
+        return [{
+                    'lon': result[0][0],
+                    'lat': result[0][1],
+                    'slope': result[1][0] if not math.isnan(result[1][0]) else 'NaN',
+                    'intercept': result[1][1] if not math.isnan(result[1][1]) else 'NaN',
+                    'r': result[1][2],
+                    'p': result[1][3],
+                    'stderr': result[1][4] if not math.isinf(result[1][4]) else 'Inf',
+                    'avg': result[1][5],
+                    'max': result[1][6],
+                    'min': result[1][7],
+                    'std': result[1][8],
+                    'cnt': result[1][9],
+                } for result in results]
 
 
+def pool_initializer():
+    from nexustiles.nexustiles import NexusTileService
+    global tile_service
+    tile_service = NexusTileService()
+    # sys.stdout = open(str(os.getpid()) + ".out", "a", buffering=0)
+    # sys.stderr = open(str(os.getpid()) + "_error.out", "a", buffering=0)
+    # print "ready"
 
-        minLat = computeOptions.get_min_lat()
-        maxLat = computeOptions.get_max_lat()
-        minLon = computeOptions.get_min_lon()
-        maxLon = computeOptions.get_max_lon()
-        ds = computeOptions.get_dataset()[0]
-        startTime = computeOptions.get_start_time()
-        endTime = computeOptions.get_end_time()
-        maskLimitType = computeOptions.get_mask_type()
 
-        chunks, meta = self.getChunksForBox(minLat, maxLat, minLon, maxLon, ds, startTime=startTime, endTime=endTime)
+def lat_lon_map_driver(search_bounding_polygon, search_start, search_end, ds, distinct_boxes):
+    import time
+    from functools import partial
+    # Start new processes to handle the work
+    pool = Pool(6, pool_initializer)
 
-        if len(chunks) == 0:
-            raise NoDataException(reason="No data found for selected timeframe")
+    func = partial(regression_on_tiles, search_bounding_polygon_wkt=search_bounding_polygon.wkt,
+                   search_start=search_start, search_end=search_end, ds=ds)
 
-        masker = LandMaskChecker(self._landmask, maskLimitType)
-        a = self._allocateArray(int(math.ceil(maxLat - minLat)), int(math.ceil(maxLon - minLon)))
-        lat = minLat
-        y = 0
-        x = 0
-        while lat < maxLat:
-            lon = minLon
-            x = 0
-            while lon < maxLon:
+    # return map(func, distinct_boxes)
+    result = pool.map_async(func, distinct_boxes)
 
-                values = []
-                # for t in range(0, len(chunks)):
-                for n in chunks:
+    pool.close()
+    while not result.ready():
+        print "Not ready"
+        time.sleep(5)
 
-                    chunk = chunks[n]
-                    value = chunk.getValueForLatLon(lat, lon)
-                    lm = chunk.getLandmaskForLatLon(lat, lon)
-                    if lm == 1.0 and value != 32767.0 and not masker.isLatLonMasked(lat, lon):
-                        values.append(value)
+    print result.successful()
+    pool.join()
+    pool.terminate()
 
-                if len(values) > 0:
-                    avg = np.average(values)
-                    min = np.min(values)
-                    max = np.max(values)
-                    std = np.std(values)
-                    cnt = len(values)
+    return [item for sublist in result.get() for item in sublist]
 
-                    xi = range(0, len(values))
-                    slope, intercept, r_value, p_value, std_err = stats.linregress(xi, values)
 
-                else:
-                    avg, min, max, std, cnt = (0, 0, 0, 0, 0)
-                    slope, intercept, r_value, p_value, std_err = (0, 0, 0, 0, 0)
+def calc_linear_regression(arry, xarry):
+    from scipy.stats import linregress
+    slope, intercept, r_value, p_value, std_err = linregress(arry, xarry)
+    return slope, intercept, r_value, p_value, std_err
 
-                avg = 0.0 if not self._validNumber(float(avg)) else float(avg)
-                min = 0.0 if not self._validNumber(float(min)) else float(min)
-                max = 0.0 if not self._validNumber(float(max)) else float(max)
-                std = 0.0 if not self._validNumber(float(std)) else float(std)
-                cnt = 0.0 if not self._validNumber(float(cnt)) else float(cnt)
-                slope = 0.0 if not self._validNumber(float(slope)) else float(slope)
-                intercept = 0.0 if not self._validNumber(float(intercept)) else float(intercept)
-                r_value = 0.0 if not self._validNumber(float(r_value)) else float(r_value)
-                p_value = 0.0 if not self._validNumber(float(p_value)) else float(p_value)
-                std_err = 0.0 if not self._validNumber(float(std_err)) else float(std_err)
 
-                a[y][x] = {
-                    'avg': avg,
-                    'min': min,
-                    'max': max,
-                    'std': std,
-                    'cnt': cnt,
-                    'slope': slope,
-                    'intercept': intercept,
-                    'r': r_value,
-                    'p': p_value,
-                    'stderr': std_err,
-                    'lat': float(lat),
-                    'lon': float(lon)
-                }
+def regression_on_tiles(tile_bounds, search_bounding_polygon_wkt, search_start, search_end, ds):
+    import numpy as np
+    import operator
+    import traceback
+    from shapely import wkt
 
-                lon = lon + 1
-                x = x + 1
-            lat = lat + 1
-            y = y + 1
+    # try:
+    tiles = tile_service.find_tiles_by_exact_bounds(tile_bounds, ds, search_start, search_end)
+    tiles = tile_service.mask_tiles_to_polygon(wkt.loads(search_bounding_polygon_wkt), tiles)
+    tiles.sort(key=operator.attrgetter('min_time'))
 
-        return LongitudeLatitudeMapResults(results=a, meta=meta, computeOptions=computeOptions)
+    stacked_tile_data = np.stack(tuple([np.squeeze(tile.data, 0) for tile in tiles]))
+    stacked_tile_lons = np.stack([tile.longitudes for tile in tiles])
+    stacked_tile_lats = np.stack([tile.latitudes for tile in tiles])
+
+    x_array = np.arange(stacked_tile_data.shape[0])
+    point_regressions = np.apply_along_axis(calc_linear_regression, 0, stacked_tile_data, x_array)
+    point_means = np.nanmean(stacked_tile_data, 0)
+    point_maximums = np.nanmax(stacked_tile_data, 0)
+    point_minimums = np.nanmin(stacked_tile_data, 0)
+    point_st_deviations = np.nanstd(stacked_tile_data, 0)
+    point_counts = np.ma.count(np.ma.masked_invalid(stacked_tile_data), 0)
+
+    results = []
+    for lat_idx, lon_idx in np.ndindex(point_means.shape):
+        lon, lat = np.max(stacked_tile_lons[:, lon_idx]), np.max(stacked_tile_lats[:, lat_idx])
+        pcnt = point_counts[lat_idx, lon_idx]
+
+        if pcnt == 0:
+            continue
+
+        mean = point_means[lat_idx, lon_idx]
+        pmax = point_maximums[lat_idx, lon_idx]
+        pmin = point_minimums[lat_idx, lon_idx]
+        pstd = point_st_deviations[lat_idx, lon_idx]
+        slope, intercept, r_value, p_value, std_err = point_regressions[:, lat_idx, lon_idx]
+
+        results.append(((lon, lat), (slope, intercept, r_value, p_value, std_err, mean, pmax, pmin, pstd, pcnt)))
+
+    return results
+    # except Exception as e:
+    #     e_str = traceback.format_exc(e)
+    #     return e_str
 
 
 class LongitudeLatitudeMapResults(NexusResults):
-    def __init__(self, results=None, meta=None, computeOptions=None):
-        NexusResults.__init__(self, results=results, meta=meta, stats=None, computeOptions=computeOptions)
-
-    '''
-    def toImage(self):
-
-        res = self.results()
-        meta = self.meta()
-        startTime = self.computeOptions().get_start_time()
-        endTime = self.computeOptions().get_end_time()
-
-        latSeries = [m[0]['lat'] for m in res]
-        lonSeries = [m['lon'] for m in res[0]][:]
-        data = np.zeros((len(lonSeries), len(latSeries)))
-        for t in range(0, len(latSeries)):
-            latSet = res[t]
-            for l in range(0, len(lonSeries)):
-                data[l][t] = latSet[l]['avg']
-
-        data[data == 0.0] = np.nan
-        #data = np.rot90(data, 3)
-        lats, lons = np.meshgrid(latSeries, lonSeries)
-        masked_array = np.ma.array (data, mask=np.isnan(data))
-        z = masked_array
-
-        fig = plt.figure()
-        fig.set_size_inches(11.0, 8.5)
-        ax = fig.add_axes([0.05,0.05,0.9,0.9])
-
-
-        m = Basemap(projection='ortho',lat_0=20,lon_0=-100,resolution='l')
-        raise Exception("Trap")
-        #m.drawmapboundary(fill_color='0.3')
-        im1 = m.pcolormesh(lons,lats,z,shading='flat',cmap=plt.cm.jet,latlon=True)
-
-        m.drawparallels(np.arange(-90.,99.,30.))
-        m.drawmeridians(np.arange(-180.,180.,60.))
-
-        #m.drawcoastlines()
-        #m.drawcountries()
-        cb = m.colorbar(im1,"bottom", size="5%", pad="2%")
-
-        title = meta['title']
-        source = meta['source']
-        if startTime is not None and endTime is not None:
-            if type(startTime) is not datetime.datetime:
-                startTime = datetime.datetime.fromtimestamp(startTime / 1000)
-            if type(endTime) is not datetime.datetime:
-                endTime = datetime.datetime.fromtimestamp(endTime / 1000)
-            dateRange = "%s - %s"%(startTime.strftime('%b %Y'), endTime.strftime('%b %Y'))
-        else:
-            dateRange = ""
-
-        ax.set_title("%s\n%s\n%s"%(title, source, dateRange))
-        ax.set_ylabel('Latitude')
-        ax.set_xlabel('Longitude')
-
-        sio = StringIO()
-        plt.savefig(sio, format='png')
-        return sio.getvalue()
-            '''
+    def __init__(self, results=None, meta=None, computeOptions=None, **kwargs):
+        NexusResults.__init__(self, results=results, meta=meta, stats=None, computeOptions=computeOptions, **kwargs)
