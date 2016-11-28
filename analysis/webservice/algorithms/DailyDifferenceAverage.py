@@ -6,6 +6,7 @@ import sys
 import traceback
 from datetime import datetime, timedelta
 from multiprocessing.dummy import Pool, Manager
+from shapely.geometry import box
 
 import numpy as np
 import pytz
@@ -103,9 +104,10 @@ class DailyDifferenceAverageImpl(NexusHandler):
             return averagebyday, None, None
         else:
 
-            result = NexusResults(results=[[{'time': dayms*1000, 'mean': avg, 'ds': 0}] for dayms, avg in averagebyday],
-                                  stats={},
-                                  meta=self.get_meta())
+            result = NexusResults(
+                results=[[{'time': dayms * 1000, 'mean': avg, 'ds': 0}] for dayms, avg in averagebyday],
+                stats={},
+                meta=self.get_meta())
 
             result.extendMeta(min_lat, max_lat, min_lon, max_lon, "", start_time, end_time)
             result.meta()['label'] = u'Difference from 5-Day mean (\u00B0C)'
@@ -138,7 +140,8 @@ class DailyDifferenceAverageImpl(NexusHandler):
             calculator = DailyDifferenceAverageCalculator()
             averagebyday = []
             for dayinseconds in daysinrange:
-                result = calculator.calc_average_diff_on_day(min_lat, max_lat, min_lon, max_lon, dataset1, dataset2, dayinseconds)
+                result = calculator.calc_average_diff_on_day(min_lat, max_lat, min_lon, max_lon, dataset1, dataset2,
+                                                             dayinseconds)
                 averagebyday.append((result[0], result[1]))
         else:
             # Create a task to calc average difference for each day
@@ -146,7 +149,8 @@ class DailyDifferenceAverageImpl(NexusHandler):
             work_queue = manager.Queue()
             done_queue = manager.Queue()
             for dayinseconds in daysinrange:
-                work_queue.put(('calc_average_diff_on_day', min_lat, max_lat, min_lon, max_lon, dataset1, dataset2, dayinseconds))
+                work_queue.put(
+                    ('calc_average_diff_on_day', min_lat, max_lat, min_lon, max_lon, dataset1, dataset2, dayinseconds))
             [work_queue.put(SENTINEL) for _ in xrange(0, maxprocesses)]
 
             # Start new processes to handle the work
@@ -188,11 +192,9 @@ class DailyDifferenceAverageCalculator(object):
         for ds1_tile in ds1_nexus_tiles:
             # Get tile for ds2 using bbox from ds1_tile and day ms
             try:
-                ds2_tile = self.__tile_service.find_tile_by_bbox_and_most_recent_day_of_year(ds1_tile.bbox.min_lat,
-                                                                                    ds1_tile.bbox.max_lat,
-                                                                                    ds1_tile.bbox.min_lon,
-                                                                                    ds1_tile.bbox.max_lon,
-                                                                                    dataset2, day_of_year)[0]
+                ds2_tile = self.__tile_service.find_tile_by_polygon_and_most_recent_day_of_year(
+                    box(ds1_tile.bbox.min_lon, ds1_tile.bbox.min_lat, ds1_tile.bbox.max_lon, ds1_tile.bbox.max_lat),
+                    dataset2, day_of_year)[0]
                 # Subtract ds2 tile from ds1 tile
                 diff = np.subtract(ds1_tile.data, ds2_tile.data)
             except NexusTileServiceException:
