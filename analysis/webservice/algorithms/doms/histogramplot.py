@@ -59,8 +59,13 @@ def render(d, x, primary, secondary, parameter, norm_and_curve=False):
     ax.set_title('n = %d' % len(x))
 
     units = PARAMETER_TO_UNITS[parameter] if parameter in PARAMETER_TO_UNITS else PARAMETER_TO_UNITS["sst"]
-    ax.set_xlabel("Difference %s" % (units))
-    ax.set_ylabel("Frequency")
+    ax.set_xlabel("%s - %s %s" % (primary, secondary, units))
+
+    if norm_and_curve:
+        ax.set_ylabel("Probability per unit difference")
+    else:
+        ax.set_ylabel("Frequency")
+
     plt.grid(True)
 
     sio = StringIO()
