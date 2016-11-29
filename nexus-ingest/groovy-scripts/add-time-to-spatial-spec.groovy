@@ -9,15 +9,16 @@
 if (timelen == null ){
     throw new RuntimeException("This script requires the length of the time array.")
 }
-if (timevar == null ){
-    timevar = 'time'
+def time = 'time'
+if (timevar != null ){
+    time = timevar
 }
 
 def sectionSpec = ''
 
 def length = timelen.toInteger()
 for (i = 0; i < length; i++) {
-    sectionSpec <<= timevar + ':' + i + ':' + (i+1) + ','
+    sectionSpec <<= time + ':' + i + ':' + (i+1) + ','
     sectionSpec <<= payload
     sectionSpec <<= ';'
 }
