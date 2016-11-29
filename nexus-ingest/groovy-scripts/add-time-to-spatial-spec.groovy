@@ -10,7 +10,7 @@ if (timelen == null ){
     throw new RuntimeException("This script requires the length of the time array.")
 }
 def time = 'time'
-if (timevar != null ){
+if (binding.variables.get("timevar") != null){
     time = timevar
 }
 
