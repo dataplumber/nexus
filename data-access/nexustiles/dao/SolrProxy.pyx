@@ -1,9 +1,7 @@
+import itertools
 import logging
 import threading
 import time
-import itertools
-from decimal import Decimal
-from shapely.geometry import box
 from datetime import datetime
 
 import solr

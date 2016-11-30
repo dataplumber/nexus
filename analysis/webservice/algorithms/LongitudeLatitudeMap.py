@@ -5,7 +5,6 @@ California Institute of Technology.  All rights reserved
 import logging
 import math
 from datetime import datetime
-from multiprocessing.dummy import Pool
 
 from pytz import timezone
 from shapely.geometry import box
@@ -107,6 +106,7 @@ class LongitudeLatitudeMapHandlerImpl(NexusHandler):
         boxes = self._tile_service.get_distinct_bounding_boxes_in_polygon(bounding_polygon, ds,
                                                                           start_seconds_from_epoch,
                                                                           end_seconds_from_epoch)
+        del self._tile_service
 
         point_avg_over_time = lat_lon_map_driver(bounding_polygon, start_seconds_from_epoch, end_seconds_from_epoch, ds,
                                                  [a_box.bounds for a_box in boxes])
@@ -148,33 +148,40 @@ def pool_initializer():
     from nexustiles.nexustiles import NexusTileService
     global tile_service
     tile_service = NexusTileService()
-    # sys.stdout = open(str(os.getpid()) + ".out", "a", buffering=0)
-    # sys.stderr = open(str(os.getpid()) + "_error.out", "a", buffering=0)
-    # print "ready"
+    from cassandra.cqlengine import connection
+    from multiprocessing import current_process
+
+    connection.register_connection(current_process().name, [host.address for host in connection.get_session().hosts])
+    connection.set_default_connection(current_process().name)
 
 
 def lat_lon_map_driver(search_bounding_polygon, search_start, search_end, ds, distinct_boxes):
-    import time
     from functools import partial
+    from nexustiles.nexustiles import NexusTileService
     # Start new processes to handle the work
-    pool = Pool(6, pool_initializer)
+    # pool = Pool(5, pool_initializer)
 
     func = partial(regression_on_tiles, search_bounding_polygon_wkt=search_bounding_polygon.wkt,
                    search_start=search_start, search_end=search_end, ds=ds)
 
-    # return map(func, distinct_boxes)
-    result = pool.map_async(func, distinct_boxes)
-
-    pool.close()
-    while not result.ready():
-        print "Not ready"
-        time.sleep(5)
-
-    print result.successful()
-    pool.join()
-    pool.terminate()
-
-    return [item for sublist in result.get() for item in sublist]
+    global tile_service
+    tile_service = NexusTileService()
+    map_result = map(func, distinct_boxes)
+    return [item for sublist in map_result for item in sublist]
+    # TODO Use for multiprocessing:
+    # result = pool.map_async(func, distinct_boxes)
+    #
+    # pool.close()
+    # while not result.ready():
+    #     print "Not ready"
+    #     time.sleep(5)
+    #
+    # print result.successful()
+    # print result.get()[0]
+    # pool.join()
+    # pool.terminate()
+    #
+    # return [item for sublist in result.get() for item in sublist]
 
 
 def calc_linear_regression(arry, xarry):
@@ -184,12 +191,13 @@ def calc_linear_regression(arry, xarry):
 
 
 def regression_on_tiles(tile_bounds, search_bounding_polygon_wkt, search_start, search_end, ds):
+    if len(tile_bounds) < 1:
+        return []
+
     import numpy as np
     import operator
-    import traceback
     from shapely import wkt
 
-    # try:
     tiles = tile_service.find_tiles_by_exact_bounds(tile_bounds, ds, search_start, search_end)
     tiles = tile_service.mask_tiles_to_polygon(wkt.loads(search_bounding_polygon_wkt), tiles)
     tiles.sort(key=operator.attrgetter('min_time'))
@@ -223,9 +231,6 @@ def regression_on_tiles(tile_bounds, search_bounding_polygon_wkt, search_start, 
         results.append(((lon, lat), (slope, intercept, r_value, p_value, std_err, mean, pmax, pmin, pstd, pcnt)))
 
     return results
-    # except Exception as e:
-    #     e_str = traceback.format_exc(e)
-    #     return e_str
 
 
 class LongitudeLatitudeMapResults(NexusResults):

@@ -1,4 +1,5 @@
 import uuid
+from multiprocessing.synchronize import Lock
 
 import nexusproto.NexusContent_pb2 as nexusproto
 import numpy as np
@@ -6,7 +7,6 @@ from cassandra.cqlengine import columns, connection, CQLEngineException
 from cassandra.cqlengine.models import Model
 from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
 from nexusproto.serialization import from_shaped_array
-from multiprocessing.synchronize import Lock
 
 INIT_LOCK = Lock()
 
