@@ -5,7 +5,7 @@ California Institute of Technology.  All rights reserved
 import setuptools
 from Cython.Build import cythonize
 
-__version__ = '0.3'
+__version__ = '0.31'
 
 setuptools.setup(
     name="nexus-data-access",

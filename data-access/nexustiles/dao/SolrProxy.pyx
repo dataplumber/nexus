@@ -1,3 +1,4 @@
+import itertools
 import logging
 import threading
 import time
@@ -289,6 +290,87 @@ class SolrProxy(object):
             *(search, None, None, False, None),
             **additionalparams)
 
+    def find_distinct_bounding_boxes_in_polygon(self, bounding_polygon, ds, start_time=0, end_time=-1, **kwargs):
+
+        search = 'dataset_s:%s' % ds
+
+        additionalparams = {
+            'fq': [
+                "{!field f=geo}Intersects(%s)" % bounding_polygon.wkt,
+                "tile_count_i:[1 TO *]"
+            ],
+            'rows': 0,
+            'facet': 'true',
+            'facet.field': ['tile_min_lon', 'tile_min_lat', 'tile_max_lon', 'tile_max_lat'],
+            'facet.limit': -1,
+            'facet.mincount': 1
+        }
+
+        if 0 < start_time <= end_time:
+            search_start_s = datetime.utcfromtimestamp(start_time).strftime('%Y-%m-%dT%H:%M:%SZ')
+            search_end_s = datetime.utcfromtimestamp(end_time).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+            time_clause = "(" \
+                          "tile_min_time_dt:[%s TO %s] " \
+                          "OR tile_max_time_dt:[%s TO %s] " \
+                          "OR (tile_min_time_dt:[* TO %s] AND tile_max_time_dt:[%s TO *])" \
+                          ")" % (
+                              search_start_s, search_end_s,
+                              search_start_s, search_end_s,
+                              search_start_s, search_end_s
+                          )
+            additionalparams['fq'].append(time_clause)
+
+        self._merge_kwargs(additionalparams, **kwargs)
+
+        response = self.do_query_raw(*(search, None, None, False, None), **additionalparams)
+
+        tile_min_lons = [float(x) for x in response.facet_counts["facet_fields"]["tile_min_lon"].keys()]
+        tile_min_lats = [float(x) for x in response.facet_counts["facet_fields"]["tile_min_lat"].keys()]
+        tile_max_lons = [float(x) for x in response.facet_counts["facet_fields"]["tile_max_lon"].keys()]
+        tile_max_lats = [float(x) for x in response.facet_counts["facet_fields"]["tile_max_lat"].keys()]
+
+        specs = set(itertools.product(tile_min_lons, tile_min_lats, tile_max_lons, tile_max_lats))
+        specs = set([(min_lon, min_lat, max_lon, max_lat) for min_lon, min_lat, max_lon, max_lat in specs if
+                     min_lon < max_lon and min_lat < max_lat])
+
+        return specs
+
+    def find_tiles_by_exact_bounds(self, minx, miny, maxx, maxy, ds, start_time=0, end_time=-1, **kwargs):
+
+        search = 'dataset_s:%s' % ds
+
+        additionalparams = {
+            'fq': [
+                "tile_min_lon:\"%s\"" % minx,
+                "tile_min_lat:\"%s\"" % miny,
+                "tile_max_lon:\"%s\"" % maxx,
+                "tile_max_lat:\"%s\"" % maxy,
+                "tile_count_i:[1 TO *]"
+            ]
+        }
+
+        if 0 < start_time <= end_time:
+            search_start_s = datetime.utcfromtimestamp(start_time).strftime('%Y-%m-%dT%H:%M:%SZ')
+            search_end_s = datetime.utcfromtimestamp(end_time).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+            time_clause = "(" \
+                          "tile_min_time_dt:[%s TO %s] " \
+                          "OR tile_max_time_dt:[%s TO %s] " \
+                          "OR (tile_min_time_dt:[* TO %s] AND tile_max_time_dt:[%s TO *])" \
+                          ")" % (
+                              search_start_s, search_end_s,
+                              search_start_s, search_end_s,
+                              search_start_s, search_end_s
+                          )
+            additionalparams['fq'].append(time_clause)
+
+        self._merge_kwargs(additionalparams, **kwargs)
+
+        return self.do_query_all(
+            *(search, None, None, False, None),
+            **additionalparams)
+
     def find_all_tiles_in_box_at_time(self, min_lat, max_lat, min_lon, max_lon, ds, time, **kwargs):
         search = 'dataset_s:%s' % ds
 
@@ -398,18 +480,26 @@ class SolrProxy(object):
         response = self.do_query_raw(*args, **params)
         results.extend(response.results)
 
-        while len(results) < response.numFound:
+        limit = min(params.get('limit', float('inf')), response.numFound)
+
+        while len(results) < limit:
             params['start'] = len(results)
             response = self.do_query_raw(*args, **params)
             results.extend(response.results)
 
-        assert len(results) == response.numFound
+        assert len(results) == limit
 
         return results
 
     @staticmethod
     def _merge_kwargs(additionalparams, **kwargs):
         # Only Solr-specific kwargs are parsed
+        # And the special 'limit'
+        try:
+            additionalparams['limit'] = kwargs['limit']
+        except KeyError:
+            pass
+
         try:
             additionalparams['rows'] = kwargs['rows']
         except KeyError:
