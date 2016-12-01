@@ -198,6 +198,9 @@ def regression_on_tiles(tile_bounds, search_bounding_polygon_wkt, search_start, 
 
     tiles = tile_service.find_tiles_by_exact_bounds(tile_bounds, ds, search_start, search_end)
     tiles = tile_service.mask_tiles_to_polygon(wkt.loads(search_bounding_polygon_wkt), tiles)
+    # If all tiles end up being masked, there is no work to do
+    if len(tiles) < 1:
+        return []
     tiles.sort(key=operator.attrgetter('min_time'))
 
     stacked_tile_data = np.stack(tuple([np.squeeze(tile.data, 0) for tile in tiles]))
