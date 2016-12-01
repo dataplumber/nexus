@@ -48,7 +48,7 @@ class NexusTileData(Model):
             meta_data = {}
             for meta_data_obj in grid_tile.meta_data:
                 name = meta_data_obj.name
-                meta_array = meta_data_obj.meta_data
+                meta_array = np.ma.masked_invalid(from_shaped_array(meta_data_obj.meta_data))
                 if len(meta_array.shape) == 2:
                     meta_array = meta_array[np.newaxis, :]
                 meta_data[name] = meta_array
