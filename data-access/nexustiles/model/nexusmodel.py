@@ -89,7 +89,7 @@ class Tile(object):
         if include_nan:
             return list(np.ndindex(self.data.shape))
         else:
-            return np.transpose(np.ma.nonzero(self.data)).tolist()
+            return np.transpose(np.where(np.ma.getmaskarray(self.data) == False)).tolist()
 
     def contains_point(self, lat, lon):
         return (
