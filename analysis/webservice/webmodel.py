@@ -193,6 +193,16 @@ class NexusRequestObject(StatsComputeOptions):
         return arg is not None and arg in ['true', '1', 't', 'y', 'yes', 'True', 'T', 'Y',
                                            'Yes', True]
 
+    def get_datetime_arg(self, name, default=None):
+        time_str = self.get_argument(name, default=default)
+        if time_str == default:
+            return default
+        try:
+            dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        except ValueError:
+            dt = datetime.utcfromtimestamp(int(time_str)).replace(tzinfo=UTC)
+        return dt
+
     def get_apply_seasonal_cycle_filter(self, default=True):
         return self.get_boolean_arg(RequestParameters.SEASONAL_CYCLE_FILTER, default=default)
 

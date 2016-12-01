@@ -32,7 +32,8 @@ setuptools.setup(
         'cython',
         'requests',
         'utm',
-        'shapely'
+        'shapely',
+        'mock'
     ],
 
     classifiers=[
