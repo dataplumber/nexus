@@ -34,10 +34,10 @@ class Tile(object):
         self.meta_data = None  # This should be a dict of the form { 'meta_data_name' : [[[ndarray]]] }. Each ndarray should be the same shape as data.
 
     def __str__(self):
-        return self.get_summary()
+        return str(self.get_summary())
 
     def get_summary(self):
-        summary = self.__dict__
+        summary = dict(self.__dict__)
 
         try:
             summary['latitudes'] = self.latitudes.shape
