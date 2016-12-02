@@ -102,9 +102,17 @@ class Matchup(SparkHandler):
         "matchOnce": {
             "name": "Match Once",
             "type": "boolean",
-            "description": "True/False flag used to determine if more than one match per primary point is returned. "
+            "description": "Optional True/False flag used to determine if more than one match per primary point is returned. "
                            + "If true, only the nearest point will be returned for each primary point. "
                            + "If false, all points within the tolerances will be returned for each primary point. Default: False"
+        },
+        "resultSizeLimit": {
+            "name": "Result Size Limit",
+            "type": "int",
+            "description": "Optional integer value that limits the number of results returned from the matchup. "
+                           "If the number of primary matches is greater than this limit, the service will respond with "
+                           "(HTTP 202: Accepted) and an empty response body. A value of 0 means return all results. "
+                           "Default: 500"
         }
     }
     singleton = True
@@ -168,13 +176,15 @@ class Matchup(SparkHandler):
 
         match_once = request.get_boolean_arg("matchOnce", default=False)
 
+        result_size_limit = request.get_int_arg("resultSizeLimit", default=500)
+
         start_seconds_from_epoch = long((start_time - EPOCH).total_seconds())
         end_seconds_from_epoch = long((end_time - EPOCH).total_seconds())
 
         return bounding_polygon, primary_ds_name, matchup_ds_names, parameter_s, \
                start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch, \
                depth_min, depth_max, time_tolerance, radius_tolerance, \
-               platforms, match_once
+               platforms, match_once, result_size_limit
 
     def calc(self, request, **args):
         start = int(round(time.time() * 1000))
@@ -182,7 +192,7 @@ class Matchup(SparkHandler):
         bounding_polygon, primary_ds_name, matchup_ds_names, parameter_s, \
         start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch, \
         depth_min, depth_max, time_tolerance, radius_tolerance, \
-        platforms, match_once = self.parse_arguments(request)
+        platforms, match_once, result_size_limit = self.parse_arguments(request)
 
         with ResultsStorage() as resultsStorage:
 
@@ -247,7 +257,7 @@ class Matchup(SparkHandler):
 
         threading.Thread(target=do_result_insert).start()
 
-        if len(matches) > self.algorithm_config.getint("sparkmatchup", "maxmatches"):
+        if 0 < result_size_limit < len(matches):
             result = DomsQueryResults(results=None, args=args, details=details, bounds=None, count=None,
                                       computeOptions=None, executionId=execution_id, status_code=202)
         else:
