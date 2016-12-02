@@ -16,3 +16,4 @@ import TileSearch
 import TimeAvgMap
 import TimeSeries
 import TimeSeriesSolr
+import StandardDeviationSearch

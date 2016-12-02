@@ -2,12 +2,10 @@
 Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
-import logging
 import json
-import itertools
-import numpy as np
-from operator import itemgetter
+import logging
 from datetime import datetime
+from functools import partial
 
 from nexustiles.nexustiles import NexusTileServiceException
 from pytz import timezone
@@ -55,7 +53,7 @@ class StandardDeviationSearchHandlerImpl(NexusHandler):
             "name": "Get all Standard Deviations in Tile",
             "type": "boolean",
             "description": "Optional True/False flag. If true, return the standard deviations for every pixel in the "
-                           "tile thatcontains the searched lon/lat point. If false, return the "
+                           "tile that contains the searched lon/lat point. If false, return the "
                            "standard deviation only for the searched lon/lat point. Default: True"
         }
 
@@ -103,12 +101,17 @@ class StandardDeviationSearchHandlerImpl(NexusHandler):
         raw_args_dict = {k: request.get_argument(k) for k in request.requestHandler.request.arguments}
         ds, longitude, latitude, day_of_year, return_all = self.parse_arguments(request)
 
-        if not return_all:
-            results = StandardDeviationSearchHandlerImpl.to_result_dict(
-                get_single_std_dev(self._tile_service, ds, longitude, latitude, day_of_year))
+        if return_all:
+            func = partial(get_all_std_dev, tile_service=self._tile_service, ds=ds, longitude=longitude,
+                           latitude=latitude, day_of_year=day_of_year)
         else:
-            results = StandardDeviationSearchHandlerImpl.to_result_dict(
-                get_all_std_dev(self._tile_service, ds, longitude, latitude, day_of_year))
+            func = partial(get_single_std_dev, tile_service=self._tile_service, ds=ds, longitude=longitude,
+                           latitude=latitude, day_of_year=day_of_year)
+
+        try:
+            results = StandardDeviationSearchHandlerImpl.to_result_dict(func())
+        except (NoTileException, NoStandardDeviationException):
+            return StandardDeviationSearchResult(raw_args_dict, [])
 
         return StandardDeviationSearchResult(raw_args_dict, results)
 
@@ -123,50 +126,50 @@ class StandardDeviationSearchHandlerImpl(NexusHandler):
             } for lon, lat, st_dev in list_of_tuples]
 
 
-def get_single_std_dev(tile_service, ds, longitude, latitude, day_of_year):
-    from shapely.geometry import Point
-    from scipy.spatial import distance
+class NoTileException(Exception):
+    pass
 
+
+class NoStandardDeviationException(Exception):
+    pass
+
+
+def find_tile_and_std_name(tile_service, ds, longitude, latitude, day_of_year):
+    from shapely.geometry import Point
     point = Point(longitude, latitude)
 
     try:
         tile = tile_service.find_tile_by_polygon_and_most_recent_day_of_year(point, ds, day_of_year)[0]
     except NexusTileServiceException:
-        return []
+        raise NoTileException
 
     # Check if this tile has any meta data that ends with 'std'. If it doesn't, just return nothing.
     try:
         st_dev_meta_name = next(iter([key for key in tile.meta_data.keys() if key.endswith('std')]))
     except StopIteration:
-        return []
+        raise NoStandardDeviationException
+
+    return tile, st_dev_meta_name
+
+
+def get_single_std_dev(tile_service, ds, longitude, latitude, day_of_year):
+    from scipy.spatial import distance
+
+    tile, st_dev_meta_name = find_tile_and_std_name(tile_service, ds, longitude, latitude, day_of_year)
 
     # Need to find the closest point in the tile to the input lon/lat point and return only that result
     valid_indices = tile.get_indices()
-    tile_points = np.array(
-        [tuple([tile.longitudes[lon_idx], tile.latitudes[lat_idx]]) for time_idx, lat_idx, lon_idx in
-             valid_indices])
-    closest_point_index = distance.cdist(np.array([(longitude, latitude)]), tile_points).argmin()
+    tile_points = [tuple([tile.longitudes[lon_idx], tile.latitudes[lat_idx]]) for time_idx, lat_idx, lon_idx in
+                   valid_indices]
+    closest_point_index = distance.cdist([(longitude, latitude)], tile_points).argmin()
     closest_lon, closest_lat = tile_points[closest_point_index]
-    closest_point_tile_index = valid_indices[closest_point_index]
+    closest_point_tile_index = tuple(valid_indices[closest_point_index])
     std_at_point = tile.meta_data[st_dev_meta_name][closest_point_tile_index]
     return [tuple([closest_lon, closest_lat, std_at_point])]
 
 
 def get_all_std_dev(tile_service, ds, longitude, latitude, day_of_year):
-    from shapely.geometry import Point
-
-    point = Point(longitude, latitude)
-
-    try:
-        tile = tile_service.find_tile_by_polygon_and_most_recent_day_of_year(point, ds, day_of_year)[0]
-    except NexusTileServiceException:
-        return []
-
-    # Check if this tile has any meta data that ends with 'std'. If it doesn't, just return nothing.
-    try:
-        st_dev_meta_name = next([key for key in tile.meta_data.keys() if key.endswith('std')])
-    except StopIteration:
-        return []
+    tile, st_dev_meta_name = find_tile_and_std_name(tile_service, ds, longitude, latitude, day_of_year)
 
     valid_indices = tile.get_indices()
     return [tuple([tile.longitudes[lon_idx], tile.latitudes[lat_idx],
