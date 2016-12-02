@@ -446,7 +446,7 @@ __CACHE = {}
 def cached(ttl=60000):
 
     def _hash_function_signature(func):
-        hash_object = hashlib.md5(str(inspect.getargspec(func)))
+        hash_object = hashlib.md5(str(inspect.getargspec(func)) + str(func))
         return hash_object.hexdigest()
 
     def _now():
