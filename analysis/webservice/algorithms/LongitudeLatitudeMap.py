@@ -82,13 +82,13 @@ class LongitudeLatitudeMapHandlerImpl(NexusHandler):
                 code=400)
 
         try:
-            start_time = request.get_start_datetime_ms()
+            start_time = request.get_start_datetime()
         except:
             raise NexusProcessingException(
                 reason="'startTime' argument is required. Can be int value milliseconds from epoch or string format YYYY-MM-DDTHH:mm:ssZ",
                 code=400)
         try:
-            end_time = request.get_end_datetime_ms()
+            end_time = request.get_end_datetime()
         except:
             raise NexusProcessingException(
                 reason="'endTime' argument is required. Can be int value milliseconds from epoch or string format YYYY-MM-DDTHH:mm:ssZ",
