@@ -7,14 +7,13 @@ import os
 import math
 import numpy as np
 from time import time
-from webservice.SparkAlg import SparkAlg
-from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMETERS_SPEC
+from webservice.NexusHandler import nexus_handler, SparkHandler, DEFAULT_PARAMETERS_SPEC
 from nexustiles.nexustiles import NexusTileService
 from webservice.webmodel import NexusProcessingException
 from pyspark import SparkContext,SparkConf
 
-# @nexus_handler
-class CorrMapSparkHandlerImpl(SparkAlg):
+@nexus_handler
+class CorrMapSparkHandlerImpl(SparkHandler):
     name = "Correlation Map Spark"
     path = "/corrMapSpark"
     description = "Computes a correlation map between two datasets given an arbitrary geographical area and time range"
@@ -22,7 +21,7 @@ class CorrMapSparkHandlerImpl(SparkAlg):
     singleton = True
 
     def __init__(self):
-        SparkAlg.__init__(self)
+        SparkHandler.__init__(self)
 
     @staticmethod
     def _map(tile_in):
@@ -224,31 +223,31 @@ class CorrMapSparkHandlerImpl(SparkAlg):
         for i in range(len(nexus_tiles_spark)):
             print nexus_tiles_spark[i]
 
-        # Configure Spark
-        sp_conf = SparkConf()
-        sp_conf.setAppName("Spark Correlation Map")
-        sp_conf.set("spark.executorEnv.HOME",
-                    os.path.join(os.getenv('HOME'), 'spark_exec_home'))
-        sp_conf.set("spark.executorEnv.PYTHONPATH", os.getcwd())
-        sp_conf.set("spark.executor.memoryOverhead", "4g")
+        # # Configure Spark
+        # sp_conf = SparkConf()
+        # sp_conf.setAppName("Spark Correlation Map")
+        # sp_conf.set("spark.executorEnv.HOME",
+        #             os.path.join(os.getenv('HOME'), 'spark_exec_home'))
+        # sp_conf.set("spark.executorEnv.PYTHONPATH", os.getcwd())
+        # sp_conf.set("spark.executor.memoryOverhead", "4g")
 
-        cores_per_exec = 1
-        if spark_master == "mesos":
-            # For Mesos, the master is set from environment variable MASTER
-            # and number of executors is set from spark.cores.max.
-            sp_conf.set("spark.cores.max", spark_nexecs)
-        else:
-            # Master is "yarn" or "local[N]" (not Mesos)
-            sp_conf.setMaster(spark_master)
-            sp_conf.set("spark.executor.instances", spark_nexecs)
-        sp_conf.set("spark.executor.cores", cores_per_exec)
+        # cores_per_exec = 1
+        # if spark_master == "mesos":
+        #     # For Mesos, the master is set from environment variable MASTER
+        #     # and number of executors is set from spark.cores.max.
+        #     sp_conf.set("spark.cores.max", spark_nexecs)
+        # else:
+        #     # Master is "yarn" or "local[N]" (not Mesos)
+        #     sp_conf.setMaster(spark_master)
+        #     sp_conf.set("spark.executor.instances", spark_nexecs)
+        # sp_conf.set("spark.executor.cores", cores_per_exec)
 
-        #print sp_conf.getAll()
-        sc = SparkContext(conf=sp_conf)
+        # #print sp_conf.getAll()
+        # sc = SparkContext(conf=sp_conf)
         
         # Launch Spark computations
         #print 'nexus_tiles_spark=',nexus_tiles_spark
-        rdd = sc.parallelize(nexus_tiles_spark,self._spark_nparts)
+        rdd = self._sc.parallelize(nexus_tiles_spark,self._spark_nparts)
         sum_tiles_part = rdd.map(self._map)
         #print "sum_tiles_part = ",sum_tiles_part.collect()
         sum_tiles = \
@@ -315,7 +314,7 @@ class CorrMapSparkHandlerImpl(SparkAlg):
         # Store global map in a NetCDF file.
         self._create_nc_file(r, 'corrmap.nc', 'r')
 
-        # Stop the SparkContext.
-        sc.stop()
+        # # Stop the SparkContext.
+        # sc.stop()
 
         return [[]], None, None

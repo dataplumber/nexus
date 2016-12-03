@@ -8,23 +8,19 @@ import os
 import traceback
 from cStringIO import StringIO
 from datetime import datetime
-
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 from nexustiles.nexustiles import NexusTileService
 from pyspark import SparkContext,SparkConf
 from scipy import stats
-
-from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMETERS_SPEC
-from webservice.SparkAlg import SparkAlg
+from webservice.NexusHandler import nexus_handler, SparkHandler, DEFAULT_PARAMETERS_SPEC
 from webservice.webmodel import NexusResults, NoDataException
 
 SENTINEL = 'STOP'
 
-
-# @nexus_handler
-class TimeSeriesHandlerImpl(SparkAlg):
+@nexus_handler
+class TimeSeriesHandlerImpl(SparkHandler):
     name = "Time Series Spark"
     path = "/timeSeriesSpark"
     description = "Computes a time series plot between one or more datasets given an arbitrary geographical area and time range"
@@ -32,7 +28,7 @@ class TimeSeriesHandlerImpl(SparkAlg):
     singleton = True
 
     def __init__(self):
-        NexusHandler.__init__(self, skipCassandra=True)
+        SparkHandler.__init__(self, skipCassandra=True)
         self.log = logging.getLogger(__name__)
 
     def calc(self, computeOptions, **args):
@@ -117,28 +113,28 @@ class TimeSeriesHandlerImpl(SparkAlg):
 
         cwd = os.getcwd()
 
-        # Configure Spark
-        sp_conf = SparkConf()
-        sp_conf.setAppName("Spark Time Series")
-        sp_conf.set("spark.executorEnv.HOME",
-                    os.path.join(os.getenv('HOME'), 'spark_exec_home'))
-        sp_conf.set("spark.executorEnv.PYTHONPATH", cwd)
-        #sp_conf.set("spark.yarn.executor.memoryOverhead", "4000")
-        sp_conf.set("spark.executor.memory", "4g")
+        # # Configure Spark
+        # sp_conf = SparkConf()
+        # sp_conf.setAppName("Spark Time Series")
+        # sp_conf.set("spark.executorEnv.HOME",
+        #             os.path.join(os.getenv('HOME'), 'spark_exec_home'))
+        # sp_conf.set("spark.executorEnv.PYTHONPATH", cwd)
+        # #sp_conf.set("spark.yarn.executor.memoryOverhead", "4000")
+        # sp_conf.set("spark.executor.memory", "4g")
 
-        cores_per_exec = 1
-        if spark_master == "mesos":
-            # For Mesos, the master is set from environment variable MASTER
-            # and number of executors is set from spark.cores.max.
-            sp_conf.set("spark.cores.max", spark_nexecs)
-        else:
-            # Master is "yarn" or "local[N]" (not Mesos)
-            sp_conf.setMaster(spark_master)
-            sp_conf.set("spark.executor.instances", spark_nexecs)
-        sp_conf.set("spark.executor.cores", cores_per_exec)
+        # cores_per_exec = 1
+        # if spark_master == "mesos":
+        #     # For Mesos, the master is set from environment variable MASTER
+        #     # and number of executors is set from spark.cores.max.
+        #     sp_conf.set("spark.cores.max", spark_nexecs)
+        # else:
+        #     # Master is "yarn" or "local[N]" (not Mesos)
+        #     sp_conf.setMaster(spark_master)
+        #     sp_conf.set("spark.executor.instances", spark_nexecs)
+        # sp_conf.set("spark.executor.cores", cores_per_exec)
 
-        #print sp_conf.getAll()
-        sc = SparkContext(conf=sp_conf)
+        # #print sp_conf.getAll()
+        # sc = SparkContext(conf=sp_conf)
 
         nexus_tiles_spark = [(min_lat, max_lat, min_lon, max_lon, ds, 
                               list(daysinrange_part), cwd, fill)
@@ -149,7 +145,7 @@ class TimeSeriesHandlerImpl(SparkAlg):
         #    print tile
         
         # Launch Spark computations
-        rdd = sc.parallelize(nexus_tiles_spark,spark_nparts)
+        rdd = self._sc.parallelize(nexus_tiles_spark,spark_nparts)
         results = rdd.map(TimeSeriesCalculator.calc_average_on_day).collect()
         #
         results = list(itertools.chain.from_iterable(results))
@@ -161,8 +157,8 @@ class TimeSeriesHandlerImpl(SparkAlg):
 
         self._create_nc_file_time1d(np.array(results), 'ts.nc', 'mean',
                                     fill=-9999.)
-        # Stop the SparkContext.
-        sc.stop()
+        # # Stop the SparkContext.
+        # sc.stop()
 
         return results, {}
 
@@ -308,7 +304,7 @@ class TimeSeriesResults(NexusResults):
         return sio.getvalue()
 
 
-class TimeSeriesCalculator(SparkAlg):
+class TimeSeriesCalculator(SparkHandler):
     def __init__(self):
         self.__tile_service = NexusTileService()
 
