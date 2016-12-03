@@ -3,7 +3,6 @@ Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 import sys
-import os
 import math
 import numpy as np
 from time import time
