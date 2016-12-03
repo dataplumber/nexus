@@ -4,7 +4,6 @@
 # pyximport.install()
 
 import sys
-import os
 import math
 import numpy as np
 from time import time
@@ -33,8 +32,6 @@ class TimeAvgMapSparkHandlerImpl(SparkHandler):
         startTime = tile_in_spark[1]
         endTime = tile_in_spark[2]
         ds = tile_in_spark[3]
-        cwd = tile_in_spark[4]
-        os.chdir(cwd)
         tile_service = NexusTileService()
         print 'Started tile', tile_bounds
         sys.stdout.flush()
@@ -153,10 +150,9 @@ class TimeAvgMapSparkHandlerImpl(SparkHandler):
         #    print 'lats: ', tile.latitudes.compressed()
         #    print 'lons: ', tile.longitudes.compressed()
         # Create array of tuples to pass to Spark map function
-        cwd = os.getcwd()
         nexus_tiles_spark = [[self._find_tile_bounds(t),
                               self._startTime, self._endTime,
-                              self._ds, cwd] for t in nexus_tiles]
+                              self._ds] for t in nexus_tiles]
         # print 'nexus_tiles_spark = ', nexus_tiles_spark
         # Remove empty tiles (should have bounds set to None)
         bad_tile_inds = np.where([t[0] is None for t in nexus_tiles_spark])[0]

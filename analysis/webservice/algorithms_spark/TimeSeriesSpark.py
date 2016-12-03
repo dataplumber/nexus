@@ -4,7 +4,6 @@ California Institute of Technology.  All rights reserved
 """
 import itertools
 import logging
-import os
 import traceback
 from cStringIO import StringIO
 from datetime import datetime
@@ -111,7 +110,7 @@ class TimeSeriesHandlerImpl(SparkHandler):
             print i, datetime.utcfromtimestamp(d)
         #print 'daysinrange=',daysinrange
 
-        cwd = os.getcwd()
+        # cwd = os.getcwd()
 
         # # Configure Spark
         # sp_conf = SparkConf()
@@ -137,7 +136,7 @@ class TimeSeriesHandlerImpl(SparkHandler):
         # sc = SparkContext(conf=sp_conf)
 
         nexus_tiles_spark = [(min_lat, max_lat, min_lon, max_lon, ds, 
-                              list(daysinrange_part), cwd, fill)
+                              list(daysinrange_part), fill)
                              for daysinrange_part
                              in np.array_split(daysinrange, spark_nparts)]
 
@@ -311,8 +310,7 @@ class TimeSeriesCalculator(SparkHandler):
     @staticmethod
     def calc_average_on_day(tile_in_spark):
         (min_lat, max_lat, min_lon, max_lon, dataset, 
-         timestamps, cwd, fill) = tile_in_spark
-        os.chdir(cwd)
+         timestamps, fill) = tile_in_spark
         start_time = timestamps[0]
         end_time = timestamps[-1]
         tile_service = NexusTileService()
