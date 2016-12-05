@@ -3,6 +3,7 @@ import logging
 import threading
 import time
 from datetime import datetime
+from shapely import wkt
 
 import solr
 
@@ -301,7 +302,7 @@ class SolrProxy(object):
             ],
             'rows': 0,
             'facet': 'true',
-            'facet.field': ['tile_min_lon', 'tile_min_lat', 'tile_max_lon', 'tile_max_lat'],
+            'facet.field': 'geo_s',
             'facet.limit': -1,
             'facet.mincount': 1
         }
@@ -325,16 +326,9 @@ class SolrProxy(object):
 
         response = self.do_query_raw(*(search, None, None, False, None), **additionalparams)
 
-        tile_min_lons = [float(x) for x in response.facet_counts["facet_fields"]["tile_min_lon"].keys()]
-        tile_min_lats = [float(x) for x in response.facet_counts["facet_fields"]["tile_min_lat"].keys()]
-        tile_max_lons = [float(x) for x in response.facet_counts["facet_fields"]["tile_max_lon"].keys()]
-        tile_max_lats = [float(x) for x in response.facet_counts["facet_fields"]["tile_max_lat"].keys()]
+        distinct_bounds = [wkt.loads(key).bounds for key in response.facet_counts["facet_fields"]["geo_s"].keys()]
 
-        specs = set(itertools.product(tile_min_lons, tile_min_lats, tile_max_lons, tile_max_lats))
-        specs = set([(min_lon, min_lat, max_lon, max_lat) for min_lon, min_lat, max_lon, max_lat in specs if
-                     min_lon < max_lon and min_lat < max_lat])
-
-        return specs
+        return distinct_bounds
 
     def find_tiles_by_exact_bounds(self, minx, miny, maxx, maxy, ds, start_time=0, end_time=-1, **kwargs):
 
