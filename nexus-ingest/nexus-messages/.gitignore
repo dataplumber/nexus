@@ -3,6 +3,8 @@
 build/
 gradlew.bat
 
+distrobution/
+
 gen/
 
 

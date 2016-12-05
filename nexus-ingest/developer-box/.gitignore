@@ -3,5 +3,6 @@ logs/
 *.nc
 *.h5
 
+.listing
 .DS_Store
 .vagrant
