@@ -146,6 +146,7 @@ def pool_initializer():
     from nexustiles.nexustiles import NexusTileService
     global tile_service
     tile_service = NexusTileService()
+    # TODO This is a hack to make sure each sub-process uses it's own connection to cassandra. data-access needs to be updated
     from cassandra.cqlengine import connection
     from multiprocessing import current_process
 
@@ -195,9 +196,18 @@ def regression_on_tiles(tile_bounds, search_bounding_polygon_wkt, search_start, 
     import numpy as np
     import operator
     from shapely import wkt
+    from shapely.geometry import box
+    search_bounding_shape = wkt.loads(search_bounding_polygon_wkt)
+    tile_bounding_shape = box(*tile_bounds)
 
+    # Load all tiles for given (exact) bounding box across the search time range
     tiles = tile_service.find_tiles_by_exact_bounds(tile_bounds, ds, search_start, search_end)
-    tiles = tile_service.mask_tiles_to_polygon(wkt.loads(search_bounding_polygon_wkt), tiles)
+    if search_bounding_shape.contains(tile_bounding_shape):
+        # The tile bounds are totally contained in the search area, we don't need to mask it.
+        pass
+    else:
+        # The tile bounds cross the search area borders, we need to mask the tiles to the search area
+        tiles = tile_service.mask_tiles_to_polygon(wkt.loads(search_bounding_polygon_wkt), tiles)
     # If all tiles end up being masked, there is no work to do
     if len(tiles) < 1:
         return []
