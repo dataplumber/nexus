@@ -178,3 +178,27 @@ class TestApproximateValueMethod(unittest.TestCase):
         #  1.0   [20.  21.  22.  23.  24.]]]
 
         self.assertAlmostEqual(11, get_approximate_value_for_lat_lon([tile], -0.4, -1))
+
+
+class TestTileContainsMethod(unittest.TestCase):
+
+    def test_masked_tile(self):
+        tile = Tile()
+        tile.bbox = BBox(30.5, 37.5, -51.5, -36.5)
+        tile.latitudes = np.ma.arange(30.5, 38.5, 1.0)
+        tile.longitudes = np.ma.arange(-51.5, -35.5, 1.0)
+        tile.times = np.ma.array([0L])
+        tile.data = np.ma.arange(128.0).reshape((1, 8, 16))
+
+        # tile.latitudes [ 30.5  31.5  32.5  33.5  34.5  35.5  36.5  37.5]
+        tile.latitudes = np.ma.masked_outside(tile.latitudes, 35, 45)
+        # tile.latitudes [-- -- -- -- -- 35.5 36.5 37.5]
+
+        # tile.longitudes [-51.5 -50.5 -49.5 -48.5 -47.5 -46.5 -45.5 -44.5 -43.5 -42.5 -41.5 -40.5 -39.5  -38.5 -37.5 -36.5]
+        tile.longitudes = np.ma.masked_outside(tile.longitudes, -50, -40)
+        # tile.longitudes [-- -- -49.5 -48.5 -47.5 -46.5 -45.5 -44.5 -43.5 -42.5 -41.5 -40.5 -- -- -- --]
+
+        # Tile no longer contains 35, -50
+        self.assertFalse(tile.contains_point(35, -50))
+
+
