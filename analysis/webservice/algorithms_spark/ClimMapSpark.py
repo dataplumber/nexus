@@ -3,8 +3,7 @@
 
 #pyximport.install()
 
-import sys
-import math
+import sys, math, logging
 import numpy as np
 from time import time
 from calendar import timegm, monthrange
@@ -25,6 +24,7 @@ class ClimMapSparkHandlerImpl(SparkHandler):
 
     def __init__(self):
         SparkHandler.__init__(self)
+        self.log = logging.getLogger(__name__)
 
     @staticmethod
     def _map(tile_in_spark):
@@ -35,23 +35,23 @@ class ClimMapSparkHandlerImpl(SparkHandler):
         endTime = tile_in_spark[2]
         ds = tile_in_spark[3]
         tile_service = NexusTileService()
-        print 'Started tile', tile_bounds
-        sys.stdout.flush()
+        #print 'Started tile', tile_bounds
+        #sys.stdout.flush()
         tile_inbounds_shape = (max_y-min_y+1, max_x-min_x+1)
         days_at_a_time = 90
         #days_at_a_time = 30
         #days_at_a_time = 7
         #days_at_a_time = 1
-        print 'days_at_a_time = ', days_at_a_time
+        #print 'days_at_a_time = ', days_at_a_time
         t_incr = 86400 * days_at_a_time
         sum_tile = np.array(np.zeros(tile_inbounds_shape, dtype=np.float64))
         cnt_tile = np.array(np.zeros(tile_inbounds_shape, dtype=np.uint32))
         t_start = startTime
         while t_start <= endTime:
             t_end = min(t_start+t_incr,endTime)
-            t1 = time()
-            print 'nexus call start at time %f' % t1
-            sys.stdout.flush()
+            #t1 = time()
+            #print 'nexus call start at time %f' % t1
+            #sys.stdout.flush()
             nexus_tiles = \
                 ClimMapSparkHandlerImpl.query_by_parts(tile_service,
                                                        min_lat, max_lat, 
@@ -66,18 +66,18 @@ class ClimMapSparkHandlerImpl(SparkHandler):
             #                                          ds=ds, 
             #                                          start_time=t_start, 
             #                                          end_time=t_end)
-            t2 = time()
-            print 'nexus call end at time %f' % t2
-            print 'secs in nexus call: ', t2-t1
-            sys.stdout.flush()
-            print 't %d to %d - Got %d tiles' % (t_start, t_end, 
-                                                 len(nexus_tiles))
+            #t2 = time()
+            #print 'nexus call end at time %f' % t2
+            #print 'secs in nexus call: ', t2-t1
+            #sys.stdout.flush()
+            #print 't %d to %d - Got %d tiles' % (t_start, t_end, 
+            #                                     len(nexus_tiles))
             #for nt in nexus_tiles:
             #    print nt.granule
             #    print nt.section_spec
             #    print 'lat min/max:', np.ma.min(nt.latitudes), np.ma.max(nt.latitudes)
             #    print 'lon min/max:', np.ma.min(nt.longitudes), np.ma.max(nt.longitudes)
-            sys.stdout.flush()
+            #sys.stdout.flush()
 
             for tile in nexus_tiles:
                 tile.data.data[:,:] = np.nan_to_num(tile.data.data)
@@ -92,9 +92,9 @@ class ClimMapSparkHandlerImpl(SparkHandler):
         #sum_tile.mask = cnt_tile.mask
         #avg_tile = sum_tile / cnt_tile
         #stats_tile = [[{'avg': avg_tile.data[y,x], 'cnt': cnt_tile.data[y,x]} for x in range(tile_inbounds_shape[1])] for y in range(tile_inbounds_shape[0])]
-        print 'Finished tile', tile_bounds
+        #print 'Finished tile', tile_bounds
         #print 'Tile avg = ', avg_tile
-        sys.stdout.flush()
+        #sys.stdout.flush()
         return ((min_lat,max_lat,min_lon,max_lon),(sum_tile,cnt_tile))
 
     def _month_from_timestamp(self, t):
@@ -124,19 +124,18 @@ class ClimMapSparkHandlerImpl(SparkHandler):
         self._endTime = timegm((self._endYear,12,31,23,59,59))
         
         self._find_native_resolution()
-        print 'Using Native resolution: lat_res=%f, lon_res=%f' % (self._latRes, self._lonRes)
+        self.log.debug('Using Native resolution: lat_res={0}, lon_res={1}'.format(self._latRes, self._lonRes))
         self._minLatCent = self._minLat + self._latRes / 2
         self._minLonCent = self._minLon + self._lonRes / 2
         nlats = int((self._maxLat-self._minLatCent)/self._latRes)+1
         nlons = int((self._maxLon-self._minLonCent)/self._lonRes)+1
         self._maxLatCent = self._minLatCent + (nlats-1) * self._latRes
         self._maxLonCent = self._minLonCent + (nlons-1) * self._lonRes
-        print 'nlats=',nlats,'nlons=',nlons
-        print 'center lat range = %f to %f' % (self._minLatCent, 
-                                               self._maxLatCent)
-        print 'center lon range = %f to %f' % (self._minLonCent, 
-                                               self._maxLonCent)
-        sys.stdout.flush()
+        self.log.debug('nlats={0}, nlons={1}'.format(nlats, nlons))
+        self.log.debug('center lat range = {0} to {1}'.format(self._minLatCent,
+                                                              self._maxLatCent))
+        self.log.debug('center lon range = {0} to {1}'.format(self._minLonCent,
+                                                              self._maxLonCent))
         a = np.zeros((nlats, nlons),dtype=np.float64,order='C')
         n = np.zeros((nlats, nlons),dtype=np.float64,order='C')
 
@@ -152,8 +151,7 @@ class ClimMapSparkHandlerImpl(SparkHandler):
         if len(nexus_tiles) == 0:
             raise NexusProcessingException.NoDataException(reason="No data found for selected timeframe")
 
-        print 'Found %d tiles' % len(nexus_tiles)
-        sys.stdout.flush()
+        self.log.debug('Found {0} tiles'.format(len(nexus_tiles)))
         #for tile in nexus_tiles:
         #    print 'lats: ', tile.latitudes.compressed()
         #    print 'lons: ', tile.longitudes.compressed()
@@ -168,14 +166,14 @@ class ClimMapSparkHandlerImpl(SparkHandler):
         for i in np.flipud(bad_tile_inds):
             del nexus_tiles_spark[i]
         num_nexus_tiles_spark = len(nexus_tiles_spark)
-        print 'Created %d spark tiles' % num_nexus_tiles_spark
+        self.log.debug('Created {0} spark tiles'.format(num_nexus_tiles_spark))
 
         # Expand Spark map tuple array by duplicating each entry N times,
         # where N is the number of ways we want the time dimension carved up.
         # (one partition per year in this case).
         num_years = self._endYear - self._startYear + 1
         nexus_tiles_spark = np.repeat(nexus_tiles_spark, num_years, axis=0)
-        print 'repeated len(nexus_tiles_spark) = ', len(nexus_tiles_spark)
+        self.log.debug('repeated len(nexus_tiles_spark) = {0}'.format(len(nexus_tiles_spark)))
         
         # Set the time boundaries for each of the Spark map tuples.
         # Every Nth element in the array gets the same time bounds.
@@ -188,35 +186,12 @@ class ClimMapSparkHandlerImpl(SparkHandler):
                                                self._endYear+1)]),
                       num_nexus_tiles_spark,
                       axis=0).reshape((len(nexus_tiles_spark), 2))
-        print 'spark_part_time_ranges=', spark_part_time_ranges
+        self.log.debug('spark_part_time_ranges={0}'.format(spark_part_time_ranges))
         nexus_tiles_spark[:,1:3] = spark_part_time_ranges
-        print 'nexus_tiles_spark final = '
-        for i in range(len(nexus_tiles_spark)):
-            print nexus_tiles_spark[i]
+        #print 'nexus_tiles_spark final = '
+        #for i in range(len(nexus_tiles_spark)):
+        #    print nexus_tiles_spark[i]
 
-        # # Configure Spark
-        # sp_conf = SparkConf()
-        # sp_conf.setAppName("Spark Climatology Map")
-        # sp_conf.set("spark.executorEnv.HOME",
-        #             os.path.join(os.getenv('HOME'), 'spark_exec_home'))
-        # sp_conf.set("spark.executorEnv.PYTHONPATH", cwd)
-        # #sp_conf.set("spark.yarn.executor.memoryOverhead", "4000")
-        # sp_conf.set("spark.executor.memory", "4g")
-
-        # cores_per_exec = 1
-        # if spark_master == "mesos":
-        #     # For Mesos, the master is set from environment variable MASTER
-        #     # and number of executors is set from spark.cores.max.
-        #     sp_conf.set("spark.cores.max", spark_nexecs)
-        # else:
-        #     # Master is "yarn" or "local[N]" (not Mesos)
-        #     sp_conf.setMaster(spark_master)
-        #     sp_conf.set("spark.executor.instances", spark_nexecs)
-        # sp_conf.set("spark.executor.cores", cores_per_exec)
-
-        # #print sp_conf.getAll()
-        # sc = SparkContext(conf=sp_conf)
-        
         # Launch Spark computations
         rdd = self._sc.parallelize(nexus_tiles_spark,self._spark_nparts)
         sum_count_part = rdd.map(self._map)
@@ -251,17 +226,14 @@ class ClimMapSparkHandlerImpl(SparkHandler):
                 x0 = self._lon2ind(tile_min_lon)
                 x1 = x0 + tile_data.shape[1] - 1
                 if np.any(np.logical_not(tile_data.mask)):
-                    print 'writing tile lat %f-%f, lon %f-%f, map y %d-%d, map x %d-%d' % \
-                        (tile_min_lat, tile_max_lat, 
-                         tile_min_lon, tile_max_lon, y0, y1, x0, x1)
-                    sys.stdout.flush()
+                    self.log.debug('writing tile lat {0}-{1}, lon {2}-{3}, map y {4}-{5}, map x {6}-{7}'.format(tile_min_lat, tile_max_lat, 
+                                tile_min_lon, tile_max_lon, y0, y1, x0, x1))
                     a[y0:y1+1,x0:x1+1] = tile_data
                     n[y0:y1+1,x0:x1+1] = tile_cnt
                 else:
-                    print 'All pixels masked in tile lat %f-%f, lon %f-%f, map y %d-%d, map x %d-%d' % \
-                        (tile_min_lat, tile_max_lat, 
-                         tile_min_lon, tile_max_lon, y0, y1, x0, x1)
-                    sys.stdout.flush()
+                    self.log.debug('All pixels masked in tile lat {0}-{1}, lon {2}-{3}, map y {4}-{5}, map x {6}-{7}'.format(tile_min_lat, tile_max_lat,
+                                             tile_min_lon, tile_max_lon, 
+                                             y0, y1, x0, x1))
 
         # Store global map in a NetCDF file.
         self._create_nc_file(a, 'clmap.nc', 'val')
@@ -269,9 +241,6 @@ class ClimMapSparkHandlerImpl(SparkHandler):
         # Create dict for JSON response
         results = [[{'avg': a[x,y], 'cnt': n[x,y]}
                     for x in range(a.shape[0])] for y in range(a.shape[1])]
-
-        # # Stop the SparkContext.
-        # sc.stop()
 
         return ClimMapSparkResults(results=results, meta={}, computeOptions=computeOptions)
 
