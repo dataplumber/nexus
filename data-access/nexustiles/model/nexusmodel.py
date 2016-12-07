@@ -92,12 +92,15 @@ class Tile(object):
             return np.transpose(np.where(np.ma.getmaskarray(self.data) == False)).tolist()
 
     def contains_point(self, lat, lon):
+
+        minx, miny, maxx, maxy = np.ma.min(self.longitudes), np.ma.min(self.latitudes), np.ma.max(
+            self.longitudes), np.ma.max(self.latitudes)
         return (
-                   (self.bbox.min_lat < lat or np.isclose(self.bbox.min_lat, lat)) and
-                   (lat < self.bbox.max_lat or np.isclose(lat, self.bbox.max_lat))
+                   (miny < lat or np.isclose(miny, lat)) and
+                   (lat < maxy or np.isclose(lat, maxy))
                ) and (
-                   (self.bbox.min_lon < lon or np.isclose(self.bbox.min_lon, lon)) and
-                   (lon < self.bbox.max_lon or np.isclose(lon, self.bbox.max_lon))
+                   (minx < lon or np.isclose(minx, lon)) and
+                   (lon < maxx or np.isclose(lon, maxx))
                )
 
 
