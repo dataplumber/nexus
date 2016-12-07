@@ -5,6 +5,7 @@ California Institute of Technology.  All rights reserved
 import json
 import math
 import numpy as np
+from shapely.geometry import box
 from scipy.stats import linregress
 from itertools import groupby
 from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMETERS_SPEC
@@ -41,10 +42,10 @@ class LongitudeLatitudeMapHandlerImpl(NexusHandler):
         if not len(ds) == 2:
             raise Exception("Requires two datasets for comparison. Specify request parameter ds=Dataset_1,Dataset_2")
 
-        ds1tiles = self._tile_service.get_tiles_bounded_by_box(minLat, maxLat, minLon, maxLon, ds[0], startTime,
-                                                               endTime)
-        ds2tiles = self._tile_service.get_tiles_bounded_by_box(minLat, maxLat, minLon, maxLon, ds[1], startTime,
-                                                               endTime)
+        ds1tiles = self._tile_service.find_tiles_in_polygon(box(minLon, minLat, maxLon, maxLat), ds[0], startTime,
+                                                            endTime)
+        ds2tiles = self._tile_service.find_tiles_in_polygon(box(minLon, minLat, maxLon, maxLat), ds[1], startTime,
+                                                            endTime)
 
         matches = self._match_tiles(ds1tiles, ds2tiles)
 
@@ -60,7 +61,7 @@ class LongitudeLatitudeMapHandlerImpl(NexusHandler):
                         'stderr': 0,
                         'lat': float(lat),
                         'lon': float(lon)
-                    } for lon in xrange(minLon, maxLon, resolution)] for lat in xrange(minLat, maxLat, resolution)]
+                    } for lon in np.arange(minLon, maxLon, resolution)] for lat in np.arange(minLat, maxLat, resolution)]
 
         for stats in results:
             for stat in stats:
@@ -81,6 +82,7 @@ class LongitudeLatitudeMapHandlerImpl(NexusHandler):
                 if len(values_x) > 2 and len(values_y) > 2:
                     stat["slope"], stat["intercept"], stat["r"], stat["p"], stat["stderr"] = linregress(values_x,
                                                                                                         values_y)
+                    stat["cnt"] = len(values_x)
 
         return CorrelationResults(results)
 
