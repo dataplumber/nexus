@@ -179,8 +179,6 @@ if __name__ == "__main__":
                 sp_conf.setAppName("nexus-analysis")
                 sp_conf.set("spark.scheduler.mode", "FAIR")
                 sp_conf.set("spark.executor.memory", "6g")
-                sp_conf.set("spark.executorEnv.HOME",
-                            os.path.join(os.getenv('HOME'), 'spark_exec_home'))
                 spark_context = SparkContext(conf=sp_conf)
 
             handlers.append(
