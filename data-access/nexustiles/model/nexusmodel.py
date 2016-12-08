@@ -93,18 +93,130 @@ class Tile(object):
 
     def contains_point(self, lat, lon):
 
-        minx, miny, maxx, maxy = np.ma.min(self.longitudes), np.ma.min(self.latitudes), np.ma.max(
-            self.longitudes), np.ma.max(self.latitudes)
-        return (
-                   (miny < lat or np.isclose(miny, lat)) and
-                   (lat < maxy or np.isclose(lat, maxy))
-               ) and (
-                   (minx < lon or np.isclose(minx, lon)) and
-                   (lon < maxx or np.isclose(lon, maxx))
-               )
+        return contains_point(self.latitudes, self.longitudes, lat, lon)
 
 
-def get_approximate_value_for_lat_lon(tile_list, lat, lon, arrayName=None):
+def contains_point(latitudes, longitudes, lat, lon):
+    minx, miny, maxx, maxy = np.ma.min(longitudes), np.ma.min(latitudes), np.ma.max(
+        longitudes), np.ma.max(latitudes)
+    return (
+               (miny < lat or np.isclose(miny, lat)) and
+               (lat < maxy or np.isclose(lat, maxy))
+           ) and (
+               (minx < lon or np.isclose(minx, lon)) and
+               (lon < maxx or np.isclose(lon, maxx))
+           )
+
+
+def merge_tiles(tile_list):
+    a = np.array([tile.times for tile in tile_list])
+    assert np.ma.max(a) == np.ma.min(a)
+
+    merged_times = tile_list[0].times
+    merged_lats = np.ndarray((0,))
+    merged_lons = np.ndarray((0,))
+    merged_data = np.ndarray((0, 0))
+
+    for tile in tile_list:
+        if tile.latitudes in merged_lats and tile.longitudes not in merged_lons:
+            merged_lons = np.ma.concatenate([merged_lons, tile.longitudes])
+            merged_data = np.ma.hstack((merged_data, np.ma.squeeze(tile.data)))
+        elif tile.latitudes not in merged_lats and tile.longitudes in merged_lons:
+            merged_lats = np.ma.concatenate([merged_lats, tile.latitudes])
+            merged_data = np.ma.vstack((merged_data, np.ma.squeeze(tile.data)))
+        elif tile.latitudes not in merged_lats and tile.longitudes not in merged_lons:
+            merged_lats = np.ma.concatenate([merged_lats, tile.latitudes])
+            merged_lons = np.ma.concatenate([merged_lons, tile.longitudes])
+            merged_data = block_diag(*[merged_data, np.ma.squeeze(tile.data)])
+        else:
+            raise Exception("Can't handle overlapping tiles")
+
+    merged_data = merged_data[np.ma.argsort(merged_lats), :]
+    merged_data = merged_data[:, np.ma.argsort(merged_lons)]
+    merged_lats = merged_lats[np.ma.argsort(merged_lats),]
+    merged_lons = merged_lons[np.ma.argsort(merged_lons),]
+
+    merged_data = merged_data[np.newaxis, :]
+
+    return merged_times, merged_lats, merged_lons, merged_data
+
+
+def block_diag(*arrs):
+    """Create a block diagonal matrix from the provided arrays.
+
+    Given the inputs `A`, `B` and `C`, the output will have these
+    arrays arranged on the diagonal::
+
+        [[A, 0, 0],
+         [0, B, 0],
+         [0, 0, C]]
+
+    If all the input arrays are square, the output is known as a
+    block diagonal matrix.
+
+    Parameters
+    ----------
+    A, B, C, ... : array-like, up to 2D
+        Input arrays.  A 1D array or array-like sequence with length n is
+        treated as a 2D array with shape (1,n).
+
+    Returns
+    -------
+    D : ndarray
+        Array with `A`, `B`, `C`, ... on the diagonal.  `D` has the
+        same dtype as `A`.
+
+    References
+    ----------
+    .. [1] Wikipedia, "Block matrix",
+           http://en.wikipedia.org/wiki/Block_diagonal_matrix
+
+    Examples
+    --------
+    >>> A = [[1, 0],
+    ...      [0, 1]]
+    >>> B = [[3, 4, 5],
+    ...      [6, 7, 8]]
+    >>> C = [[7]]
+    >>> print(block_diag(A, B, C))
+    [[1 0 0 0 0 0]
+     [0 1 0 0 0 0]
+     [0 0 3 4 5 0]
+     [0 0 6 7 8 0]
+     [0 0 0 0 0 7]]
+    >>> block_diag(1.0, [2, 3], [[4, 5], [6, 7]])
+    array([[ 1.,  0.,  0.,  0.,  0.],
+           [ 0.,  2.,  3.,  0.,  0.],
+           [ 0.,  0.,  0.,  4.,  5.],
+           [ 0.,  0.,  0.,  6.,  7.]])
+
+    """
+    if arrs == ():
+        arrs = ([],)
+    arrs = [np.atleast_2d(a) for a in arrs]
+
+    bad_args = [k for k in range(len(arrs)) if arrs[k].ndim > 2]
+    if bad_args:
+        raise ValueError("arguments in the following positions have dimension "
+                         "greater than 2: %s" % bad_args)
+
+    shapes = np.array([a.shape for a in arrs])
+    out = np.ma.masked_all(np.sum(shapes, axis=0), dtype=arrs[0].dtype)
+
+    r, c = 0, 0
+    for i, (rr, cc) in enumerate(shapes):
+        out[r:r + rr, c:c + cc] = arrs[i]
+        r += rr
+        c += cc
+    return out
+
+
+def find_nearest(array, value):
+    idx = (np.abs(array - value)).argmin()
+    return array[idx]
+
+
+def get_approximate_value_for_lat_lon(tile_list, lat, lon):
     """
     This function pulls the value out of one of the tiles in tile_list that is the closest to the given
     lat, lon point.
@@ -113,33 +225,17 @@ def get_approximate_value_for_lat_lon(tile_list, lat, lon, arrayName=None):
     """
 
     try:
-        tile = next(tile for tile in tile_list if tile.contains_point(lat, lon))
-    except StopIteration:
-        # lat or lon are out of bounds for these tiles, return nan
+        times, lats, longs, data = merge_tiles(tile_list)
+        if not contains_point(lats, longs, lat, lon):
+            # Lat, Lon is out of bounds for these tiles
+            return float('NaN')
+    except AssertionError:
+        # Tiles are not all at the same time
         return float('NaN')
 
-    # Check latitude array for an exact match on the latitude being searched for
-    lat_idx = np.ma.where(np.isclose(tile.latitudes, lat))[0]
-    if len(lat_idx) == 0:
-        # No exact match but the lat being search for is between min and max. So break the lats into all values less
-        # than the lat being searched for, then take the last one in that list
-        lat_idx = next(iter(np.ma.where((lat > tile.latitudes))))[-1]
-    else:
-        lat_idx = lat_idx[0]
+    nearest_lat = find_nearest(lats, lat)
+    nearest_long = find_nearest(longs, lon)
 
-    # Repeat for longitude
-    lon_idx = np.ma.where(np.isclose(tile.longitudes, lon))[0]
-    if len(lon_idx) == 0:
-        lon_idx = next(iter(np.ma.where((lon > tile.longitudes))))[-1]
-    else:
-        lon_idx = lon_idx[0]
-
-    try:
-        if arrayName is None or arrayName == "data":
-            data_val = tile.data[0][lat_idx][lon_idx]
-        else:
-            data_val = tile.meta_data[arrayName][lat_idx][lon_idx]
-    except IndexError:
-        return None
+    data_val = data[0][(np.abs(lats - lat)).argmin()][(np.abs(longs - lon)).argmin()]
 
     return data_val.item() if (data_val is not np.ma.masked) and data_val.size == 1 else float('Nan')

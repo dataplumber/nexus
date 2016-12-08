@@ -61,7 +61,8 @@ class LongitudeLatitudeMapHandlerImpl(NexusHandler):
                         'stderr': 0,
                         'lat': float(lat),
                         'lon': float(lon)
-                    } for lon in np.arange(minLon, maxLon, resolution)] for lat in np.arange(minLat, maxLat, resolution)]
+                    } for lon in np.arange(minLon, maxLon, resolution)] for lat in
+                   np.arange(minLat, maxLat, resolution)]
 
         for stats in results:
             for stat in stats:
@@ -80,8 +81,15 @@ class LongitudeLatitudeMapHandlerImpl(NexusHandler):
                         values_y.append(value_2)
 
                 if len(values_x) > 2 and len(values_y) > 2:
-                    stat["slope"], stat["intercept"], stat["r"], stat["p"], stat["stderr"] = linregress(values_x,
-                                                                                                        values_y)
+                    stats = linregress(values_x, values_y)
+
+                    stat["slope"] = stats[0] if not math.isnan(stats[0]) and not math.isinf(stats[0]) else str(stats[0])
+                    stat["intercept"] = stats[1] if not math.isnan(stats[1]) and not math.isinf(stats[1]) else str(
+                        stats[1])
+                    stat["r"] = stats[2] if not math.isnan(stats[2]) and not math.isinf(stats[2]) else str(stats[2])
+                    stat["p"] = stats[3] if not math.isnan(stats[3]) and not math.isinf(stats[3]) else str(stats[3])
+                    stat["stderr"] = stats[4] if not math.isnan(stats[4]) and not math.isinf(stats[4]) else str(
+                        stats[4])
                     stat["cnt"] = len(values_x)
 
         return CorrelationResults(results)
