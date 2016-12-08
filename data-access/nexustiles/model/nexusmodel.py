@@ -113,9 +113,9 @@ def merge_tiles(tile_list):
     assert np.ma.max(a) == np.ma.min(a)
 
     merged_times = tile_list[0].times
-    merged_lats = []
-    merged_lons = []
-    merged_data = []
+    merged_lats = np.ndarray((0,), dtype=np.float32)
+    merged_lons = np.ndarray((0,), dtype=np.float32)
+    merged_data = np.ndarray((0, 0), dtype=np.float32)
 
     for tile in tile_list:
         if tile.latitudes in merged_lats and tile.longitudes not in merged_lons:
