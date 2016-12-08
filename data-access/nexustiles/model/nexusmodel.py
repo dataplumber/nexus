@@ -118,13 +118,13 @@ def merge_tiles(tile_list):
     merged_data = np.ndarray((0, 0), dtype=np.float32)
 
     for tile in tile_list:
-        if tile.latitudes in merged_lats and tile.longitudes not in merged_lons:
+        if np.ma.in1d(tile.latitudes, merged_lats).all() and not np.ma.in1d(tile.longitudes, merged_lons).all():
             merged_lons = np.ma.concatenate([merged_lons, tile.longitudes])
             merged_data = np.ma.hstack((merged_data, np.ma.squeeze(tile.data)))
-        elif tile.latitudes not in merged_lats and tile.longitudes in merged_lons:
+        elif not np.ma.in1d(tile.latitudes, merged_lats).all() and np.ma.in1d(tile.longitudes, merged_lons).all():
             merged_lats = np.ma.concatenate([merged_lats, tile.latitudes])
             merged_data = np.ma.vstack((merged_data, np.ma.squeeze(tile.data)))
-        elif tile.latitudes not in merged_lats and tile.longitudes not in merged_lons:
+        elif not np.ma.in1d(tile.latitudes, merged_lats).all() and not np.ma.in1d(tile.longitudes, merged_lons).all():
             merged_lats = np.ma.concatenate([merged_lats, tile.latitudes])
             merged_lons = np.ma.concatenate([merged_lons, tile.longitudes])
             merged_data = block_diag(*[merged_data, np.ma.squeeze(tile.data)])
