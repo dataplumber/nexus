@@ -433,51 +433,57 @@ class SparkHandler(NexusHandler):
             if part_dim == 0: 
                 # Partition by latitude.
                 mid_lat = (min_lat + max_lat) / 2
-                nexus_tiles = SparkAlg.query_by_parts(tile_service, 
-                                                      min_lat, mid_lat, 
-                                                      min_lon, max_lon, 
-                                                      dataset, 
-                                                      start_time, end_time,
-                                                      part_dim = part_dim)
-                nexus_tiles.extend(SparkAlg.query_by_parts(tile_service, 
-                                                           mid_lat, max_lat, 
-                                                           min_lon, max_lon, 
-                                                           dataset, 
-                                                           start_time, 
-                                                           end_time,
-                                                           part_dim = part_dim))
+                nexus_tiles = SparkHandler.query_by_parts(tile_service, 
+                                                          min_lat, mid_lat, 
+                                                          min_lon, max_lon, 
+                                                          dataset, 
+                                                          start_time, end_time,
+                                                          part_dim=part_dim)
+                nexus_tiles.extend(SparkHandler.query_by_parts(tile_service, 
+                                                               mid_lat, 
+                                                               max_lat, 
+                                                               min_lon, 
+                                                               max_lon, 
+                                                               dataset, 
+                                                               start_time, 
+                                                               end_time,
+                                                               part_dim=part_dim))
             elif part_dim == 1: 
                 # Partition by longitude.
                 mid_lon = (min_lon + max_lon) / 2
-                nexus_tiles = SparkAlg.query_by_parts(tile_service, 
-                                                      min_lat, max_lat, 
-                                                      min_lon, mid_lon, 
-                                                      dataset, 
-                                                      start_time, end_time,
-                                                      part_dim = part_dim)
-                nexus_tiles.extend(SparkAlg.query_by_parts(tile_service, 
-                                                           min_lat, max_lat, 
-                                                           mid_lon, max_lon, 
-                                                           dataset, 
-                                                           start_time, 
-                                                           end_time,
-                                                           part_dim = part_dim))
+                nexus_tiles = SparkHandler.query_by_parts(tile_service, 
+                                                          min_lat, max_lat, 
+                                                          min_lon, mid_lon, 
+                                                          dataset, 
+                                                          start_time, end_time,
+                                                          part_dim=part_dim)
+                nexus_tiles.extend(SparkHandler.query_by_parts(tile_service, 
+                                                               min_lat, 
+                                                               max_lat, 
+                                                               mid_lon, 
+                                                               max_lon, 
+                                                               dataset, 
+                                                               start_time, 
+                                                               end_time,
+                                                               part_dim=part_dim))
             elif part_dim == 2:
                 # Partition by time.
                 mid_time = (start_time + end_time) / 2
-                nexus_tiles = SparkAlg.query_by_parts(tile_service, 
-                                                      min_lat, max_lat, 
-                                                      min_lon, max_lon, 
-                                                      dataset, 
-                                                      start_time, mid_time,
-                                                      part_dim = part_dim)
-                nexus_tiles.extend(SparkAlg.query_by_parts(tile_service, 
-                                                           min_lat, max_lat, 
-                                                           min_lon, max_lon, 
-                                                           dataset, 
-                                                           mid_time, 
-                                                           end_time,
-                                                           part_dim = part_dim))
+                nexus_tiles = SparkHandler.query_by_parts(tile_service, 
+                                                          min_lat, max_lat, 
+                                                          min_lon, max_lon, 
+                                                          dataset, 
+                                                          start_time, mid_time,
+                                                          part_dim=part_dim)
+                nexus_tiles.extend(SparkHandler.query_by_parts(tile_service, 
+                                                               min_lat, 
+                                                               max_lat, 
+                                                               min_lon, 
+                                                               max_lon, 
+                                                               dataset, 
+                                                               mid_time, 
+                                                               end_time,
+                                                               part_dim=part_dim))
         else:
             # No exception, so query Cassandra for the tile data.
             #print 'Making NEXUS query to Cassandra for %d tiles...' % \
