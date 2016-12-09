@@ -6,7 +6,7 @@ import ConfigParser
 import importlib
 import json
 import logging
-import sys
+import sys, os
 import traceback
 from multiprocessing.pool import ThreadPool
 
@@ -179,7 +179,6 @@ if __name__ == "__main__":
                 sp_conf.setAppName("nexus-analysis")
                 sp_conf.set("spark.scheduler.mode", "FAIR")
                 sp_conf.set("spark.executor.memory", "6g")
-
                 spark_context = SparkContext(conf=sp_conf)
 
             handlers.append(

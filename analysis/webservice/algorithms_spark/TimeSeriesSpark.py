@@ -4,27 +4,22 @@ California Institute of Technology.  All rights reserved
 """
 import itertools
 import logging
-import os
 import traceback
 from cStringIO import StringIO
 from datetime import datetime
-
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 from nexustiles.nexustiles import NexusTileService
 from pyspark import SparkContext,SparkConf
 from scipy import stats
-
-from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMETERS_SPEC
-from webservice.SparkAlg import SparkAlg
+from webservice.NexusHandler import nexus_handler, SparkHandler, DEFAULT_PARAMETERS_SPEC
 from webservice.webmodel import NexusResults, NoDataException
 
 SENTINEL = 'STOP'
 
-
-# @nexus_handler
-class TimeSeriesHandlerImpl(SparkAlg):
+@nexus_handler
+class TimeSeriesHandlerImpl(SparkHandler):
     name = "Time Series Spark"
     path = "/timeSeriesSpark"
     description = "Computes a time series plot between one or more datasets given an arbitrary geographical area and time range"
@@ -32,7 +27,7 @@ class TimeSeriesHandlerImpl(SparkAlg):
     singleton = True
 
     def __init__(self):
-        NexusHandler.__init__(self, skipCassandra=True)
+        SparkHandler.__init__(self, skipCassandra=True)
         self.log = logging.getLogger(__name__)
 
     def calc(self, computeOptions, **args):
@@ -110,46 +105,16 @@ class TimeSeriesHandlerImpl(SparkAlg):
         if len(daysinrange) == 0:
             raise NoDataException(reason="No data found for selected timeframe")
 
-        print 'Found %d days in range' % len(daysinrange)
+        self.log.debug('Found {0} days in range'.format(len(daysinrange)))
         for i,d in enumerate(daysinrange):
-            print i, datetime.utcfromtimestamp(d)
-        #print 'daysinrange=',daysinrange
-
-        cwd = os.getcwd()
-
-        # Configure Spark
-        sp_conf = SparkConf()
-        sp_conf.setAppName("Spark Time Series")
-        sp_conf.set("spark.executorEnv.HOME",
-                    os.path.join(os.getenv('HOME'), 'spark_exec_home'))
-        sp_conf.set("spark.executorEnv.PYTHONPATH", cwd)
-        #sp_conf.set("spark.yarn.executor.memoryOverhead", "4000")
-        sp_conf.set("spark.executor.memory", "4g")
-
-        cores_per_exec = 1
-        if spark_master == "mesos":
-            # For Mesos, the master is set from environment variable MASTER
-            # and number of executors is set from spark.cores.max.
-            sp_conf.set("spark.cores.max", spark_nexecs)
-        else:
-            # Master is "yarn" or "local[N]" (not Mesos)
-            sp_conf.setMaster(spark_master)
-            sp_conf.set("spark.executor.instances", spark_nexecs)
-        sp_conf.set("spark.executor.cores", cores_per_exec)
-
-        #print sp_conf.getAll()
-        sc = SparkContext(conf=sp_conf)
-
+            self.log.debug('{0}, {1}'.format(i, datetime.utcfromtimestamp(d)))
         nexus_tiles_spark = [(min_lat, max_lat, min_lon, max_lon, ds, 
-                              list(daysinrange_part), cwd, fill)
+                              list(daysinrange_part), fill)
                              for daysinrange_part
                              in np.array_split(daysinrange, spark_nparts)]
 
-        #for tile in nexus_tiles_spark:
-        #    print tile
-        
         # Launch Spark computations
-        rdd = sc.parallelize(nexus_tiles_spark,spark_nparts)
+        rdd = self._sc.parallelize(nexus_tiles_spark,spark_nparts)
         results = rdd.map(TimeSeriesCalculator.calc_average_on_day).collect()
         #
         results = list(itertools.chain.from_iterable(results))
@@ -161,9 +126,6 @@ class TimeSeriesHandlerImpl(SparkAlg):
 
         self._create_nc_file_time1d(np.array(results), 'ts.nc', 'mean',
                                     fill=-9999.)
-        # Stop the SparkContext.
-        sc.stop()
-
         return results, {}
 
     def calculateComparisonStats(self, results, suffix=""):
@@ -308,15 +270,14 @@ class TimeSeriesResults(NexusResults):
         return sio.getvalue()
 
 
-class TimeSeriesCalculator(SparkAlg):
+class TimeSeriesCalculator(SparkHandler):
     def __init__(self):
         self.__tile_service = NexusTileService()
 
     @staticmethod
     def calc_average_on_day(tile_in_spark):
         (min_lat, max_lat, min_lon, max_lon, dataset, 
-         timestamps, cwd, fill) = tile_in_spark
-        os.chdir(cwd)
+         timestamps, fill) = tile_in_spark
         start_time = timestamps[0]
         end_time = timestamps[-1]
         tile_service = NexusTileService()
@@ -339,13 +300,6 @@ class TimeSeriesCalculator(SparkAlg):
         #                                                      dataset, 
         #                                                      timestamps[0],
         #                                                      timestamps[-1])
-
-        # debug code
-        #for tile in ds1_nexus_tiles:
-            #print 'tile shape: ', tile.data.shape
-            #print 'tile data shape: ', tile.data.data.shape
-            #print 'tile mask shape: ', tile.data.mask.shape
-            #print 'tile: ', tile.data
 
         stats_arr = []
         for timeinseconds in timestamps:
