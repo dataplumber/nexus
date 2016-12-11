@@ -116,19 +116,15 @@ class TimeAvgMapSparkHandlerImpl(SparkHandler):
 
         self._find_native_resolution()
         self.log.debug('Using Native resolution: lat_res={0}, lon_res={1}'.format(self._latRes, self._lonRes))
-        self._minLatCent = self._minLat + self._latRes / 2
-        self._minLonCent = self._minLon + self._lonRes / 2
         nlats = int((self._maxLat - self._minLatCent) / self._latRes) + 1
         nlons = int((self._maxLon - self._minLonCent) / self._lonRes) + 1
-        self._maxLatCent = self._minLatCent + (nlats - 1) * self._latRes
-        self._maxLonCent = self._minLonCent + (nlons - 1) * self._lonRes
         self.log.debug('nlats={0}, nlons={1}'.format(nlats, nlons))
         self.log.debug('center lat range = {0} to {1}'.format(self._minLatCent,
                                                               self._maxLatCent))
         self.log.debug('center lon range = {0} to {1}'.format(self._minLonCent,
                                                               self._maxLonCent))
         a = np.zeros((nlats, nlons), dtype=np.float64, order='C')
-        n = np.zeros((nlats, nlons), dtype=np.float64, order='C')
+        n = np.zeros((nlats, nlons), dtype=np.uint32, order='C')
 
         nexus_tiles = self._find_global_tile_set()
         # print 'tiles:'
@@ -229,7 +225,8 @@ class TimeAvgMapSparkHandlerImpl(SparkHandler):
         self._create_nc_file(a, 'tam.nc', 'val', fill=self._fill)
 
         # Create dict for JSON response
-        results = [[{'avg': a[x, y], 'cnt': n[x, y]}
+        results = [[{'avg': a[x, y], 'cnt': int(n[x, y]),
+                     'lat': self._ind2lat(y), 'lon': self._ind2lon(x)}
                     for x in range(a.shape[0])] for y in range(a.shape[1])]
 
         return TimeAvgMapSparkResults(results=results, meta={}, computeOptions=computeOptions)

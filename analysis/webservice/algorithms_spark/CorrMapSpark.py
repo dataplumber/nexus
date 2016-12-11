@@ -2,12 +2,12 @@
 Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
-import sys, math, logging
+import sys, math, logging, json
 import numpy as np
 #from time import time
 from webservice.NexusHandler import nexus_handler, SparkHandler, DEFAULT_PARAMETERS_SPEC
 from nexustiles.nexustiles import NexusTileService
-from webservice.webmodel import NexusProcessingException
+from webservice.webmodel import NexusProcessingException, NexusResults
 from pyspark import SparkContext,SparkConf
 
 @nexus_handler
@@ -166,12 +166,8 @@ class CorrMapSparkHandlerImpl(SparkHandler):
 
         self._find_native_resolution()
         self.log.debug('Using Native resolution: lat_res={0}, lon_res={1}'.format(self._latRes, self._lonRes))
-        self._minLatCent = self._minLat + self._latRes / 2
-        self._minLonCent = self._minLon + self._lonRes / 2
         nlats = int((self._maxLat-self._minLatCent)/self._latRes)+1
         nlons = int((self._maxLon-self._minLonCent)/self._lonRes)+1
-        self._maxLatCent = self._minLatCent + (nlats-1) * self._latRes
-        self._maxLonCent = self._minLonCent + (nlons-1) * self._lonRes
         self.log.debug('nlats={0}, nlons={1}'.format(nlats, nlons))
 
         nexus_tiles = self._find_global_tile_set()
@@ -268,6 +264,7 @@ class CorrMapSparkHandlerImpl(SparkHandler):
                                n)).collect()
             
         r = np.zeros((nlats, nlons),dtype=np.float64,order='C')
+        n = np.zeros((nlats, nlons),dtype=np.uint32,order='C')
 
         # The tiles below are NOT Nexus objects.  They are tuples
         # with the following for each correlation map subset:
@@ -283,8 +280,27 @@ class CorrMapSparkHandlerImpl(SparkHandler):
             self.log.debug('writing tile lat {0}-{1}, lon {2}-{3}, map y {4}-{5}, map x {6}-{7}'.format(tile_min_lat, tile_max_lat, 
                         tile_min_lon, tile_max_lon, y0, y1, x0, x1))
             r[y0:y1+1,x0:x1+1] = tile_data
+            n[y0:y1+1,x0:x1+1] = tile_cnt
 
         # Store global map in a NetCDF file.
         self._create_nc_file(r, 'corrmap.nc', 'r')
 
-        return [[]], None, None
+        # Create dict for JSON response
+        results = [[{'r': r[x, y], 'cnt': int(n[x,y]),
+                     'lat': self._ind2lat(y), 'lon': self._ind2lon(x)}
+                    for x in range(r.shape[0])] for y in range(r.shape[1])]
+
+        return CorrelationResults(results)
+
+class CorrelationResults(NexusResults):
+    def __init__(self, results):
+        NexusResults.__init__(self)
+        self.results = results
+
+    def toJson(self):
+        json_d = {
+            "stats": {},
+            "meta": [None, None],
+            "data": self.results
+        }
+        return json.dumps(json_d, indent=4)
