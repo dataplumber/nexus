@@ -362,6 +362,14 @@ class SparkHandler(NexusHandler):
                         if (len(lons) > 1):
                             lon_res = lons[1] - lons[0]
                     if (lat_res >= 1e-10) and (lon_res >= 1e-10):
+                        lats_agg = np.array([tile.latitudes.compressed()
+                                             for tile in nexus_tiles])
+                        lons_agg = np.array([tile.longitudes.compressed()
+                                             for tile in nexus_tiles])
+                        self._minLatCent = np.min(lats_agg)
+                        self._maxLatCent = np.max(lats_agg)
+                        self._minLonCent = np.min(lons_agg)
+                        self._maxLonCent = np.max(lons_agg)
                         break
             if (lat_res < 1e-10) or (lon_res < 1e-10):
                 t -= t_incr
@@ -514,6 +522,12 @@ class SparkHandler(NexusHandler):
 
     def _lon2ind(self,lon):
         return int((lon-self._minLonCent)/self._lonRes)
+
+    def _ind2lat(self,y):
+        return self._minLatCent+y*self._latRes
+
+    def _ind2lon(self,x):
+        return self._minLonCent+x*self._lonRes
 
     def _create_nc_file_time1d(self, a, fname, varname, varunits=None,
                                fill=None):
