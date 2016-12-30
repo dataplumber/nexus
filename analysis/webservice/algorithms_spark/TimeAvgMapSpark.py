@@ -226,9 +226,9 @@ class TimeAvgMapSparkHandlerImpl(SparkHandler):
         self._create_nc_file(a, 'tam.nc', 'val', fill=self._fill)
 
         # Create dict for JSON response
-        results = [[{'avg': a[x, y], 'cnt': int(n[x, y]),
+        results = [[{'avg': a[y,x], 'cnt': int(n[y,x]),
                      'lat': self._ind2lat(y), 'lon': self._ind2lon(x)}
-                    for x in range(a.shape[0])] for y in range(a.shape[1])]
+                    for x in range(a.shape[1])] for y in range(a.shape[0])]
 
         return TimeAvgMapSparkResults(results=results, meta={}, computeOptions=computeOptions)
 

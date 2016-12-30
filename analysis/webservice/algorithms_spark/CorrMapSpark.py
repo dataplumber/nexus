@@ -287,9 +287,9 @@ class CorrMapSparkHandlerImpl(SparkHandler):
         self._create_nc_file(r, 'corrmap.nc', 'r')
 
         # Create dict for JSON response
-        results = [[{'r': r[x, y], 'cnt': int(n[x,y]),
+        results = [[{'r': r[y,x], 'cnt': int(n[y,x]),
                      'lat': self._ind2lat(y), 'lon': self._ind2lon(x)}
-                    for x in range(r.shape[0])] for y in range(r.shape[1])]
+                    for x in range(r.shape[1])] for y in range(r.shape[0])]
 
         return CorrelationResults(results)
 
