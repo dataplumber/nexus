@@ -353,11 +353,11 @@ class SparkHandler(NexusHandler):
                     if self._latRes is None:
                         lats = tile.latitudes.data
                         if (len(lats) > 1):
-                            self._latRes = lats[1] - lats[0]
+                            self._latRes = abs(lats[1]-lats[0])
                     if self._lonRes is None:
                         lons = tile.longitudes.data
                         if (len(lons) > 1):
-                            self._lonRes = lons[1] - lons[0]
+                            self._lonRes = abs(lons[1]-lons[0])
                     if ((self._latRes is not None) and 
                         (self._lonRes is not None)):
                         lats_agg = np.array([tile.latitudes.compressed()
