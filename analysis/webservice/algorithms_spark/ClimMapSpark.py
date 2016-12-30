@@ -25,6 +25,7 @@ class ClimMapSparkHandlerImpl(SparkHandler):
     def __init__(self):
         SparkHandler.__init__(self)
         self.log = logging.getLogger(__name__)
+        #self.log.setLevel(logging.DEBUG)
 
     @staticmethod
     def _map(tile_in_spark):
@@ -123,18 +124,6 @@ class ClimMapSparkHandlerImpl(SparkHandler):
         self._startTime = timegm((self._startYear,1,1,0,0,0))
         self._endTime = timegm((self._endYear,12,31,23,59,59))
         
-        self._find_native_resolution()
-        self.log.debug('Using Native resolution: lat_res={0}, lon_res={1}'.format(self._latRes, self._lonRes))
-        nlats = int((self._maxLat-self._minLatCent)/self._latRes)+1
-        nlons = int((self._maxLon-self._minLonCent)/self._lonRes)+1
-        self.log.debug('nlats={0}, nlons={1}'.format(nlats, nlons))
-        self.log.debug('center lat range = {0} to {1}'.format(self._minLatCent,
-                                                              self._maxLatCent))
-        self.log.debug('center lon range = {0} to {1}'.format(self._minLonCent,
-                                                              self._maxLonCent))
-        a = np.zeros((nlats, nlons),dtype=np.float64,order='C')
-        n = np.zeros((nlats, nlons), dtype=np.uint32, order='C')
-
         nexus_tiles = self._find_global_tile_set()
         # print 'tiles:'
         # for tile in nexus_tiles:
@@ -151,8 +140,16 @@ class ClimMapSparkHandlerImpl(SparkHandler):
         #for tile in nexus_tiles:
         #    print 'lats: ', tile.latitudes.compressed()
         #    print 'lons: ', tile.longitudes.compressed()
-        # Create array of tuples to pass to Spark map function
+        self.log.debug('Using Native resolution: lat_res={0}, lon_res={1}'.format(self._latRes, self._lonRes))
+        nlats = int((self._maxLat-self._minLatCent)/self._latRes)+1
+        nlons = int((self._maxLon-self._minLonCent)/self._lonRes)+1
+        self.log.debug('nlats={0}, nlons={1}'.format(nlats, nlons))
+        self.log.debug('center lat range = {0} to {1}'.format(self._minLatCent,
+                                                              self._maxLatCent))
+        self.log.debug('center lon range = {0} to {1}'.format(self._minLonCent,
+                                                              self._maxLonCent))
 
+        # Create array of tuples to pass to Spark map function
         nexus_tiles_spark = [[self._find_tile_bounds(t), 
                               self._startTime, self._endTime, 
                               self._ds] for t in nexus_tiles]
@@ -210,6 +207,8 @@ class ClimMapSparkHandlerImpl(SparkHandler):
         #
         # The tiles below are NOT Nexus objects.  They are tuples
         # with the time avg map data and lat-lon bounding box.
+        a = np.zeros((nlats, nlons),dtype=np.float64,order='C')
+        n = np.zeros((nlats, nlons), dtype=np.uint32, order='C')
         for tile in avg_tiles:
             if tile is not None:
                 ((tile_min_lat, tile_max_lat, tile_min_lon, tile_max_lon),

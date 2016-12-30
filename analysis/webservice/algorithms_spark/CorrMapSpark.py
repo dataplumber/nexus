@@ -21,6 +21,7 @@ class CorrMapSparkHandlerImpl(SparkHandler):
     def __init__(self):
         SparkHandler.__init__(self)
         self.log = logging.getLogger(__name__)
+        #self.log.setLevel(logging.DEBUG)
 
     @staticmethod
     def _map(tile_in):
@@ -164,11 +165,6 @@ class CorrMapSparkHandlerImpl(SparkHandler):
         if not len(self._ds) == 2:
             raise Exception("Requires two datasets for comparison. Specify request parameter ds=Dataset_1,Dataset_2")
 
-        self._find_native_resolution()
-        self.log.debug('Using Native resolution: lat_res={0}, lon_res={1}'.format(self._latRes, self._lonRes))
-        nlats = int((self._maxLat-self._minLatCent)/self._latRes)+1
-        nlons = int((self._maxLon-self._minLonCent)/self._lonRes)+1
-        self.log.debug('nlats={0}, nlons={1}'.format(nlats, nlons))
 
         nexus_tiles = self._find_global_tile_set()
         # print 'tiles:'
@@ -183,6 +179,11 @@ class CorrMapSparkHandlerImpl(SparkHandler):
             raise NexusProcessingException.NoDataException(reason="No data found for selected timeframe")
 
         self.log.debug('Found {0} tiles'.format(len(nexus_tiles)))
+        self.log.debug('Using Native resolution: lat_res={0}, lon_res={1}'.format(self._latRes, self._lonRes))
+        nlats = int((self._maxLat-self._minLatCent)/self._latRes)+1
+        nlons = int((self._maxLon-self._minLonCent)/self._lonRes)+1
+        self.log.debug('nlats={0}, nlons={1}'.format(nlats, nlons))
+
         # Create array of tuples to pass to Spark map function
         nexus_tiles_spark = [[self._find_tile_bounds(t), 
                               self._startTime, self._endTime, 

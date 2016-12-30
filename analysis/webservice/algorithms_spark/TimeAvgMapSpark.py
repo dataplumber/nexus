@@ -23,6 +23,7 @@ class TimeAvgMapSparkHandlerImpl(SparkHandler):
     def __init__(self):
         SparkHandler.__init__(self)
         self.log = logging.getLogger(__name__)
+        #self.log.setLevel(logging.DEBUG)
 
     @staticmethod
     def _map(tile_in_spark):
@@ -114,18 +115,6 @@ class TimeAvgMapSparkHandlerImpl(SparkHandler):
                              spark_nexecs=spark_nexecs,
                              spark_nparts=spark_nparts)
 
-        self._find_native_resolution()
-        self.log.debug('Using Native resolution: lat_res={0}, lon_res={1}'.format(self._latRes, self._lonRes))
-        nlats = int((self._maxLat - self._minLatCent) / self._latRes) + 1
-        nlons = int((self._maxLon - self._minLonCent) / self._lonRes) + 1
-        self.log.debug('nlats={0}, nlons={1}'.format(nlats, nlons))
-        self.log.debug('center lat range = {0} to {1}'.format(self._minLatCent,
-                                                              self._maxLatCent))
-        self.log.debug('center lon range = {0} to {1}'.format(self._minLonCent,
-                                                              self._maxLonCent))
-        a = np.zeros((nlats, nlons), dtype=np.float64, order='C')
-        n = np.zeros((nlats, nlons), dtype=np.uint32, order='C')
-
         nexus_tiles = self._find_global_tile_set()
         # print 'tiles:'
         # for tile in nexus_tiles:
@@ -139,6 +128,16 @@ class TimeAvgMapSparkHandlerImpl(SparkHandler):
             raise NexusProcessingException.NoDataException(reason="No data found for selected timeframe")
 
         self.log.debug('Found {0} tiles'.format(len(nexus_tiles)))
+
+        self.log.debug('Using Native resolution: lat_res={0}, lon_res={1}'.format(self._latRes, self._lonRes))
+        nlats = int((self._maxLat - self._minLatCent) / self._latRes) + 1
+        nlons = int((self._maxLon - self._minLonCent) / self._lonRes) + 1
+        self.log.debug('nlats={0}, nlons={1}'.format(nlats, nlons))
+        self.log.debug('center lat range = {0} to {1}'.format(self._minLatCent,
+                                                              self._maxLatCent))
+        self.log.debug('center lon range = {0} to {1}'.format(self._minLonCent,
+                                                              self._maxLonCent))
+
         # for tile in nexus_tiles:
         #    print 'lats: ', tile.latitudes.compressed()
         #    print 'lons: ', tile.longitudes.compressed()
@@ -198,6 +197,8 @@ class TimeAvgMapSparkHandlerImpl(SparkHandler):
         #
         # The tiles below are NOT Nexus objects.  They are tuples
         # with the time avg map data and lat-lon bounding box.
+        a = np.zeros((nlats, nlons), dtype=np.float64, order='C')
+        n = np.zeros((nlats, nlons), dtype=np.uint32, order='C')
         for tile in avg_tiles:
             if tile is not None:
                 ((tile_min_lat, tile_max_lat, tile_min_lon, tile_max_lon),
