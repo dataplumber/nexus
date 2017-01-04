@@ -360,17 +360,18 @@ class SparkHandler(NexusHandler):
                             self._lonRes = abs(lons[1]-lons[0])
                     if ((self._latRes is not None) and 
                         (self._lonRes is not None)):
-                        lats_agg = np.array([tile.latitudes.compressed()
-                                             for tile in nexus_tiles])
-                        lons_agg = np.array([tile.longitudes.compressed()
-                                             for tile in nexus_tiles])
-                        self._minLatCent = np.min(lats_agg)
-                        self._maxLatCent = np.max(lats_agg)
-                        self._minLonCent = np.min(lons_agg)
-                        self._maxLonCent = np.max(lons_agg)
                         break
                 if (self._latRes is None) or (self._lonRes is None):
                     ntiles = 0
+                else:
+                    lats_agg = np.concatenate([tile.latitudes.compressed()
+                                               for tile in nexus_tiles])
+                    lons_agg = np.concatenate([tile.longitudes.compressed()
+                                               for tile in nexus_tiles])
+                    self._minLatCent = np.min(lats_agg)
+                    self._maxLatCent = np.max(lats_agg)
+                    self._minLonCent = np.min(lons_agg)
+                    self._maxLonCent = np.max(lons_agg)
             t -= t_incr
         return nexus_tiles
 
