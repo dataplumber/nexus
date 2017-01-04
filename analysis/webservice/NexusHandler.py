@@ -324,51 +324,6 @@ class SparkHandler(NexusHandler):
         self._spark_nexecs = spark_nexecs
         self._spark_nparts = spark_nparts
 
-    def _find_native_resolution(self):
-        if type(self._ds) in (list,tuple):
-            ds = self._ds[0]
-        else:
-            ds = self._ds
-        ntiles = 0
-        ##################################################################
-        # Temporary workaround until we have dataset metadata to indicate
-        # temporal resolution.
-        if "monthly" in ds.lower():
-            t_incr = 2592000 # 30 days
-        else:
-            t_incr = 86400 # 1 day
-        ##################################################################
-        t = self._endTime
-        while ntiles == 0:
-            nexus_tiles = self.query_by_parts(self._tile_service,
-                                              self._minLat, self._maxLat, 
-                                              self._minLon, self._maxLon,
-                                              ds, t-t_incr, t)
-            ntiles = len(nexus_tiles)
-            self.log.debug('find_native_res: got {0} tiles'.format(len(nexus_tiles)))
-            lat_res = 0.
-            lon_res = 0.
-            if ntiles > 0:
-                for tile in nexus_tiles:
-                    self.log.debug('tile coords:')
-                    self.log.debug('tile lats: {0}'.format(tile.latitudes))
-                    self.log.debug('tile lons: {0}'.format(tile.longitudes))
-                    if lat_res < 1e-10:
-                        lats = tile.latitudes.data
-                        if (len(lats) > 1):
-                            lat_res = lats[1] - lats[0]
-                    if lon_res < 1e-10:
-                        lons = tile.longitudes.data
-                        if (len(lons) > 1):
-                            lon_res = lons[1] - lons[0]
-                    if (lat_res >= 1e-10) and (lon_res >= 1e-10):
-                        break
-            if (lat_res < 1e-10) or (lon_res < 1e-10):
-                t -= t_incr
-
-        self._latRes = lat_res
-        self._lonRes = lon_res
-
     def _find_global_tile_set(self):
         if type(self._ds) in (list,tuple):
             ds = self._ds[0]
@@ -384,10 +339,39 @@ class SparkHandler(NexusHandler):
             t_incr = 86400 # 1 day
         ##################################################################
         t = self._endTime
+        self._latRes = None
+        self._lonRes = None
         while ntiles == 0:
             nexus_tiles = self._tile_service.get_tiles_bounded_by_box(self._minLat, self._maxLat, self._minLon, self._maxLon, ds=ds, start_time=t-t_incr, end_time=t)
             ntiles = len(nexus_tiles)
             self.log.debug('find_global_tile_set got {0} tiles'.format(ntiles))
+            if ntiles > 0:
+                for tile in nexus_tiles:
+                    self.log.debug('tile coords:')
+                    self.log.debug('tile lats: {0}'.format(tile.latitudes))
+                    self.log.debug('tile lons: {0}'.format(tile.longitudes))
+                    if self._latRes is None:
+                        lats = tile.latitudes.data
+                        if (len(lats) > 1):
+                            self._latRes = abs(lats[1]-lats[0])
+                    if self._lonRes is None:
+                        lons = tile.longitudes.data
+                        if (len(lons) > 1):
+                            self._lonRes = abs(lons[1]-lons[0])
+                    if ((self._latRes is not None) and 
+                        (self._lonRes is not None)):
+                        break
+                if (self._latRes is None) or (self._lonRes is None):
+                    ntiles = 0
+                else:
+                    lats_agg = np.concatenate([tile.latitudes.compressed()
+                                               for tile in nexus_tiles])
+                    lons_agg = np.concatenate([tile.longitudes.compressed()
+                                               for tile in nexus_tiles])
+                    self._minLatCent = np.min(lats_agg)
+                    self._maxLatCent = np.max(lats_agg)
+                    self._minLonCent = np.min(lons_agg)
+                    self._maxLonCent = np.max(lons_agg)
             t -= t_incr
         return nexus_tiles
 
@@ -514,6 +498,12 @@ class SparkHandler(NexusHandler):
 
     def _lon2ind(self,lon):
         return int((lon-self._minLonCent)/self._lonRes)
+
+    def _ind2lat(self,y):
+        return self._minLatCent+y*self._latRes
+
+    def _ind2lon(self,x):
+        return self._minLonCent+x*self._lonRes
 
     def _create_nc_file_time1d(self, a, fname, varname, varunits=None,
                                fill=None):
