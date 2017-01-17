@@ -9,6 +9,7 @@ import DataInBoundsSearch
 import DataSeriesList
 import DelayTest
 import ErrorTosserTest
+import Heartbeat
 import HofMoeller
 import LongitudeLatitudeMap
 import TestInitializer

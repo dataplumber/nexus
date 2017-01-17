@@ -4,6 +4,8 @@ import threading
 import time
 from datetime import datetime
 from shapely import wkt
+import requests
+import json
 
 import solr
 
@@ -484,6 +486,15 @@ class SolrProxy(object):
         assert len(results) == limit
 
         return results
+
+    def ping(self):
+        solrAdminPing = 'http://%s/solr/%s/admin/ping' % (self.solrUrl, self.solrCore)
+        try:
+            r = requests.get(solrAdminPing, params={'wt': 'json'})
+            results = json.loads(r.text)
+            return results
+        except:
+            return None
 
     @staticmethod
     def _merge_kwargs(additionalparams, **kwargs):

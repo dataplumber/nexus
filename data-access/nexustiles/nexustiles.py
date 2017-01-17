@@ -335,3 +335,11 @@ class NexusTileService(object):
             tiles.append(tile)
 
         return tiles
+
+    def pingSolr(self):
+        status = self._solr.ping()
+        if status and status["status"] == "OK":
+            return True
+        else:
+            return False
+
