@@ -172,6 +172,7 @@
 
    <field name="NexusDataBeginningDateTime" type="tdate" indexed="true" stored="true" multiValued="false" />
    <field name="NexusDataEndingDateTime" type="tdate" indexed="true" stored="true" multiValued="false" />
+   <field name="NexusShortName" type="string" indexed="true" stored="true" multiValued="true" />
 
    <!-- Only remove the "id" field if you have a very good reason to. While not strictly
      required, it is highly recommended. A <uniqueKey> is present in almost all Solr 
