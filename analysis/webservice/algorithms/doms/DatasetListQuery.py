@@ -63,6 +63,8 @@ class DomsDatasetListQueryHandler(BaseDomsHandler.BaseDomsQueryHandler):
                 dataset = "MUR-JPL-L4-GLOB-v4.1"
             elif dataset == "SMAP_L2B_SSS":
                 dataset = "JPL_SMAP-SSS_L2_EVAL-V2"
+            elif dataset == "AVHRR_OI_L4_GHRSST_NCEI_CLIM":
+                dataset = "AVHRR_OI-NCEI-L4-GLOB-v2.0"
 
             return "http://doms.jpl.nasa.gov/ws/metadata/dataset?shortName=%s&format=umm-json"%dataset
 
