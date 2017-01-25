@@ -124,9 +124,10 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         source_name, parameter_s, start_time, end_time, bounding_polygon, \
         depth_min, depth_max, platforms = self.parse_arguments(request)
 
-        edge_results = query_edge(source_name, parameter_s, start_time, end_time,
-                                  ','.join([str(bound) for bound in bounding_polygon.bounds]),
-                                  platforms, depth_min, depth_max)['results']
+        with requests.session() as edge_session:
+            edge_results = query_edge(source_name, parameter_s, start_time, end_time,
+                                      ','.join([str(bound) for bound in bounding_polygon.bounds]),
+                                      platforms, depth_min, depth_max, edge_session)['results']
 
         if len(edge_results) == 0:
             raise NoDataException
@@ -156,8 +157,9 @@ class InSituSubsetResult(object):
         return csv_out
 
 
-def query_edge(dataset, variable, startTime, endTime, bbox, platform, depth_min, depth_max, itemsPerPage=1000,
-               startIndex=0, stats=True, session=None):
+def query_edge(dataset, variable, startTime, endTime, bbox, platform, depth_min, depth_max, session, itemsPerPage=1000,
+               startIndex=0, stats=True):
+    log = logging.getLogger('webservice.algorithms.doms.insitusubset.query_edge')
     try:
         startTime = datetime.utcfromtimestamp(startTime).strftime('%Y-%m-%dT%H:%M:%SZ')
     except TypeError:
@@ -188,10 +190,7 @@ def query_edge(dataset, variable, startTime, endTime, bbox, platform, depth_min,
     if platform:
         params['platform'] = platform
 
-    if session is not None:
-        edge_request = session.get(edge_endpoints.getEndpointByName(dataset)['url'], params=params)
-    else:
-        edge_request = requests.get(edge_endpoints.getEndpointByName(dataset)['url'], params=params)
+    edge_request = session.get(edge_endpoints.getEndpointByName(dataset)['url'], params=params)
 
     edge_request.raise_for_status()
     edge_response = json.loads(edge_request.text)
@@ -199,16 +198,14 @@ def query_edge(dataset, variable, startTime, endTime, bbox, platform, depth_min,
     # Get all edge results
     next_page_url = edge_response.get('next', None)
     while next_page_url is not None:
-        if session is not None:
-            edge_page_request = session.get(next_page_url)
-        else:
-            edge_page_request = requests.get(next_page_url)
+        log.debug("requesting %s" % next_page_url)
+        edge_page_request = session.get(next_page_url)
 
         edge_page_request.raise_for_status()
         edge_page_response = json.loads(edge_page_request.text)
 
         edge_response['results'].extend(edge_page_response['results'])
 
-        next_page_url = edge_response.get('next', None)
+        next_page_url = edge_page_response.get('next', None)
 
     return edge_response
