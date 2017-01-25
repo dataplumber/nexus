@@ -22,7 +22,7 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         "source": {
             "name": "In Situ Dataset",
             "type": "comma-delimited string",
-            "description": "The in situ Dataset to be subsetted"
+            "description": "The in situ Dataset to be sub-setted"
         },
         "parameter": {
             "name": "Parameter",
@@ -47,12 +47,12 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         "depthMin": {
             "name": "Minimum Depth",
             "type": "float",
-            "description": "Minimum depth of measurements allowed to be considered for matchup"
+            "description": "Minimum depth of measurements allowed"
         },
         "depthMax": {
             "name": "Maximum Depth",
             "type": "float",
-            "description": "Maximum depth of measurements allowed to be considered for matchup"
+            "description": "Maximum depth of measurements allowed"
         },
         "platforms": {
             "name": "Platforms",
