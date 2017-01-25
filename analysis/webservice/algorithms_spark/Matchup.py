@@ -664,4 +664,19 @@ def query_edge(dataset, variable, startTime, endTime, bbox, platform, depth_min,
     edge_request.raise_for_status()
     edge_response = json.loads(edge_request.text)
 
+    # Get all edge results
+    next_page_url = edge_response.get('next', None)
+    while next_page_url is not None:
+        if session is not None:
+            edge_page_request = session.get(next_page_url)
+        else:
+            edge_page_request = requests.get(next_page_url)
+
+        edge_page_request.raise_for_status()
+        edge_page_response = json.loads(edge_page_request.text)
+
+        edge_response['results'].extend(edge_page_response['results'])
+
+        next_page_url = edge_response.get('next', None)
+
     return edge_response
