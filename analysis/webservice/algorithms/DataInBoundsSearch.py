@@ -11,7 +11,7 @@ from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMET
 from webservice.webmodel import NexusResults
 
 
-# @nexus_handler
+@nexus_handler
 class DataInBoundsSearchHandlerImpl(NexusHandler):
     name = "Data In-Bounds Search"
     path = "/datainbounds"

@@ -197,6 +197,7 @@ class Matchup(SparkHandler):
         with ResultsStorage() as resultsStorage:
 
             execution_id = resultsStorage.insertExecution(None, start, None, None)
+            resultsStorage.insertLog(execution_id, "Querying for tiles in search domain")
 
         self.log.debug("Querying for tiles in search domain")
         # Get tile ids in box

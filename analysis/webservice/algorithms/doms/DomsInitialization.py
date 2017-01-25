@@ -149,3 +149,16 @@ class DomsInitializer:
             );
         """
         session.execute(cql)
+
+    def createDomsExecutionLogTable(self, session):
+        log = logging.getLogger(__name__)
+        log.info("Verifying doms_execuction_log table")
+        cql = """
+            CREATE TABLE IF NOT EXISTS doms_execution_log (
+              execution_id text,
+              log_id timeuuid,
+              message text,
+              PRIMARY KEY (execution_id, log_id)
+            );
+        """
+        session.execute(cql)

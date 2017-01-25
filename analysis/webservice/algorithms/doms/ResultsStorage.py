@@ -71,6 +71,10 @@ class ResultsStorage(AbstractResultsContainer):
         self._session.execute(cql, (execution_id, startTime, completeTime, userEmail))
         return execution_id
 
+    def insertLog(self, execution_id, message):
+        cql = "INSERT INTO doms_execution_log (execution_id, log_id, message) VALUES (%s, now(), %s)"
+        self._session.execute(cql, parameters=(execution_id, message))
+
     def __insertParams(self, id, params):
         cql = """INSERT INTO doms_params
                     (execution_id, primary_dataset, matchup_datasets, depth_min, depth_max, time_tolerance, radius_tolerance, start_time, end_time, platforms, bounding_box)
