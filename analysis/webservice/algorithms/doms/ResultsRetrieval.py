@@ -16,11 +16,10 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
 
     def calc(self, computeOptions, **args):
         id = computeOptions.get_argument("id", None)
-
-        # retrieval = ResultsStorage.ResultsRetrieval()
+        simple_results = computeOptions.get_boolean_arg("simpleResults", default=False)
 
         with ResultsStorage.ResultsRetrieval() as storage:
-            params, stats, data = storage.retrieveResults(id)
+            params, stats, data = storage.retrieveResults(id, trim_data=simple_results)
 
         return BaseDomsHandler.DomsQueryResults(results=data, args=params, details=stats, bounds=None, count=None,
                                                 computeOptions=None, executionId=id)

@@ -79,7 +79,8 @@ class ResultsStorage(AbstractResultsContainer):
         """
         self._session.execute(cql, (id,
                                     params["primary"],
-                                    ",".join(params["matchup"]) if type(params["matchup"]) == list else params["matchup"],
+                                    ",".join(params["matchup"]) if type(params["matchup"]) == list else params[
+                                        "matchup"],
                                     params["depthMin"] if "depthMin" in params.keys() else None,
                                     params["depthMax"] if "depthMax" in params.keys() else None,
                                     int(params["timeTolerance"]),
@@ -172,24 +173,24 @@ class ResultsRetrieval(AbstractResultsContainer):
     def __init__(self):
         AbstractResultsContainer.__init__(self)
 
-    def retrieveResults(self, id):
+    def retrieveResults(self, id, trim_data=False):
         params = self.__retrieveParams(id)
         stats = self.__retrieveStats(id)
-        data = self.__retrieveData(id)
+        data = self.__retrieveData(id, trim_data=trim_data)
         return params, stats, data
 
-    def __retrieveData(self, id):
-        dataMap = self.__retrievePrimaryData(id)
-        self.__enrichPrimaryDataWithMatches(id, dataMap)
+    def __retrieveData(self, id, trim_data=False):
+        dataMap = self.__retrievePrimaryData(id, trim_data=trim_data)
+        self.__enrichPrimaryDataWithMatches(id, dataMap, trim_data=trim_data)
         data = [dataMap[name] for name in dataMap]
         return data
 
-    def __enrichPrimaryDataWithMatches(self, id, dataMap):
+    def __enrichPrimaryDataWithMatches(self, id, dataMap, trim_data=False):
         cql = "SELECT * FROM doms_data where execution_id = %s and is_primary = 0 ALLOW FILTERING"
         rows = self._session.execute(cql, (id,))
 
         for row in rows:
-            entry = self.__rowToDataEntry(row)
+            entry = self.__rowToDataEntry(row, trim_data=trim_data)
             if row.primary_value_id in dataMap:
                 if not "matches" in dataMap[row.primary_value_id]:
                     dataMap[row.primary_value_id]["matches"] = []
@@ -197,26 +198,34 @@ class ResultsRetrieval(AbstractResultsContainer):
             else:
                 print row
 
-    def __retrievePrimaryData(self, id):
+    def __retrievePrimaryData(self, id, trim_data=False):
         cql = "SELECT * FROM doms_data where execution_id = %s and is_primary = 1 ALLOW FILTERING"
         rows = self._session.execute(cql, (id,))
 
         dataMap = {}
         for row in rows:
-            entry = self.__rowToDataEntry(row)
+            entry = self.__rowToDataEntry(row, trim_data=trim_data)
             dataMap[row.value_id] = entry
         return dataMap
 
-    def __rowToDataEntry(self, row):
-        entry = {
-            "id": row.value_id,
-            "x": row.x,
-            "y": row.y,
-            "source": row.source_dataset,
-            "device": row.device,
-            "platform": row.platform,
-            "time": row.measurement_time
-        }
+    def __rowToDataEntry(self, row, trim_data=False):
+        if trim_data:
+            entry = {
+                "x": row.x,
+                "y": row.y,
+                "source": row.source_dataset,
+                "time": row.measurement_time
+            }
+        else:
+            entry = {
+                "id": row.value_id,
+                "x": row.x,
+                "y": row.y,
+                "source": row.source_dataset,
+                "device": row.device,
+                "platform": row.platform,
+                "time": row.measurement_time
+            }
         for key in row.measurement_values:
             value = row.measurement_values[key]
             entry[key] = value
