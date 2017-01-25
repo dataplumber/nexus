@@ -79,7 +79,7 @@ class DomsQueryResults(NexusResults):
         return DomsCSVFormatter.create(self.__executionId, self.results(), self.__args, self.__details)
 
     def toNetCDF(self):
-        return DomsNetCDFFormatter.create(self.__executionId, self.results(), self.__args, self.__details)
+        return DomsNetCDFFormatterAlt.create(self.__executionId, self.results(), self.__args, self.__details)
 
 
 class DomsCSVFormatter:
