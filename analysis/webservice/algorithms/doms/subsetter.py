@@ -5,6 +5,7 @@ from datetime import datetime
 import requests
 import csv
 import StringIO
+import os
 
 import BaseDomsHandler
 from webservice.NexusHandler import nexus_handler
@@ -134,6 +135,14 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         primary_ds_name, matchup_ds_names, parameter_s, start_time, end_time, \
         bounding_polygon, depth_min, depth_max, platforms = self.parse_arguments(request)
 
+        primary_url = "doms.jpl.nasa.gov/datainbounds"
+        primary_params = {
+            'ds': primary_ds_name,
+            'parameter': parameter_s,
+            'b': ','.join([str(bound) for bound in bounding_polygon.bounds]),
+            'startTime': start_time,
+            'endTime': end_time
+        }
         # Download primary
         # Download matchup
 
@@ -141,3 +150,12 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         # ???
         # Profit
         pass
+
+
+def download_file(url, local_filepath, params=None):
+    r = requests.get(url, params=params, stream=True)
+    with open(local_filepath, 'wb') as f:
+        for chunk in r.iter_content(chunk_size=1024):
+            if chunk:  # filter out keep-alive new chunks
+                f.write(chunk)
+    return local_filepath
