@@ -1,15 +1,13 @@
-from datetime import datetime
-from pytz import timezone, UTC
-from webservice.NexusHandler import NexusHandler as BaseHandler
-from webservice.webmodel import StatsComputeOptions
-from webservice.NexusHandler import nexus_handler
-from webservice.NexusHandler import DEFAULT_PARAMETERS_SPEC
-from webservice.webmodel import NexusResults, NexusProcessingException
-import os
 import json
-import config
+from datetime import datetime
+
 import numpy as np
+from pytz import timezone
+
+import config
 import geo
+from webservice.NexusHandler import NexusHandler as BaseHandler
+from webservice.webmodel import NexusResults
 
 EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
 
@@ -21,8 +19,6 @@ except ImportError:
     from gdalnumeric import *
 
 from netCDF4 import Dataset
-from os import listdir
-from os.path import isfile, join
 import tempfile
 
 
@@ -83,7 +79,6 @@ class DomsQueryResults(NexusResults):
 
 
 class DomsCSVFormatter:
-
     @staticmethod
     def create(executionId, results, params, details):
 
@@ -94,8 +89,10 @@ class DomsCSVFormatter:
         rows.append("%s = \"%s\"" % ("Matchup_TimeWindow", params["timeTolerance"]))
         rows.append("%s = \"%s\"" % ("Matchup_TimeWindow_Units", "hours"))
 
-        rows.append("%s = \"%s\"" % ("time_coverage_start", datetime.fromtimestamp(params["startTime"] / 1000).strftime('%Y%m%d %H:%M:%S')))
-        rows.append("%s = \"%s\"" % ("time_coverage_end", datetime.fromtimestamp(params["endTime"] / 1000).strftime('%Y%m%d %H:%M:%S')))
+        rows.append("%s = \"%s\"" % (
+        "time_coverage_start", datetime.fromtimestamp(params["startTime"] / 1000).strftime('%Y%m%d %H:%M:%S')))
+        rows.append("%s = \"%s\"" % (
+        "time_coverage_end", datetime.fromtimestamp(params["endTime"] / 1000).strftime('%Y%m%d %H:%M:%S')))
         rows.append("%s = \"%s\"" % ("depth_min", params["depthMin"]))
         rows.append("%s = \"%s\"" % ("depth_max", params["depthMax"]))
         rows.append("%s = \"%s\"" % ("platforms", params["platforms"]))
@@ -181,14 +178,17 @@ class DomsCSVFormatter:
         for value in primaryValue["matches"]:
             cols = []
 
-            cols.append("\"%s\""%primaryValue["id"])
-            cols.append("\"%s\""%primaryValue["source"])
+            cols.append("\"%s\"" % primaryValue["id"])
+            cols.append("\"%s\"" % primaryValue["source"])
             cols.append(str(primaryValue["x"]))
             cols.append(str(primaryValue["y"]))
-            cols.append("\"%s\""%datetime.fromtimestamp(primaryValue["time"] / 1000).strftime('%Y%m%d %H:%M:%S') if "time" in primaryValue else "")
-            cols.append("\"%s\""%primaryValue["platform"])
-            cols.append(str(DomsCSVFormatter.__pickOne(primaryValue["sea_water_salinity_depth"] if "sea_water_salinity_depth" in primaryValue else None,
-                                                       primaryValue["sea_water_temperature_depth"] if "sea_water_temperature_depth" in primaryValue else None)))
+            cols.append("\"%s\"" % datetime.fromtimestamp(primaryValue["time"] / 1000).strftime(
+                '%Y%m%d %H:%M:%S') if "time" in primaryValue else "")
+            cols.append("\"%s\"" % primaryValue["platform"])
+            cols.append(str(DomsCSVFormatter.__pickOne(
+                primaryValue["sea_water_salinity_depth"] if "sea_water_salinity_depth" in primaryValue else None,
+                primaryValue[
+                    "sea_water_temperature_depth"] if "sea_water_temperature_depth" in primaryValue else None)))
 
             cols.append(str(primaryValue["sea_water_salinity"] if "sea_water_salinity" in primaryValue else ""))
             cols.append(str(primaryValue["sea_water_temperature"] if "sea_water_temperature" in primaryValue else ""))
@@ -197,12 +197,13 @@ class DomsCSVFormatter:
             cols.append(str(primaryValue["wind_u"] if "wind_u" in primaryValue else ""))
             cols.append(str(primaryValue["wind_v"] if "wind_v" in primaryValue else ""))
 
-            cols.append("\"%s\""%value["id"])
-            cols.append("\"%s\""%value["source"])
+            cols.append("\"%s\"" % value["id"])
+            cols.append("\"%s\"" % value["source"])
             cols.append(str(value["x"]))
             cols.append(str(value["y"]))
-            cols.append("\"%s\""%datetime.fromtimestamp(value["time"] / 1000).strftime('%Y%m%d %H:%M:%S') if "time" in value else "")
-            cols.append("\"%s\""%value["platform"])
+            cols.append("\"%s\"" % datetime.fromtimestamp(value["time"] / 1000).strftime(
+                '%Y%m%d %H:%M:%S') if "time" in value else "")
+            cols.append("\"%s\"" % value["platform"])
             cols.append(str(DomsCSVFormatter.__pickOne(
                 value["sea_water_salinity_depth"] if "sea_water_salinity_depth" in value else None,
                 value["sea_water_temperature_depth"] if "sea_water_temperature_depth" in value else None)))
@@ -217,24 +218,25 @@ class DomsCSVFormatter:
 
             rows.append(",".join(cols))
 
-
-
     @staticmethod
     def __addConstants(rows):
 
-        rows.append("%s = \"%s\"" % ("bnds","2"))
+        rows.append("%s = \"%s\"" % ("bnds", "2"))
         rows.append("%s = \"%s\"" % ("Conventions", "CF-1.6, ACDD-1.3"))
         rows.append("%s = \"%s\"" % ("title", "DOMS satellite-insitu machup output file"))
-        rows.append("%s = \"%s\"" % ("history", "Processing_Version = V1.0, Software_Name = DOMS, Software_Version = 1.03"))
+        rows.append(
+            "%s = \"%s\"" % ("history", "Processing_Version = V1.0, Software_Name = DOMS, Software_Version = 1.03"))
         rows.append("%s = \"%s\"" % ("institution", "JPL, FSU, NCAR"))
         rows.append("%s = \"%s\"" % ("source", "doms.jpl.nasa.gov"))
-        rows.append("%s = \"%s\"" % ("standard_name_vocabulary", "CF Standard Name Table v27\", \"BODC controlled vocabulary"))
+        rows.append(
+            "%s = \"%s\"" % ("standard_name_vocabulary", "CF Standard Name Table v27\", \"BODC controlled vocabulary"))
         rows.append("%s = \"%s\"" % ("cdm_data_type", "Point/Profile, Swath/Grid"))
         rows.append("%s = \"%s\"" % ("processing_level", "4"))
         rows.append("%s = \"%s\"" % ("platform", "Endeavor"))
         rows.append("%s = \"%s\"" % ("instrument", "Endeavor on-board sea-bird SBE 9/11 CTD"))
         rows.append("%s = \"%s\"" % ("project", "Distributed Oceanographic Matchup System (DOMS)"))
-        rows.append("%s = \"%s\"" % ("keywords_vocabulary", "NASA Global Change Master Directory (GCMD) Science Keywords"))
+        rows.append(
+            "%s = \"%s\"" % ("keywords_vocabulary", "NASA Global Change Master Directory (GCMD) Science Keywords"))
         rows.append("%s = \"%s\"" % ("keywords", "Salinity, Upper Ocean, SPURS, CTD, Endeavor, Atlantic Ocean"))
         rows.append("%s = \"%s\"" % ("creator_name", "NASA PO.DAAC"))
         rows.append("%s = \"%s\"" % ("creator_email", "podaac@podaac.jpl.nasa.gov"))
@@ -246,7 +248,6 @@ class DomsCSVFormatter:
 
 
 class DomsNetCDFFormatter:
-
     @staticmethod
     def create(executionId, results, params, details):
         t = tempfile.mkstemp(prefix="doms_", suffix=".nc")
@@ -317,9 +318,11 @@ class DomsNetCDFFormatter:
         DomsNetCDFFormatter.__createDimension(dataset, results, "lat", "f4", "y")
         DomsNetCDFFormatter.__createDimension(dataset, results, "lon", "f4", "x")
 
-        DomsNetCDFFormatter.__createDimension(dataset, results, "sea_water_temperature_depth", "f4", "sea_water_temperature_depth")
+        DomsNetCDFFormatter.__createDimension(dataset, results, "sea_water_temperature_depth", "f4",
+                                              "sea_water_temperature_depth")
         DomsNetCDFFormatter.__createDimension(dataset, results, "sea_water_temperature", "f4", "sea_water_temperature")
-        DomsNetCDFFormatter.__createDimension(dataset, results, "sea_water_salinity_depth", "f4", "sea_water_salinity_depth")
+        DomsNetCDFFormatter.__createDimension(dataset, results, "sea_water_salinity_depth", "f4",
+                                              "sea_water_salinity_depth")
         DomsNetCDFFormatter.__createDimension(dataset, results, "sea_water_salinity", "f4", "sea_water_salinity")
 
         DomsNetCDFFormatter.__createDimension(dataset, results, "wind_speed", "f4", "wind_speed")
@@ -360,7 +363,7 @@ class DomsNetCDFFormatter:
     @staticmethod
     def __createDimension(dataset, values, name, type, arrayField):
         dim = dataset.createDimension(name, size=None)
-        var = dataset.createVariable(name, type, (name,), chunksizes=(2048, ), fill_value=-32767.0)
+        var = dataset.createVariable(name, type, (name,), chunksizes=(2048,), fill_value=-32767.0)
 
         varList = []
         DomsNetCDFFormatter.__packDimensionList(values, arrayField, varList)
@@ -390,7 +393,6 @@ class DomsNetCDFFormatter:
         elif name == "wind_v":
             DomsNetCDFFormatter.__enrichWindVVariable(var)
 
-
     @staticmethod
     def __enrichSSSVariable(var):
         var.long_name = "sea surface salinity"
@@ -405,7 +407,6 @@ class DomsNetCDFFormatter:
         var.comment = ""
         var.cell_methods = ""
         var.metadata_link = ""
-
 
     @staticmethod
     def __enrichSSSDepthVariable(var):
@@ -509,8 +510,6 @@ class DomsNetCDFFormatter:
         var.calendar = "standard"
         var.comment = "Nominal time of satellite corresponding to the start of the product time interval"
 
-
-
     @staticmethod
     def __enrichLonVariable(var):
         var.long_name = "Longitude"
@@ -556,21 +555,7 @@ class DomsNetCDFFormatter:
         dataset.acknowledgment = "DOMS is a NASA/AIST-funded project.  Grant number ####."
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 class DomsNetCDFFormatterAlt:
-
     @staticmethod
     def create(executionId, results, params, details):
         t = tempfile.mkstemp(prefix="doms_", suffix=".nc")
@@ -637,13 +622,14 @@ class DomsNetCDFFormatterAlt:
         insituWriter.commit()
 
         satDim = dataset.createDimension("satellite_ids", size=None)
-        satVar = dataset.createVariable("satellite_ids", "i4", ("satellite_ids",), chunksizes=(2048,), fill_value=-32767)
+        satVar = dataset.createVariable("satellite_ids", "i4", ("satellite_ids",), chunksizes=(2048,),
+                                        fill_value=-32767)
 
         satVar[:] = [f[0] for f in matches]
 
         insituDim = dataset.createDimension("insitu_ids", size=None)
         insituVar = dataset.createVariable("insitu_ids", "i4", ("insitu_ids",), chunksizes=(2048,),
-                                        fill_value=-32767)
+                                           fill_value=-32767)
         insituVar[:] = [f[1] for f in matches]
 
         dataset.close()
@@ -674,9 +660,6 @@ class DomsNetCDFFormatterAlt:
 
         return matches
 
-
-
-
     @staticmethod
     def __addNetCDFConstants(dataset):
         dataset.bnds = 2
@@ -702,9 +685,7 @@ class DomsNetCDFFormatterAlt:
         dataset.acknowledgment = "DOMS is a NASA/AIST-funded project.  Grant number ####."
 
 
-
 class DomsNetCDFValueWriter:
-
     def __init__(self, group):
         self.latVar = DomsNetCDFValueWriter.__createDimension(group, "lat", "f4")
         self.lonVar = DomsNetCDFValueWriter.__createDimension(group, "lon", "f4")
@@ -728,10 +709,8 @@ class DomsNetCDFValueWriter:
         self.sstVar[:] = self.sst
         self.timeVar[:] = self.time
 
-
-
     @staticmethod
     def __createDimension(group, name, type):
         dim = group.createDimension(name, size=None)
-        var = group.createVariable(name, type, (name,), chunksizes=(2048, ), fill_value=-32767.0)
+        var = group.createVariable(name, type, (name,), chunksizes=(2048,), fill_value=-32767.0)
         return var
