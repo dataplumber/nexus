@@ -7,7 +7,8 @@ import csv
 import StringIO
 
 import BaseDomsHandler
-from webservice.NexusHandler import nexus_handler, NexusProcessingException
+from webservice.NexusHandler import nexus_handler
+from webservice.webmodel import NexusProcessingException, NoDataException
 from webservice.algorithms.doms import config as edge_endpoints
 
 
@@ -127,6 +128,8 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
                                   ','.join([str(bound) for bound in bounding_polygon.bounds]),
                                   platforms, depth_min, depth_max)['results']
 
+        if len(edge_results) == 0:
+            raise NoDataException
         return InSituSubsetResult(results=edge_results)
 
 
