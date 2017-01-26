@@ -1,18 +1,14 @@
-import json
 import logging
+import os
+import tempfile
+import zipfile
 from datetime import datetime
 
 import requests
-import csv
-import StringIO
-import os
-import zipfile
-import tempfile
 
 import BaseDomsHandler
 from webservice.NexusHandler import nexus_handler
-from webservice.webmodel import NexusProcessingException, NoDataException
-from webservice.algorithms.doms import config as edge_endpoints
+from webservice.webmodel import NexusProcessingException
 
 
 @nexus_handler
