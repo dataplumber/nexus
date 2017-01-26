@@ -677,6 +677,6 @@ def query_edge(dataset, variable, startTime, endTime, bbox, platform, depth_min,
 
         edge_response['results'].extend(edge_page_response['results'])
 
-        next_page_url = edge_response.get('next', None)
+        next_page_url = edge_page_response.get('next', None)
 
     return edge_response
