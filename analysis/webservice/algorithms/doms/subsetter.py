@@ -62,6 +62,11 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
             "name": "Platforms",
             "type": "comma-delimited integer",
             "description": "Platforms to include for subset consideration"
+        },
+        "output": {
+            "name": "Output",
+            "type": "string",
+            "description": "Output type. Only 'ZIP' is currently supported"
         }
     }
     singleton = True
