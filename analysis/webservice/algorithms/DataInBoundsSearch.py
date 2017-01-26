@@ -157,6 +157,7 @@ class DataInBoundsResult(NexusResults):
         rows = []
 
         headers = [
+            "id",
             "lon",
             "lat",
             "time"
@@ -165,6 +166,7 @@ class DataInBoundsResult(NexusResults):
         for i, result in enumerate(self.results()):
             cols = []
 
+            cols.append(str(result['data'][0]['id']))
             cols.append(str(result['latitude']))
             cols.append(str(result['longitude']))
             cols.append(datetime.utcfromtimestamp(result["time"]).strftime('%Y-%m-%dT%H:%M:%SZ'))
