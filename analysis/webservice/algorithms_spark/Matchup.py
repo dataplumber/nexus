@@ -47,57 +47,58 @@ class Matchup(SparkHandler):
         "primary": {
             "name": "Primary Dataset",
             "type": "string",
-            "description": "The Primary dataset used to find matches for"
+            "description": "The Primary dataset used to find matches for. Required"
         },
         "matchup": {
             "name": "Match-Up Datasets",
             "type": "comma-delimited string",
-            "description": "The Dataset(s) being searched for measurements that match the measurements in Primary"
+            "description": "The Dataset(s) being searched for measurements that match the Primary. Required"
         },
         "parameter": {
             "name": "Match-Up Parameter",
             "type": "string",
-            "description": "The parameter of interest used for the match up. One of 'sst', 'sss', 'wind'."
+            "description": "The parameter of interest used for the match up. One of 'sst', 'sss', 'wind'. Required"
         },
         "startTime": {
             "name": "Start Time",
             "type": "string",
-            "description": "Starting time in format YYYY-MM-DDTHH:mm:ssZ"
+            "description": "Starting time in format YYYY-MM-DDTHH:mm:ssZ or seconds since EPOCH. Required"
         },
         "endTime": {
             "name": "End Time",
             "type": "string",
-            "description": "Ending time in format YYYY-MM-DDTHH:mm:ssZ"
+            "description": "Ending time in format YYYY-MM-DDTHH:mm:ssZ or seconds since EPOCH. Required"
         },
         "b": {
             "name": "Bounding box",
             "type": "comma-delimited float",
-            "description": "Minimum (Western) Longitude, Minimum (Southern) Latitude, Maximum (Eastern) Longitude, Maximum (Northern) Latitude"
+            "description": "Minimum (Western) Longitude, Minimum (Southern) Latitude, "
+                           "Maximum (Eastern) Longitude, Maximum (Northern) Latitude. Required"
         },
         "depthMin": {
             "name": "Minimum Depth",
             "type": "float",
-            "description": "Minimum depth of measurements allowed to be considered for matchup"
+            "description": "Minimum depth of measurements. Must be less than depthMax. Optional. Default: no limit"
         },
         "depthMax": {
             "name": "Maximum Depth",
             "type": "float",
-            "description": "Maximum depth of measurements allowed to be considered for matchup"
+            "description": "Maximum depth of measurements. Must be greater than depthMin. Optional. Default: no limit"
         },
         "tt": {
             "name": "Time Tolerance",
             "type": "long",
-            "description": "Tolerance in time (seconds) when comparing two measurements"
+            "description": "Tolerance in time (seconds) when comparing two measurements. Optional. Default: 86400"
         },
         "rt": {
             "name": "Radius Tolerance",
             "type": "float",
-            "description": "Tolerance in radius when comparing two measurements"
+            "description": "Tolerance in radius (meters) when comparing two measurements. Optional. Default: 1000"
         },
         "platforms": {
             "name": "Platforms",
             "type": "comma-delimited integer",
-            "description": "Platforms to include for matchup consideration"
+            "description": "Platforms to include for matchup consideration. Required"
         },
         "matchOnce": {
             "name": "Match Once",
