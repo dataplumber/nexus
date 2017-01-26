@@ -22,42 +22,43 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         "source": {
             "name": "In Situ Dataset",
             "type": "comma-delimited string",
-            "description": "The in situ Dataset to be sub-setted"
+            "description": "The in situ Dataset to be sub-setted. Required"
         },
         "parameter": {
             "name": "Parameter",
             "type": "string",
-            "description": "The parameter of interest. One of 'sst', 'sss', 'wind'."
+            "description": "The parameter of interest. One of 'sst', 'sss', 'wind'. Optional"
         },
         "startTime": {
             "name": "Start Time",
             "type": "string",
-            "description": "Starting time in format YYYY-MM-DDTHH:mm:ssZ"
+            "description": "Starting time in format YYYY-MM-DDTHH:mm:ssZ or seconds since EPOCH. Required"
         },
         "endTime": {
             "name": "End Time",
             "type": "string",
-            "description": "Ending time in format YYYY-MM-DDTHH:mm:ssZ"
+            "description": "Ending time in format YYYY-MM-DDTHH:mm:ssZ or seconds since EPOCH. Required"
         },
         "b": {
             "name": "Bounding box",
             "type": "comma-delimited float",
-            "description": "Minimum (Western) Longitude, Minimum (Southern) Latitude, Maximum (Eastern) Longitude, Maximum (Northern) Latitude"
+            "description": "Minimum (Western) Longitude, Minimum (Southern) Latitude, "
+                           "Maximum (Eastern) Longitude, Maximum (Northern) Latitude. Required"
         },
         "depthMin": {
             "name": "Minimum Depth",
             "type": "float",
-            "description": "Minimum depth of measurements allowed"
+            "description": "Minimum depth of measurements. Must be less than depthMax. Optional"
         },
         "depthMax": {
             "name": "Maximum Depth",
             "type": "float",
-            "description": "Maximum depth of measurements allowed"
+            "description": "Maximum depth of measurements. Must be greater than depthMin. Optional"
         },
         "platforms": {
             "name": "Platforms",
             "type": "comma-delimited integer",
-            "description": "Platforms to include for subset consideration"
+            "description": "Platforms to include for subset consideration. Optional"
         }
     }
     singleton = True

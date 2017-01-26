@@ -20,27 +20,28 @@ class DataInBoundsSearchHandlerImpl(NexusHandler):
         "ds": {
             "name": "Dataset",
             "type": "string",
-            "description": "The Dataset shortname to use in calculation"
+            "description": "The Dataset shortname to use in calculation. Required"
         },
         "parameter": {
             "name": "Parameter",
             "type": "string",
-            "description": "The parameter of interest. One of 'sst', 'sss', 'wind'."
+            "description": "The parameter of interest. One of 'sst', 'sss', 'wind'. Required"
         },
         "b": {
             "name": "Bounding box",
             "type": "comma-delimited float",
-            "description": "Minimum (Western) Longitude, Minimum (Southern) Latitude, Maximum (Eastern) Longitude, Maximum (Northern) Latitude"
+            "description": "Minimum (Western) Longitude, Minimum (Southern) Latitude, "
+                           "Maximum (Eastern) Longitude, Maximum (Northern) Latitude. Required"
         },
         "startTime": {
             "name": "Start Time",
             "type": "string",
-            "description": "Starting time in format YYYY-MM-DDTHH:mm:ssZ"
+            "description": "Starting time in format YYYY-MM-DDTHH:mm:ssZ or seconds since EPOCH. Required"
         },
         "endTime": {
             "name": "End Time",
             "type": "string",
-            "description": "Ending time in format YYYY-MM-DDTHH:mm:ssZ"
+            "description": "Ending time in format YYYY-MM-DDTHH:mm:ssZ or seconds since EPOCH. Required"
         }
     }
     singleton = True
