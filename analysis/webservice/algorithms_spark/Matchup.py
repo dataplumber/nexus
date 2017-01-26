@@ -367,6 +367,7 @@ class DomsPoint(object):
 
         point.sst_depth = 0
         point.source = tile.dataset
+        point.file_url = tile.granule
 
         # TODO device should change based on the satellite making the observations.
         point.platform = 9
