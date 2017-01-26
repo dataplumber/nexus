@@ -6,6 +6,8 @@ import requests
 import csv
 import StringIO
 import os
+import zipfile
+import tempfile
 
 import BaseDomsHandler
 from webservice.NexusHandler import nexus_handler
@@ -83,6 +85,10 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         matchup_ds_names = request.get_argument('matchup', None)
         if matchup_ds_names is None:
             raise NexusProcessingException(reason="'matchup' argument is required", code=400)
+        try:
+            matchup_ds_names = matchup_ds_names.split(',')
+        except:
+            raise NexusProcessingException(reason="'matchup' argument should be a comma-seperated list", code=400)
 
         parameter_s = request.get_argument('parameter', None)
         if parameter_s not in ['sst', 'sss', 'wind', None]:
@@ -135,27 +141,80 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         primary_ds_name, matchup_ds_names, parameter_s, start_time, end_time, \
         bounding_polygon, depth_min, depth_max, platforms = self.parse_arguments(request)
 
-        primary_url = "doms.jpl.nasa.gov/datainbounds"
+        primary_url = "https://doms.jpl.nasa.gov/datainbounds"
         primary_params = {
             'ds': primary_ds_name,
             'parameter': parameter_s,
             'b': ','.join([str(bound) for bound in bounding_polygon.bounds]),
             'startTime': start_time,
-            'endTime': end_time
+            'endTime': end_time,
+            'output': "CSV"
         }
-        # Download primary
-        # Download matchup
+
+        matchup_url = "https://doms.jpl.nasa.gov/domsinsitusubset"
+        matchup_params = {
+            'source': None,
+            'parameter': parameter_s,
+            'startTime': start_time,
+            'endTime': end_time,
+            'b': ','.join([str(bound) for bound in bounding_polygon.bounds]),
+            'depthMin': depth_min,
+            'depthMax': depth_max,
+            'platforms': platforms,
+            'output': 'CSV'
+        }
+
+        with requests.session() as session:
+            # Download primary
+            primary_temp_file, primary_temp_file_path = tempfile.mkstemp(suffix='.csv')
+            download_file(primary_url, primary_temp_file_path, session, params=primary_params)
+
+            # Download matchup
+            matchup_downloads = {}
+            for matchup_ds in matchup_ds_names:
+                matchup_downloads[matchup_ds] = tempfile.mkstemp(suffix='.csv')
+                matchup_params['source'] = matchup_ds
+                download_file(matchup_url, matchup_downloads[matchup_ds][1], session, params=matchup_params)
 
         # Zip downloads
-        # ???
-        # Profit
-        pass
+        date_range = "%s-%s" % (datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y%m%d"),
+                                datetime.strptime(end_time, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y%m%d"))
+        bounds = '%sW_%sS_%sE_%sN' % bounding_polygon.bounds
+        zip_dir = tempfile.mkdtemp()
+        zip_path = '%s/subset.%s.%s.zip' % (zip_dir, date_range, bounds)
+        with zipfile.ZipFile(zip_path, 'w') as my_zip:
+            my_zip.write(primary_temp_file_path, arcname='%s.%s.%s.csv' % (primary_ds_name, date_range, bounds))
+            for matchup_ds, download in matchup_downloads.iteritems():
+                my_zip.write(download[1], arcname='%s.%s.%s.csv' % (matchup_ds, date_range, bounds))
+
+        # Clean up
+        os.remove(primary_temp_file_path)
+        for matchup_ds, download in matchup_downloads.iteritems():
+            os.remove(download[1])
+
+        return SubsetResult(zip_path)
 
 
-def download_file(url, local_filepath, params=None):
-    r = requests.get(url, params=params, stream=True)
-    with open(local_filepath, 'wb') as f:
+class SubsetResult(object):
+    def __init__(self, zip_path):
+        self.zip_path = zip_path
+
+    def toJson(self):
+        raise NotImplementedError
+
+    def toZip(self):
+        with open(self.zip_path, 'rb') as zip_file:
+            zip_contents = zip_file.read()
+
+        return zip_contents
+
+    def cleanup(self):
+        os.remove(self.zip_path)
+
+
+def download_file(url, filepath, session, params=None):
+    r = session.get(url, params=params, stream=True)
+    with open(filepath, 'wb') as f:
         for chunk in r.iter_content(chunk_size=1024):
             if chunk:  # filter out keep-alive new chunks
                 f.write(chunk)
-    return local_filepath
