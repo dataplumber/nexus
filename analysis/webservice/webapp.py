@@ -27,6 +27,7 @@ class ContentTypes(object):
     XML = "XML"
     PNG = "PNG"
     NETCDF = "NETCDF"
+    ZIP = "ZIP"
 
 
 class BaseHandler(tornado.web.RequestHandler):
@@ -122,6 +123,21 @@ class ModularNexusHandlerWrapper(BaseHandler):
             except:
                 traceback.print_exc(file=sys.stdout)
                 raise NexusProcessingException(reason="Unable to convert results to NetCDF.")
+        elif request.get_content_type() == ContentTypes.ZIP:
+            self.set_header("Content-Type", "application/zip")
+            self.set_header("Content-Disposition", "filename=\"%s\"" % request.get_argument('filename', "download.zip"))
+            try:
+                self.write(results.toZip())
+            except:
+                traceback.print_exc(file=sys.stdout)
+                raise NexusProcessingException(reason="Unable to convert results to Zip.")
+
+        return results
+
+    def async_callback(self, result):
+        super(ModularNexusHandlerWrapper, self).async_callback(result)
+        if hasattr(result, 'cleanup'):
+            result.cleanup()
 
 
 if __name__ == "__main__":
@@ -183,7 +199,8 @@ if __name__ == "__main__":
 
             handlers.append(
                 (clazzWrapper.path(), ModularNexusHandlerWrapper,
-                 dict(clazz=clazzWrapper, algorithm_config=algorithm_config, sc=spark_context, thread_pool=request_thread_pool)))
+                 dict(clazz=clazzWrapper, algorithm_config=algorithm_config, sc=spark_context,
+                      thread_pool=request_thread_pool)))
         else:
             handlers.append(
                 (clazzWrapper.path(), ModularNexusHandlerWrapper,
