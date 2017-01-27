@@ -80,17 +80,17 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         # Parse input arguments
         self.log.debug("Parsing arguments")
 
-        primary_ds_name = request.get_argument('primary', None)
+        primary_ds_name = request.get_argument('dataset', None)
 
-        matchup_ds_names = request.get_argument('matchup', None)
+        matchup_ds_names = request.get_argument('insitu', None)
         if matchup_ds_names is not None:
             try:
                 matchup_ds_names = matchup_ds_names.split(',')
             except:
-                raise NexusProcessingException(reason="'matchup' argument should be a comma-seperated list", code=400)
+                raise NexusProcessingException(reason="'insitu' argument should be a comma-seperated list", code=400)
 
         if primary_ds_name is None and matchup_ds_names is None:
-            raise NexusProcessingException(reason="Either 'primary', 'matchup', or both arguments are required",
+            raise NexusProcessingException(reason="Either 'dataset', 'insitu', or both arguments are required",
                                            code=400)
 
         parameter_s = request.get_argument('parameter', None)
