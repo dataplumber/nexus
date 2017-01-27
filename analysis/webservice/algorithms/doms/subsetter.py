@@ -18,20 +18,20 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
     description = "Subset DOMS sources given the search domain"
 
     params = {
-        "primary": {
-            "name": "Primary Dataset",
+        "dataset": {
+            "name": "NEXUS Dataset",
             "type": "string",
-            "description": "The Primary dataset. Optional but at least one of 'primary' or 'matchup' are required"
+            "description": "The NEXUS dataset. Optional but at least one of 'dataset' or 'insitu' are required"
         },
-        "matchup": {
-            "name": "Match-Up Datasets",
+        "insitu": {
+            "name": "In Situ sources",
             "type": "comma-delimited string",
-            "description": "The Match-Up Dataset(s). Optional but at least one of 'primary' or 'matchup' are required"
+            "description": "The in situ source(s). Optional but at least one of 'dataset' or 'insitu' are required"
         },
         "parameter": {
-            "name": "Match-Up Parameter",
+            "name": "Data Parameter",
             "type": "string",
-            "description": "The parameter of interest used for the match up. One of 'sst', 'sss', 'wind'. Required"
+            "description": "The parameter of interest. One of 'sst', 'sss', 'wind'. Required"
         },
         "startTime": {
             "name": "Start Time",

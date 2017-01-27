@@ -18,49 +18,77 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
     path = "/domsinsitusubset"
     description = "Subset a DOMS in situ source given the search domain."
 
-    params = {
-        "source": {
-            "name": "In Situ Dataset",
+    params = [
+        {
+            "name": "source",
             "type": "comma-delimited string",
-            "description": "The in situ Dataset to be sub-setted. Required"
+            "description": "The in situ Dataset to be sub-setted",
+            "required": "true",
+            "sample": "spurs"
         },
-        "parameter": {
-            "name": "Parameter",
+        {
+            "name": "parameter",
             "type": "string",
-            "description": "The parameter of interest. One of 'sst', 'sss', 'wind'. Optional"
+            "description": "The parameter of interest. One of 'sst', 'sss', 'wind'",
+            "required": "false",
+            "default": "All",
+            "sample": "sss"
         },
-        "startTime": {
-            "name": "Start Time",
+        {
+            "name": "startTime",
             "type": "string",
-            "description": "Starting time in format YYYY-MM-DDTHH:mm:ssZ or seconds since EPOCH. Required"
+            "description": "Starting time in format YYYY-MM-DDTHH:mm:ssZ or seconds since EPOCH",
+            "required": "true",
+            "sample": "2013-10-21T00:00:00Z"
         },
-        "endTime": {
-            "name": "End Time",
+        {
+            "name": "endTime",
             "type": "string",
-            "description": "Ending time in format YYYY-MM-DDTHH:mm:ssZ or seconds since EPOCH. Required"
+            "description": "Ending time in format YYYY-MM-DDTHH:mm:ssZ or seconds since EPOCH",
+            "required": "true",
+            "sample": "2013-10-31T23:59:59Z"
         },
-        "b": {
-            "name": "Bounding box",
+        {
+            "name": "b",
             "type": "comma-delimited float",
             "description": "Minimum (Western) Longitude, Minimum (Southern) Latitude, "
-                           "Maximum (Eastern) Longitude, Maximum (Northern) Latitude. Required"
+                           "Maximum (Eastern) Longitude, Maximum (Northern) Latitude",
+            "required": "true",
+            "sample": "-30,15,-45,30"
         },
-        "depthMin": {
-            "name": "Minimum Depth",
+        {
+            "name": "depthMin",
             "type": "float",
-            "description": "Minimum depth of measurements. Must be less than depthMax. Optional"
+            "description": "Minimum depth of measurements. Must be less than depthMax",
+            "required": "false",
+            "default": "No limit",
+            "sample": "0"
         },
-        "depthMax": {
-            "name": "Maximum Depth",
+        {
+            "name": "depthMax",
             "type": "float",
-            "description": "Maximum depth of measurements. Must be greater than depthMin. Optional"
+            "description": "Maximum depth of measurements. Must be greater than depthMin",
+            "required": "false",
+            "default": "No limit",
+            "sample": "5"
         },
-        "platforms": {
-            "name": "Platforms",
+        {
+            "name": "platforms",
             "type": "comma-delimited integer",
-            "description": "Platforms to include for subset consideration. Optional"
+            "description": "Platforms to include for subset consideration",
+            "required": "false",
+            "default": "All",
+            "sample": "1,2,3,4,5,6,7,8,9"
+        },
+        {
+            "name": "output",
+            "type": "string",
+            "description": "Output type. Only 'CSV' or 'JSON' is currently supported",
+            "required": "false",
+            "default": "JSON",
+            "sample": "CSV"
         }
-    }
+    ]
     singleton = True
 
     def __init__(self):
