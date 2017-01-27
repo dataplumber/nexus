@@ -197,7 +197,7 @@ class Matchup(SparkHandler):
 
         with ResultsStorage() as resultsStorage:
 
-            execution_id = resultsStorage.insertExecution(None, start, None, None)
+            execution_id = str(resultsStorage.insertExecution(None, start, None, None))
 
         self.log.debug("Querying for tiles in search domain")
         # Get tile ids in box
@@ -291,8 +291,8 @@ class Matchup(SparkHandler):
             "wind_v": domspoint.wind_v,
             "platform": doms_values.getPlatformById(domspoint.platform),
             "device": doms_values.getDeviceById(domspoint.device),
-            "x": domspoint.longitude,
-            "y": domspoint.latitude,
+            "x": str(domspoint.longitude),
+            "y": str(domspoint.latitude),
             "point": "Point(%s %s)" % (domspoint.longitude, domspoint.latitude),
             "time": iso_time_to_epoch(domspoint.time),
             "fileurl": domspoint.file_url,
@@ -421,7 +421,6 @@ DRIVER_LOCK = Lock()
 def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_names, parameter, depth_min, depth_max,
                          time_tolerance, radius_tolerance, platforms, match_once, sc=None):
     from functools import partial
-    from scipy.spatial.distance import cdist
 
     with DRIVER_LOCK:
         # Broadcast parameters

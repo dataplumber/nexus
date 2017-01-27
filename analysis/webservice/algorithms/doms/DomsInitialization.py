@@ -65,9 +65,9 @@ class DomsInitializer:
         log.info("Verifying doms_executions table")
         cql = """
             CREATE TABLE IF NOT EXISTS doms_executions (
-              id text PRIMARY KEY,
-              time_started bigint,
-              time_completed bigint,
+              id uuid PRIMARY KEY,
+              time_started timestamp,
+              time_completed timestamp,
               user_email text
             );
                 """
@@ -78,69 +78,50 @@ class DomsInitializer:
         log.info("Verifying doms_params table")
         cql = """
             CREATE TABLE IF NOT EXISTS doms_params (
-              execution_id text PRIMARY KEY,
+              execution_id uuid PRIMARY KEY,
               primary_dataset text,
               matchup_datasets text,
-              depth_tolerance float,
+              depth_tolerance decimal,
+              depth_min decimal,
+              depth_max decimal,
               time_tolerance int,
-              radius_tolerance float,
-              start_time bigint,
-              end_time bigint,
+              radius_tolerance decimal,
+              start_time timestamp,
+              end_time timestamp,
               platforms text,
               bounding_box text
             );
         """
         session.execute(cql)
-        self.alterDomsParamsTable(session)
-
-    def alterDomsParamsTable(self, session):
-        log = logging.getLogger(__name__)
-        log.info("Altering doms_params table")
-        cql = """
-                    Alter TABLE doms_params ADD depth_min float;
-                """
-        try:
-            session.execute(cql)
-        except InvalidRequest:
-            pass
-
-        cql = """
-        Alter TABLE doms_params ADD depth_max float;
-        """
-        try:
-            session.execute(cql)
-        except InvalidRequest:
-            pass
 
     def createDomsDataTable(self, session):
         log = logging.getLogger(__name__)
         log.info("Verifying doms_data table")
         cql = """
             CREATE TABLE IF NOT EXISTS doms_data (
-              id text PRIMARY KEY,
-              execution_id text,
+              id uuid,
+              execution_id uuid,
               value_id text,
               primary_value_id text,
-              is_primary int,
-              x float,
-              y float,
+              is_primary boolean,
+              x decimal,
+              y decimal,
               source_dataset text,
-              measurement_time bigint,
+              measurement_time timestamp,
               platform text,
               device text,
-              measurement_values map<text, float>
+              measurement_values map<text, decimal>,
+              PRIMARY KEY (execution_id, is_primary, id)
             );
         """
         session.execute(cql)
-        session.execute("CREATE INDEX IF NOT EXISTS  doms_data_execution_id ON doms_data( execution_id );")
-        session.execute("CREATE INDEX IF NOT EXISTS  doms_data_is_primary ON doms_data( is_primary );")
 
     def createDomsExecutionStatsTable(self, session):
         log = logging.getLogger(__name__)
         log.info("Verifying doms_execuction_stats table")
         cql = """
             CREATE TABLE IF NOT EXISTS doms_execution_stats (
-              execution_id text PRIMARY KEY,
+              execution_id uuid PRIMARY KEY,
               num_gridded_matched int,
               num_gridded_checked int,
               num_insitu_matched int,
