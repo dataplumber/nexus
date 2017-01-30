@@ -157,6 +157,12 @@ class Matchup(SparkHandler):
                 reason="'endTime' argument is required. Can be int value seconds from epoch or string format YYYY-MM-DDTHH:mm:ssZ",
                 code=400)
 
+        if start_time > end_time:
+            raise NexusProcessingException(
+                reason="The starting time must be before the ending time. Received startTime: %s, endTime: %s" % (
+                    request.get_start_datetime().strftime(ISO_8601), request.get_end_datetime().strftime(ISO_8601)),
+                code=400)
+
         depth_min = request.get_decimal_arg('depthMin', default=None)
         depth_max = request.get_decimal_arg('depthMax', default=None)
 
