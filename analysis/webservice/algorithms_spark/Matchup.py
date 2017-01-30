@@ -545,7 +545,7 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
         for insitudata_name in matchup_b.value.split(','):
             bbox = ','.join(
                 [str(matchup_min_lon), str(matchup_min_lat), str(matchup_max_lon), str(matchup_max_lat)])
-            edge_response = query_edge(insitudata_name, None, matchup_min_time, matchup_max_time, bbox,
+            edge_response = query_edge(insitudata_name, parameter_b.value, matchup_min_time, matchup_max_time, bbox,
                                        platforms_b.value, depth_min_b.value, depth_max_b.value, session=edge_session)
             if edge_response['totalResults'] == 0:
                 continue

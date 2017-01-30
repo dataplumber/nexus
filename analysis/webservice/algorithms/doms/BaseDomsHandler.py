@@ -180,26 +180,13 @@ class DomsCSVFormatter:
 
         global_attrs = [
             {"Global Attribute": "Platform", "Value": ', '.join(platforms)},
-            {"Global Attribute": "matchID", "Value": executionId},
-            {"Global Attribute": "Matchup_TimeWindow", "Value": params["timeTolerance"] / 60 / 60},
-            {"Global Attribute": "Matchup_TimeWindow_Units", "Value": "hours"},
             {"Global Attribute": "time_coverage_start",
              "Value": params["startTime"].strftime(ISO_8601)},
-
             {"Global Attribute": "time_coverage_end",
              "Value": params["endTime"].strftime(ISO_8601)},
-            {"Global Attribute": "depth_min", "Value": params["depthMin"]},
-            {"Global Attribute": "depth_max", "Value": params["depthMax"]},
-            {"Global Attribute": "platforms", "Value": params["platforms"]},
-            {"Global Attribute": "Matchup_SearchRadius", "Value": params["radiusTolerance"]},
+            # TODO I don't think this applies
+            # {"Global Attribute": "time_coverage_resolution", "Value": "point"},
 
-            {"Global Attribute": "Matchup_SearchRadius_Units", "Value": "m"},
-            {"Global Attribute": "bounding_box", "Value": params["bbox"]},
-            {"Global Attribute": "primary", "Value": params["primary"]},
-            {"Global Attribute": "secondary", "Value": ",".join(params["matchup"])},
-            {"Global Attribute": "Matchup_ParameterPrimary", "Value": params.get("parameter", "")},
-
-            {"Global Attribute": "time_coverage_resolution", "Value": "point"},
             {"Global Attribute": "geospatial_lon_min", "Value": params["bbox"].split(',')[0]},
             {"Global Attribute": "geospatial_lat_min", "Value": params["bbox"].split(',')[1]},
             {"Global Attribute": "geospatial_lon_max", "Value": params["bbox"].split(',')[2]},
@@ -208,19 +195,37 @@ class DomsCSVFormatter:
             {"Global Attribute": "geospatial_lon_resolution", "Value": "point"},
             {"Global Attribute": "geospatial_lat_units", "Value": "degrees_north"},
             {"Global Attribute": "geospatial_lon_units", "Value": "degrees_east"},
+
             {"Global Attribute": "geospatial_vertical_min", "Value": params["depthMin"]},
             {"Global Attribute": "geospatial_vertical_max", "Value": params["depthMax"]},
             {"Global Attribute": "geospatial_vertical_units", "Value": "m"},
             {"Global Attribute": "geospatial_vertical_resolution", "Value": "point"},
             {"Global Attribute": "geospatial_vertical_positive", "Value": "down"},
-            {"Global Attribute": "time_to_complete", "Value": details["timeToComplete"]},
-            {"Global Attribute": "time_to_complete_units", "Value": "seconds"},
-            {"Global Attribute": "num_matchup_matched", "Value": details["numInSituMatched"]},
-            {"Global Attribute": "num_primary_matched", "Value": details["numGriddedMatched"]},
-            {"Global Attribute": "num_matchup_checked",
+
+            {"Global Attribute": "DOMS_matchID", "Value": executionId},
+            {"Global Attribute": "DOMS_TimeWindow", "Value": params["timeTolerance"] / 60 / 60},
+            {"Global Attribute": "DOMS_TimeWindow_Units", "Value": "hours"},
+            {"Global Attribute": "DOMS_depth_min", "Value": params["depthMin"]},
+            {"Global Attribute": "DOMS_depth_max", "Value": params["depthMax"]},
+
+            {"Global Attribute": "DOMS_platforms", "Value": params["platforms"]},
+            {"Global Attribute": "DOMS_SearchRadius", "Value": params["radiusTolerance"]},
+            {"Global Attribute": "DOMS_SearchRadius_Units", "Value": "m"},
+            {"Global Attribute": "DOMS_bounding_box", "Value": params["bbox"]},
+
+            {"Global Attribute": "DOMS_primary", "Value": params["primary"]},
+            {"Global Attribute": "DOMS_secondary", "Value": ",".join(params["matchup"])},
+            {"Global Attribute": "DOMS_ParameterPrimary", "Value": params.get("parameter", "")},
+
+            {"Global Attribute": "DOMS_time_to_complete", "Value": details["timeToComplete"]},
+            {"Global Attribute": "DOMS_time_to_complete_units", "Value": "seconds"},
+            {"Global Attribute": "DOMS_num_matchup_matched", "Value": details["numInSituMatched"]},
+            {"Global Attribute": "DOMS_num_primary_matched", "Value": details["numGriddedMatched"]},
+            {"Global Attribute": "DOMS_num_matchup_checked",
              "Value": details["numInSituChecked"] if details["numInSituChecked"] != 0 else "N/A"},
-            {"Global Attribute": "num_primary_checked",
+            {"Global Attribute": "DOMS_num_primary_checked",
              "Value": details["numGriddedChecked"] if details["numGriddedChecked"] != 0 else "N/A"},
+
             {"Global Attribute": "date_modified", "Value": datetime.utcnow().replace(tzinfo=UTC).strftime(ISO_8601)},
             {"Global Attribute": "date_created", "Value": datetime.utcnow().replace(tzinfo=UTC).strftime(ISO_8601)},
         ]
