@@ -12,6 +12,7 @@ import pkg_resources
 from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
 from cassandra.query import BatchStatement
+from pytz import UTC
 
 
 class AbstractResultsContainer:
@@ -73,9 +74,9 @@ class ResultsStorage(AbstractResultsContainer):
 
     def __insertParams(self, execution_id, params):
         cql = """INSERT INTO doms_params
-                    (execution_id, primary_dataset, matchup_datasets, depth_min, depth_max, time_tolerance, radius_tolerance, start_time, end_time, platforms, bounding_box)
+                    (execution_id, primary_dataset, matchup_datasets, depth_min, depth_max, time_tolerance, radius_tolerance, start_time, end_time, platforms, bounding_box, parameter)
                  VALUES
-                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         self._session.execute(cql, (execution_id,
                                     params["primary"],
@@ -88,7 +89,8 @@ class ResultsStorage(AbstractResultsContainer):
                                     params["startTime"],
                                     params["endTime"],
                                     params["platforms"],
-                                    params["bbox"]
+                                    params["bbox"],
+                                    params["parameter"]
                                     ))
 
     def __insertStats(self, execution_id, stats):
@@ -135,7 +137,7 @@ class ResultsStorage(AbstractResultsContainer):
             result["x"],
             result["y"],
             result["source"],
-            int(result["time"]),
+            result["time"],
             result["platform"] if "platform" in result else None,
             result["device"] if "device" in result else None,
             dataMap,
@@ -215,7 +217,7 @@ class ResultsRetrieval(AbstractResultsContainer):
                 "x": str(float(row.x)),
                 "y": str(float(row.y)),
                 "source": row.source_dataset,
-                "time": row.measurement_time
+                "time": row.measurement_time.replace(tzinfo=UTC)
             }
         else:
             entry = {
@@ -225,10 +227,10 @@ class ResultsRetrieval(AbstractResultsContainer):
                 "source": row.source_dataset,
                 "device": row.device,
                 "platform": row.platform,
-                "time": row.measurement_time
+                "time": row.measurement_time.replace(tzinfo=UTC)
             }
         for key in row.measurement_values:
-            value = row.measurement_values[key]
+            value = str(float(row.measurement_values[key]))
             entry[key] = value
         return entry
 
@@ -257,11 +259,12 @@ class ResultsRetrieval(AbstractResultsContainer):
                 "depthMin": str(float(row.depth_min)),
                 "depthMax": str(float(row.depth_max)),
                 "timeTolerance": row.time_tolerance,
-                "radiusTolerance": row.radius_tolerance,
-                "startTime": row.start_time,
-                "endTime": row.end_time,
+                "radiusTolerance": str(float(row.radius_tolerance)),
+                "startTime": row.start_time.replace(tzinfo=UTC),
+                "endTime": row.end_time.replace(tzinfo=UTC),
                 "platforms": row.platforms,
-                "bbox": row.bounding_box
+                "bbox": row.bounding_box,
+                "parameter": row.parameter
             }
             return params
 

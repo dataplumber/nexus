@@ -89,7 +89,8 @@ class DomsInitializer:
               start_time timestamp,
               end_time timestamp,
               platforms text,
-              bounding_box text
+              bounding_box text,
+              parameter text
             );
         """
         session.execute(cql)

@@ -30,6 +30,7 @@ from webservice.algorithms.doms.ResultsStorage import ResultsStorage
 from webservice.webmodel import NexusProcessingException
 
 EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
+ISO_8601 = '%Y-%m-%dT%H:%M:%S%z'
 
 
 def iso_time_to_epoch(str_time):
@@ -188,7 +189,7 @@ class Matchup(SparkHandler):
                platforms, match_once, result_size_limit
 
     def calc(self, request, **args):
-        start = int(round(time.time() * 1000))
+        start = datetime.utcnow()
         # TODO Assuming Satellite primary
         bounding_polygon, primary_ds_name, matchup_ds_names, parameter_s, \
         start_time, start_seconds_from_epoch, end_time, end_seconds_from_epoch, \
@@ -218,18 +219,19 @@ class Matchup(SparkHandler):
             self.log.exception(e)
             raise NexusProcessingException(reason="An unknown error occurred while computing matches", code=500)
 
-        end = int(round(time.time() * 1000))
+        end = datetime.utcnow()
 
         self.log.debug("Building and saving results")
         args = {
             "primary": primary_ds_name,
             "matchup": matchup_ds_names,
-            "startTime": start_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
-            "endTime": end_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            "startTime": start_time,
+            "endTime": end_time,
             "bbox": request.get_argument('b'),
             "timeTolerance": time_tolerance,
             "radiusTolerance": float(radius_tolerance),
-            "platforms": platforms
+            "platforms": platforms,
+            "parameter": parameter_s
         }
 
         if depth_min is not None:
@@ -241,7 +243,7 @@ class Matchup(SparkHandler):
         total_keys = len(spark_result.keys())
         total_values = sum(len(v) for v in spark_result.itervalues())
         details = {
-            "timeToComplete": (end - start),
+            "timeToComplete": int((end - start).total_seconds()),
             "numInSituRecords": 0,
             "numInSituMatched": total_values,
             "numGriddedChecked": 0,
@@ -294,7 +296,7 @@ class Matchup(SparkHandler):
             "x": str(domspoint.longitude),
             "y": str(domspoint.latitude),
             "point": "Point(%s %s)" % (domspoint.longitude, domspoint.latitude),
-            "time": iso_time_to_epoch(domspoint.time),
+            "time": datetime.strptime(domspoint.time, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC),
             "fileurl": domspoint.file_url,
             "id": domspoint.data_id,
             "source": domspoint.source,
@@ -543,7 +545,7 @@ def match_satellite_to_insitu(tile_ids, primary_b, matchup_b, parameter_b, tt_b,
         for insitudata_name in matchup_b.value.split(','):
             bbox = ','.join(
                 [str(matchup_min_lon), str(matchup_min_lat), str(matchup_max_lon), str(matchup_max_lat)])
-            edge_response = query_edge(insitudata_name, parameter_b.value, matchup_min_time, matchup_max_time, bbox,
+            edge_response = query_edge(insitudata_name, None, matchup_min_time, matchup_max_time, bbox,
                                        platforms_b.value, depth_min_b.value, depth_max_b.value, session=edge_session)
             if edge_response['totalResults'] == 0:
                 continue

@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 import numpy as np
-from pytz import timezone
+from pytz import timezone, UTC
 
 import config
 import geo
@@ -12,7 +12,7 @@ from webservice.NexusHandler import NexusHandler as BaseHandler
 from webservice.webmodel import NexusResults
 
 EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
-ISO_8601 = '%Y-%m-%dT%H:%M:%SZ'
+ISO_8601 = '%Y-%m-%dT%H:%M:%S%z'
 
 try:
     from osgeo import gdal
@@ -89,7 +89,7 @@ class DomsCSVFormatter:
         try:
             DomsCSVFormatter.__addConstants(csv_mem_file)
             DomsCSVFormatter.__addDynamicAttrs(csv_mem_file, executionId, results, params, details)
-            csv.writer(csv_mem_file).writerow()
+            csv.writer(csv_mem_file).writerow([])
 
             DomsCSVFormatter.__packValues(csv_mem_file, results)
 
@@ -98,7 +98,6 @@ class DomsCSVFormatter:
             csv_mem_file.close()
 
         return csv_out
-
 
     @staticmethod
     def __packValues(csv_mem_file, results):
@@ -121,18 +120,19 @@ class DomsCSVFormatter:
                 row = [
                     # Primary
                     primaryValue["id"], primaryValue["source"], str(primaryValue["x"]), str(primaryValue["y"]),
-                    datetime.utcfromtimestamp(primaryValue["time"]).strftime(ISO_8601), primaryValue["platform"],
-                    primaryValue["sea_water_salinity_depth"], primaryValue["sea_water_salinity"],
-                    primaryValue["sea_water_temperature_depth"], primaryValue["sea_water_temperature"],
-                    primaryValue["wind_speed"], primaryValue["wind_direction"], primaryValue["wind_u"],
-                    primaryValue["wind_v"],
+                    primaryValue["time"].strftime(ISO_8601), primaryValue["platform"],
+                    primaryValue.get("sea_water_salinity_depth", ""), primaryValue.get("sea_water_salinity", ""),
+                    primaryValue.get("sea_water_temperature_depth", ""), primaryValue.get("sea_water_temperature", ""),
+                    primaryValue.get("wind_speed", ""), primaryValue.get("wind_direction", ""),
+                    primaryValue.get("wind_u", ""), primaryValue.get("wind_v", ""),
 
                     # Matchup
                     matchup["id"], matchup["source"], matchup["x"], matchup["y"],
-                    datetime.utcfromtimestamp(matchup["time"]).strftime(ISO_8601), matchup["platform"],
-                    matchup["sea_water_salinity_depth"], matchup["sea_water_salinity"],
-                    matchup["sea_water_temperature_depth"], matchup["sea_water_temperature"],
-                    matchup["wind_speed"], matchup["wind_direction"], matchup["wind_u"], matchup["wind_v"],
+                    matchup["time"].strftime(ISO_8601), matchup["platform"],
+                    matchup.get("sea_water_salinity_depth", ""), matchup.get("sea_water_salinity", ""),
+                    matchup.get("sea_water_temperature_depth", ""), matchup.get("sea_water_temperature", ""),
+                    matchup.get("wind_speed", ""), matchup.get("wind_direction", ""),
+                    matchup.get("wind_u", ""), matchup.get("wind_v", ""),
                 ]
 
                 writer.writerow(row)
@@ -154,7 +154,8 @@ class DomsCSVFormatter:
             {"Global Attribute": "project", "Value": "Distributed Oceanographic Matchup System (DOMS)"},
             {"Global Attribute": "keywords_vocabulary",
              "Value": "NASA Global Change Master Directory (GCMD) Science Keywords"},
-            {"Global Attribute": "keywords", "Value": "Salinity, Upper Ocean, SPURS, CTD, Endeavor, Atlantic Ocean"},
+            # TODO What should the keywords be?
+            # {"Global Attribute": "keywords", "Value": "Salinity, Upper Ocean, SPURS, CTD, Endeavor, Atlantic Ocean"},
             {"Global Attribute": "creator_name", "Value": "NASA PO.DAAC"},
             {"Global Attribute": "creator_email", "Value": "podaac@podaac.jpl.nasa.gov"},
             {"Global Attribute": "creator_url", "Value": "https://podaac.jpl.nasa.gov/"},
@@ -178,15 +179,15 @@ class DomsCSVFormatter:
                 platforms.add(match['platform'])
 
         global_attrs = [
-            {"Global Attribute": "Platform", "Value": ','.join(platforms)},
+            {"Global Attribute": "Platform", "Value": ', '.join(platforms)},
             {"Global Attribute": "matchID", "Value": executionId},
-            {"Global Attribute": "Matchup_TimeWindow", "Value": params["timeTolerance"]},
+            {"Global Attribute": "Matchup_TimeWindow", "Value": params["timeTolerance"] / 60 / 60},
             {"Global Attribute": "Matchup_TimeWindow_Units", "Value": "hours"},
             {"Global Attribute": "time_coverage_start",
-             "Value": datetime.utcfromtimestamp(params["startTime"]).strftime(ISO_8601)},
+             "Value": params["startTime"].strftime(ISO_8601)},
 
             {"Global Attribute": "time_coverage_end",
-             "Value": datetime.utcfromtimestamp(params["endTime"]).strftime(ISO_8601)},
+             "Value": params["endTime"].strftime(ISO_8601)},
             {"Global Attribute": "depth_min", "Value": params["depthMin"]},
             {"Global Attribute": "depth_max", "Value": params["depthMax"]},
             {"Global Attribute": "platforms", "Value": params["platforms"]},
@@ -212,14 +213,16 @@ class DomsCSVFormatter:
             {"Global Attribute": "geospatial_vertical_units", "Value": "m"},
             {"Global Attribute": "geospatial_vertical_resolution", "Value": "point"},
             {"Global Attribute": "geospatial_vertical_positive", "Value": "down"},
-            {"Global Attribute": "time_to_complete", "Value": "timeToComplete"},
+            {"Global Attribute": "time_to_complete", "Value": details["timeToComplete"]},
             {"Global Attribute": "time_to_complete_units", "Value": "seconds"},
             {"Global Attribute": "num_matchup_matched", "Value": details["numInSituMatched"]},
             {"Global Attribute": "num_primary_matched", "Value": details["numGriddedMatched"]},
-            {"Global Attribute": "num_matchup_checked", "Value": details["numInSituChecked"]},
-            {"Global Attribute": "num_primary_checked", "Value": details["numGriddedChecked"]},
-            {"Global Attribute": "date_modified", "Value": datetime.utcnow().strftime(ISO_8601)},
-            {"Global Attribute": "date_created", "Value": datetime.utcnow().strftime(ISO_8601)},
+            {"Global Attribute": "num_matchup_checked",
+             "Value": details["numInSituChecked"] if details["numInSituChecked"] != 0 else "N/A"},
+            {"Global Attribute": "num_primary_checked",
+             "Value": details["numGriddedChecked"] if details["numGriddedChecked"] != 0 else "N/A"},
+            {"Global Attribute": "date_modified", "Value": datetime.utcnow().replace(tzinfo=UTC).strftime(ISO_8601)},
+            {"Global Attribute": "date_created", "Value": datetime.utcnow().replace(tzinfo=UTC).strftime(ISO_8601)},
         ]
 
         writer = csv.DictWriter(csvfile, sorted(next(iter(global_attrs)).keys()))
