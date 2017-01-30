@@ -10,6 +10,8 @@ from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMET
 from webservice.webmodel import NexusResults, NexusProcessingException
 
 EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
+ISO_8601 = '%Y-%m-%dT%H:%M:%S%z'
+
 
 @nexus_handler
 class DataInBoundsSearchHandlerImpl(NexusHandler):
@@ -50,7 +52,6 @@ class DataInBoundsSearchHandlerImpl(NexusHandler):
         NexusHandler.__init__(self)
         self.log = logging.getLogger(__name__)
 
-
     def parse_arguments(self, request):
         # Parse input arguments
         self.log.debug("Parsing arguments")
@@ -78,6 +79,12 @@ class DataInBoundsSearchHandlerImpl(NexusHandler):
         except:
             raise NexusProcessingException(
                 reason="'endTime' argument is required. Can be int value seconds from epoch or string format YYYY-MM-DDTHH:mm:ssZ",
+                code=400)
+
+        if start_time > end_time:
+            raise NexusProcessingException(
+                reason="The starting time must be before the ending time. Received startTime: %s, endTime: %s" % (
+                    request.get_start_datetime().strftime(ISO_8601), request.get_end_datetime().strftime(ISO_8601)),
                 code=400)
 
         try:
@@ -116,7 +123,7 @@ class DataInBoundsSearchHandlerImpl(NexusHandler):
                 elif parameter == 'wind':
                     point['wind_u'] = nexus_point.data_val.item()
                     try:
-                        point['wind_v']= tile.meta_data['wind_v'][tuple(nexus_point.index)].item()
+                        point['wind_v'] = tile.meta_data['wind_v'][tuple(nexus_point.index)].item()
                     except (KeyError, IndexError):
                         pass
                     try:
@@ -152,6 +159,7 @@ class DataInBoundsSearchHandlerImpl(NexusHandler):
         result.extendMeta(min_lat, max_lat, min_lon, max_lon, "", start_time, end_time)
 
         return result
+
 
 class DataInBoundsResult(NexusResults):
     def toCSV(self):

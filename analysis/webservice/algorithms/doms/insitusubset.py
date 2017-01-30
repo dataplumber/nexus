@@ -1,15 +1,17 @@
+import StringIO
+import csv
 import json
 import logging
 from datetime import datetime
 
 import requests
-import csv
-import StringIO
 
 import BaseDomsHandler
 from webservice.NexusHandler import nexus_handler
-from webservice.webmodel import NexusProcessingException, NoDataException
 from webservice.algorithms.doms import config as edge_endpoints
+from webservice.webmodel import NexusProcessingException, NoDataException
+
+ISO_8601 = '%Y-%m-%dT%H:%M:%S%z'
 
 
 @nexus_handler
@@ -121,6 +123,12 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         except:
             raise NexusProcessingException(
                 reason="'endTime' argument is required. Can be int value seconds from epoch or string format YYYY-MM-DDTHH:mm:ssZ",
+                code=400)
+
+        if start_time > end_time:
+            raise NexusProcessingException(
+                reason="The starting time must be before the ending time. Received startTime: %s, endTime: %s" % (
+                    request.get_start_datetime().strftime(ISO_8601), request.get_end_datetime().strftime(ISO_8601)),
                 code=400)
 
         try:

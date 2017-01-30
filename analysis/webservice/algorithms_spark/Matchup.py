@@ -30,6 +30,7 @@ from webservice.algorithms.doms.ResultsStorage import ResultsStorage
 from webservice.webmodel import NexusProcessingException
 
 EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
+ISO_8601 = '%Y-%m-%dT%H:%M:%S%z'
 
 
 def iso_time_to_epoch(str_time):
@@ -154,6 +155,12 @@ class Matchup(SparkHandler):
         except:
             raise NexusProcessingException(
                 reason="'endTime' argument is required. Can be int value seconds from epoch or string format YYYY-MM-DDTHH:mm:ssZ",
+                code=400)
+
+        if start_time > end_time:
+            raise NexusProcessingException(
+                reason="The starting time must be before the ending time. Received startTime: %s, endTime: %s" % (
+                    request.get_start_datetime().strftime(ISO_8601), request.get_end_datetime().strftime(ISO_8601)),
                 code=400)
 
         depth_min = request.get_decimal_arg('depthMin', default=None)
@@ -421,7 +428,6 @@ DRIVER_LOCK = Lock()
 def spark_matchup_driver(tile_ids, bounding_wkt, primary_ds_name, matchup_ds_names, parameter, depth_min, depth_max,
                          time_tolerance, radius_tolerance, platforms, match_once, sc=None):
     from functools import partial
-    from scipy.spatial.distance import cdist
 
     with DRIVER_LOCK:
         # Broadcast parameters
