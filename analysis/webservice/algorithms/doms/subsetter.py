@@ -13,6 +13,10 @@ from webservice.webmodel import NexusProcessingException
 ISO_8601 = '%Y-%m-%dT%H:%M:%S%z'
 
 
+def is_blank(my_string):
+    return not (my_string and my_string.strip() != '')
+
+
 @nexus_handler
 class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
     name = "DOMS Subsetter"
@@ -91,7 +95,7 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
             except:
                 raise NexusProcessingException(reason="'insitu' argument should be a comma-seperated list", code=400)
 
-        if primary_ds_name is None and matchup_ds_names is None:
+        if is_blank(primary_ds_name) and is_blank(matchup_ds_names):
             raise NexusProcessingException(reason="Either 'dataset', 'insitu', or both arguments are required",
                                            code=400)
 
