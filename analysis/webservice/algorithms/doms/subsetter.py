@@ -87,17 +87,17 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         self.log.debug("Parsing arguments")
 
         primary_ds_name = request.get_argument('dataset', None)
-
         matchup_ds_names = request.get_argument('insitu', None)
+
+        if is_blank(primary_ds_name) and is_blank(matchup_ds_names):
+            raise NexusProcessingException(reason="Either 'dataset', 'insitu', or both arguments are required",
+                                           code=400)
+
         if matchup_ds_names is not None:
             try:
                 matchup_ds_names = matchup_ds_names.split(',')
             except:
                 raise NexusProcessingException(reason="'insitu' argument should be a comma-seperated list", code=400)
-
-        if is_blank(primary_ds_name) and is_blank(','.join(matchup_ds_names)):
-            raise NexusProcessingException(reason="Either 'dataset', 'insitu', or both arguments are required",
-                                           code=400)
 
         parameter_s = request.get_argument('parameter', None)
         if parameter_s not in ['sst', 'sss', 'wind']:
