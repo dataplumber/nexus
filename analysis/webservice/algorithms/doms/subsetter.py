@@ -13,6 +13,10 @@ from webservice.webmodel import NexusProcessingException
 ISO_8601 = '%Y-%m-%dT%H:%M:%S%z'
 
 
+def is_blank(my_string):
+    return not (my_string and my_string.strip() != '')
+
+
 @nexus_handler
 class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
     name = "DOMS Subsetter"
@@ -83,17 +87,17 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         self.log.debug("Parsing arguments")
 
         primary_ds_name = request.get_argument('dataset', None)
-
         matchup_ds_names = request.get_argument('insitu', None)
+
+        if is_blank(primary_ds_name) and is_blank(matchup_ds_names):
+            raise NexusProcessingException(reason="Either 'dataset', 'insitu', or both arguments are required",
+                                           code=400)
+
         if matchup_ds_names is not None:
             try:
                 matchup_ds_names = matchup_ds_names.split(',')
             except:
                 raise NexusProcessingException(reason="'insitu' argument should be a comma-seperated list", code=400)
-
-        if primary_ds_name is None and matchup_ds_names is None:
-            raise NexusProcessingException(reason="Either 'dataset', 'insitu', or both arguments are required",
-                                           code=400)
 
         parameter_s = request.get_argument('parameter', None)
         if parameter_s not in ['sst', 'sss', 'wind']:
@@ -175,33 +179,43 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
             'output': 'CSV'
         }
 
-        with requests.session() as session:
-            # Download primary
-            primary_temp_file, primary_temp_file_path = tempfile.mkstemp(suffix='.csv')
-            download_file(primary_url, primary_temp_file_path, session, params=primary_params)
+        primary_temp_file_path = None
+        matchup_downloads = None
 
-            # Download matchup
-            matchup_downloads = {}
-            for matchup_ds in matchup_ds_names:
-                matchup_downloads[matchup_ds] = tempfile.mkstemp(suffix='.csv')
-                matchup_params['source'] = matchup_ds
-                download_file(matchup_url, matchup_downloads[matchup_ds][1], session, params=matchup_params)
+        with requests.session() as session:
+
+            if not is_blank(primary_ds_name):
+                # Download primary
+                primary_temp_file, primary_temp_file_path = tempfile.mkstemp(suffix='.csv')
+                download_file(primary_url, primary_temp_file_path, session, params=primary_params)
+
+            if len(matchup_ds_names) > 0:
+                # Download matchup
+                matchup_downloads = {}
+                for matchup_ds in matchup_ds_names:
+                    matchup_downloads[matchup_ds] = tempfile.mkstemp(suffix='.csv')
+                    matchup_params['source'] = matchup_ds
+                    download_file(matchup_url, matchup_downloads[matchup_ds][1], session, params=matchup_params)
 
         # Zip downloads
         date_range = "%s-%s" % (datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y%m%d"),
                                 datetime.strptime(end_time, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y%m%d"))
-        bounds = '%sW_%sS_%sE_%sN' % bounding_polygon.bounds
+        bounds = '%.4fW_%.4fS_%.4fE_%.4fN' % bounding_polygon.bounds
         zip_dir = tempfile.mkdtemp()
         zip_path = '%s/subset.%s.%s.zip' % (zip_dir, date_range, bounds)
         with zipfile.ZipFile(zip_path, 'w') as my_zip:
-            my_zip.write(primary_temp_file_path, arcname='%s.%s.%s.csv' % (primary_ds_name, date_range, bounds))
-            for matchup_ds, download in matchup_downloads.iteritems():
-                my_zip.write(download[1], arcname='%s.%s.%s.csv' % (matchup_ds, date_range, bounds))
+            if primary_temp_file_path:
+                my_zip.write(primary_temp_file_path, arcname='%s.%s.%s.csv' % (primary_ds_name, date_range, bounds))
+            if matchup_downloads:
+                for matchup_ds, download in matchup_downloads.iteritems():
+                    my_zip.write(download[1], arcname='%s.%s.%s.csv' % (matchup_ds, date_range, bounds))
 
         # Clean up
-        os.remove(primary_temp_file_path)
-        for matchup_ds, download in matchup_downloads.iteritems():
-            os.remove(download[1])
+        if primary_temp_file_path:
+            os.remove(primary_temp_file_path)
+        if matchup_downloads:
+            for matchup_ds, download in matchup_downloads.iteritems():
+                os.remove(download[1])
 
         return SubsetResult(zip_path)
 

@@ -102,7 +102,7 @@ class DomsResultsRetrievalHandler(BaseDomsHandler.BaseDomsQueryHandler):
         self.log.debug("Parsing arguments")
 
         source_name = request.get_argument('source', None)
-        if source_name is None:
+        if source_name is None or source_name.strip() == '':
             raise NexusProcessingException(reason="'source' argument is required", code=400)
 
         parameter_s = request.get_argument('parameter', None)
