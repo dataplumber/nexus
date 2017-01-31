@@ -371,5 +371,61 @@ class TestReadCcmpData(unittest.TestCase):
         self.assertEquals(1451606400, results[0].tile.grid_tile.time)
 
 
+class TestReadAvhrrData(unittest.TestCase):
+    def setUp(self):
+        environ['READER'] = 'GRIDTILE'
+        environ['INBOUND_PORT'] = '7890'
+        environ['OUTBOUND_PORT'] = '7891'
+        environ['VARIABLE'] = 'analysed_sst'
+        environ['LONGITUDE'] = 'lon'
+        environ['TIME'] = 'time'
+        environ['LATITUDE'] = 'lat'
+
+        self.module = importlib.import_module('nexusxd.tilereadingprocessor')
+        reload(self.module)
+
+    def tearDown(self):
+        del environ['READER']
+        del environ['INBOUND_PORT']
+        del environ['OUTBOUND_PORT']
+        del environ['VARIABLE']
+        del environ['LONGITUDE']
+        del environ['TIME']
+        del environ['LATITUDE']
+
+    def test_read_not_empty_avhrr(self):
+        test_file = path.join(path.dirname(__file__), 'datafiles', 'not_empty_avhrr.nc4')
+
+        results = list(self.module.read_grid_data(None,
+                                                  "time:0:1,lat:0:10,lon:0:10;file://%s" % test_file))
+
+        self.assertEquals(1, len(results))
+
+        results = [nexusproto.NexusTile.FromString(nexus_tile_data) for nexus_tile_data in results]
+
+        for nexus_tile in results:
+            self.assertTrue(nexus_tile.HasField('tile'))
+            self.assertTrue(nexus_tile.tile.HasField('grid_tile'))
+
+            tile = nexus_tile.tile.grid_tile
+            self.assertEquals(10, from_shaped_array(tile.latitude).size)
+            self.assertEquals(10, from_shaped_array(tile.longitude).size)
+            self.assertEquals((1, 10, 10), from_shaped_array(tile.variable_data).shape)
+
+        tile1_data = np.ma.masked_invalid(from_shaped_array(results[0].tile.grid_tile.variable_data))
+        self.assertEquals(100, np.ma.count(tile1_data))
+        self.assertAlmostEquals(-39.875,
+                                np.ma.min(np.ma.masked_invalid(from_shaped_array(results[0].tile.grid_tile.latitude))),
+                                places=3)
+        self.assertAlmostEquals(-37.625,
+                                np.ma.max(np.ma.masked_invalid(from_shaped_array(results[0].tile.grid_tile.latitude))),
+                                places=3)
+
+        self.assertEquals(1462060800, results[0].tile.grid_tile.time)
+        self.assertAlmostEquals(289.71,
+                                np.ma.masked_invalid(from_shaped_array(results[0].tile.grid_tile.variable_data))[0, 0, 0],
+                                places=3)
+
+
 if __name__ == '__main__':
     unittest.main()
