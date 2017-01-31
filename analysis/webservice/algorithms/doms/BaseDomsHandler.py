@@ -155,7 +155,7 @@ class DomsCSVFormatter:
             {"Global Attribute": "keywords_vocabulary",
              "Value": "NASA Global Change Master Directory (GCMD) Science Keywords"},
             # TODO What should the keywords be?
-            # {"Global Attribute": "keywords", "Value": "Salinity, Upper Ocean, SPURS, CTD, Endeavor, Atlantic Ocean"},
+            {"Global Attribute": "keywords", "Value": ""},
             {"Global Attribute": "creator_name", "Value": "NASA PO.DAAC"},
             {"Global Attribute": "creator_email", "Value": "podaac@podaac.jpl.nasa.gov"},
             {"Global Attribute": "creator_url", "Value": "https://podaac.jpl.nasa.gov/"},
@@ -206,7 +206,9 @@ class DomsCSVFormatter:
             {"Global Attribute": "DOMS_TimeWindow", "Value": params["timeTolerance"] / 60 / 60},
             {"Global Attribute": "DOMS_TimeWindow_Units", "Value": "hours"},
             {"Global Attribute": "DOMS_depth_min", "Value": params["depthMin"]},
+            {"Global Attribute": "DOMS_depth_min_units", "Value": "m"},
             {"Global Attribute": "DOMS_depth_max", "Value": params["depthMax"]},
+            {"Global Attribute": "DOMS_depth_max_units", "Value": "m"},
 
             {"Global Attribute": "DOMS_platforms", "Value": params["platforms"]},
             {"Global Attribute": "DOMS_SearchRadius", "Value": params["radiusTolerance"]},
@@ -214,7 +216,7 @@ class DomsCSVFormatter:
             {"Global Attribute": "DOMS_bounding_box", "Value": params["bbox"]},
 
             {"Global Attribute": "DOMS_primary", "Value": params["primary"]},
-            {"Global Attribute": "DOMS_secondary", "Value": ",".join(params["matchup"])},
+            {"Global Attribute": "DOMS_match-up", "Value": ",".join(params["matchup"])},
             {"Global Attribute": "DOMS_ParameterPrimary", "Value": params.get("parameter", "")},
 
             {"Global Attribute": "DOMS_time_to_complete", "Value": details["timeToComplete"]},
