@@ -5,7 +5,6 @@ California Institute of Technology.  All rights reserved
 
 import ConfigParser
 import logging
-import string
 import uuid
 from datetime import datetime
 
@@ -13,6 +12,7 @@ import pkg_resources
 from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
 from cassandra.query import BatchStatement
+from pytz import UTC
 
 
 class AbstractResultsContainer:
@@ -43,9 +43,6 @@ class AbstractResultsContainer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._cluster.shutdown()
 
-    def generateExecutionId(self):
-        return str(uuid.uuid4())
-
     def _parseDatetime(self, dtString):
         dt = datetime.strptime(dtString, "%Y-%m-%dT%H:%M:%SZ")
         epoch = datetime.utcfromtimestamp(0)
@@ -58,6 +55,8 @@ class ResultsStorage(AbstractResultsContainer):
         AbstractResultsContainer.__init__(self)
 
     def insertResults(self, results, params, stats, startTime, completeTime, userEmail, execution_id=None):
+        if type(execution_id) is str:
+            execution_id = uuid.UUID(execution_id)
 
         execution_id = self.insertExecution(execution_id, startTime, completeTime, userEmail)
         self.__insertParams(execution_id, params)
@@ -66,18 +65,20 @@ class ResultsStorage(AbstractResultsContainer):
         return execution_id
 
     def insertExecution(self, execution_id, startTime, completeTime, userEmail):
-        execution_id = self.generateExecutionId() if execution_id is None else execution_id
+        if execution_id is None:
+            execution_id = uuid.uuid4()
+
         cql = "INSERT INTO doms_executions (id, time_started, time_completed, user_email) VALUES (%s, %s, %s, %s)"
         self._session.execute(cql, (execution_id, startTime, completeTime, userEmail))
         return execution_id
 
-    def __insertParams(self, id, params):
+    def __insertParams(self, execution_id, params):
         cql = """INSERT INTO doms_params
-                    (execution_id, primary_dataset, matchup_datasets, depth_min, depth_max, time_tolerance, radius_tolerance, start_time, end_time, platforms, bounding_box)
+                    (execution_id, primary_dataset, matchup_datasets, depth_min, depth_max, time_tolerance, radius_tolerance, start_time, end_time, platforms, bounding_box, parameter)
                  VALUES
-                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
-        self._session.execute(cql, (id,
+        self._session.execute(cql, (execution_id,
                                     params["primary"],
                                     ",".join(params["matchup"]) if type(params["matchup"]) == list else params[
                                         "matchup"],
@@ -85,13 +86,14 @@ class ResultsStorage(AbstractResultsContainer):
                                     params["depthMax"] if "depthMax" in params.keys() else None,
                                     int(params["timeTolerance"]),
                                     params["radiusTolerance"],
-                                    self._parseDatetime(params["startTime"]),
-                                    self._parseDatetime(params["endTime"]),
+                                    params["startTime"],
+                                    params["endTime"],
                                     params["platforms"],
-                                    params["bbox"]
+                                    params["bbox"],
+                                    params["parameter"]
                                     ))
 
-    def __insertStats(self, id, stats):
+    def __insertStats(self, execution_id, stats):
         cql = """
            INSERT INTO doms_execution_stats
                 (execution_id, num_gridded_matched, num_gridded_checked, num_insitu_matched, num_insitu_checked, time_to_complete)
@@ -99,7 +101,7 @@ class ResultsStorage(AbstractResultsContainer):
                 (%s, %s, %s, %s, %s, %s)
         """
         self._session.execute(cql, (
-            id,
+            execution_id,
             stats["numGriddedMatched"],
             stats["numGriddedChecked"],
             stats["numInSituMatched"],
@@ -107,7 +109,7 @@ class ResultsStorage(AbstractResultsContainer):
             stats["timeToComplete"]
         ))
 
-    def __insertResults(self, id, results):
+    def __insertResults(self, execution_id, results):
 
         cql = """
            INSERT INTO doms_data
@@ -119,22 +121,23 @@ class ResultsStorage(AbstractResultsContainer):
         batch = BatchStatement()
 
         for result in results:
-            self.__insertResult(id, None, result, batch, insertStatement)
+            self.__insertResult(execution_id, None, result, batch, insertStatement)
 
         self._session.execute(batch)
 
-    def __insertResult(self, id, primaryId, result, batch, insertStatement):
+    def __insertResult(self, execution_id, primaryId, result, batch, insertStatement):
 
         dataMap = self.__buildDataMap(result)
+        result_id = uuid.uuid4()
         batch.add(insertStatement, (
-            self.generateExecutionId(),
-            id,
+            result_id,
+            execution_id,
             result["id"],
             primaryId,
             result["x"],
             result["y"],
             result["source"],
-            int(result["time"]),
+            result["time"],
             result["platform"] if "platform" in result else None,
             result["device"] if "device" in result else None,
             dataMap,
@@ -145,7 +148,7 @@ class ResultsStorage(AbstractResultsContainer):
         n = 0
         if "matches" in result:
             for match in result["matches"]:
-                self.__insertResult(id, result["id"], match, batch, insertStatement)
+                self.__insertResult(execution_id, result["id"], match, batch, insertStatement)
                 n += 1
                 if n >= 20:
                     if primaryId is None:
@@ -186,7 +189,7 @@ class ResultsRetrieval(AbstractResultsContainer):
         return data
 
     def __enrichPrimaryDataWithMatches(self, id, dataMap, trim_data=False):
-        cql = "SELECT * FROM doms_data where execution_id = %s and is_primary = 0 ALLOW FILTERING"
+        cql = "SELECT * FROM doms_data where execution_id = %s and is_primary = false"
         rows = self._session.execute(cql, (id,))
 
         for row in rows:
@@ -199,7 +202,7 @@ class ResultsRetrieval(AbstractResultsContainer):
                 print row
 
     def __retrievePrimaryData(self, id, trim_data=False):
-        cql = "SELECT * FROM doms_data where execution_id = %s and is_primary = 1 ALLOW FILTERING"
+        cql = "SELECT * FROM doms_data where execution_id = %s and is_primary = true"
         rows = self._session.execute(cql, (id,))
 
         dataMap = {}
@@ -211,23 +214,23 @@ class ResultsRetrieval(AbstractResultsContainer):
     def __rowToDataEntry(self, row, trim_data=False):
         if trim_data:
             entry = {
-                "x": row.x,
-                "y": row.y,
+                "x": str(float(row.x)),
+                "y": str(float(row.y)),
                 "source": row.source_dataset,
-                "time": row.measurement_time
+                "time": row.measurement_time.replace(tzinfo=UTC)
             }
         else:
             entry = {
                 "id": row.value_id,
-                "x": row.x,
-                "y": row.y,
+                "x": str(float(row.x)),
+                "y": str(float(row.y)),
                 "source": row.source_dataset,
                 "device": row.device,
                 "platform": row.platform,
-                "time": row.measurement_time
+                "time": row.measurement_time.replace(tzinfo=UTC)
             }
         for key in row.measurement_values:
-            value = row.measurement_values[key]
+            value = str(float(row.measurement_values[key]))
             entry[key] = value
         return entry
 
@@ -253,14 +256,15 @@ class ResultsRetrieval(AbstractResultsContainer):
             params = {
                 "primary": row.primary_dataset,
                 "matchup": row.matchup_datasets.split(","),
-                "depthMin": row.depth_min,
-                "depthMax": row.depth_max,
+                "depthMin": str(float(row.depth_min)),
+                "depthMax": str(float(row.depth_max)),
                 "timeTolerance": row.time_tolerance,
-                "radiusTolerance": row.radius_tolerance,
-                "startTime": row.start_time,
-                "endTime": row.end_time,
+                "radiusTolerance": str(float(row.radius_tolerance)),
+                "startTime": row.start_time.replace(tzinfo=UTC),
+                "endTime": row.end_time.replace(tzinfo=UTC),
                 "platforms": row.platforms,
-                "bbox": row.bounding_box
+                "bbox": row.bounding_box,
+                "parameter": row.parameter
             }
             return params
 

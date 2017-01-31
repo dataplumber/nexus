@@ -117,21 +117,21 @@ class DataInBoundsSearchHandlerImpl(NexusHandler):
                 point['id'] = tile.tile_id
 
                 if parameter == 'sst':
-                    point['sst'] = nexus_point.data_val.item()
+                    point['sst'] = nexus_point.data_val
                 elif parameter == 'sss':
-                    point['sss'] = nexus_point.data_val.item()
+                    point['sss'] = nexus_point.data_val
                 elif parameter == 'wind':
-                    point['wind_u'] = nexus_point.data_val.item()
+                    point['wind_u'] = nexus_point.data_val
                     try:
-                        point['wind_v'] = tile.meta_data['wind_v'][tuple(nexus_point.index)].item()
+                        point['wind_v'] = tile.meta_data['wind_v'][tuple(nexus_point.index)]
                     except (KeyError, IndexError):
                         pass
                     try:
-                        point['wind_direction'] = tile.meta_data['wind_dir'][tuple(nexus_point.index)].item()
+                        point['wind_direction'] = tile.meta_data['wind_dir'][tuple(nexus_point.index)]
                     except (KeyError, IndexError):
                         pass
                     try:
-                        point['wind_speed'] = tile.meta_data['wind_speed'][tuple(nexus_point.index)].item()
+                        point['wind_speed'] = tile.meta_data['wind_speed'][tuple(nexus_point.index)]
                     except (KeyError, IndexError):
                         pass
                 else:

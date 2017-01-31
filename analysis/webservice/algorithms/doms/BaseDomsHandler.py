@@ -1,8 +1,10 @@
+import StringIO
+import csv
 import json
 from datetime import datetime
 
 import numpy as np
-from pytz import timezone
+from pytz import timezone, UTC
 
 import config
 import geo
@@ -10,6 +12,7 @@ from webservice.NexusHandler import NexusHandler as BaseHandler
 from webservice.webmodel import NexusResults
 
 EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
+ISO_8601 = '%Y-%m-%dT%H:%M:%S%z'
 
 try:
     from osgeo import gdal
@@ -63,7 +66,7 @@ class DomsQueryResults(NexusResults):
         self.__bounds = bounds
         self.__count = count
         self.__details = details
-        self.__executionId = executionId
+        self.__executionId = str(executionId)
 
     def toJson(self):
         bounds = self.__bounds.toMap() if self.__bounds is not None else {}
@@ -82,169 +85,156 @@ class DomsCSVFormatter:
     @staticmethod
     def create(executionId, results, params, details):
 
-        rows = []
-        DomsCSVFormatter.__addConstants(rows)
+        csv_mem_file = StringIO.StringIO()
+        try:
+            DomsCSVFormatter.__addConstants(csv_mem_file)
+            DomsCSVFormatter.__addDynamicAttrs(csv_mem_file, executionId, results, params, details)
+            csv.writer(csv_mem_file).writerow([])
 
-        rows.append("%s = \"%s\"" % ("matchID", executionId))
-        rows.append("%s = \"%s\"" % ("Matchup_TimeWindow", params["timeTolerance"]))
-        rows.append("%s = \"%s\"" % ("Matchup_TimeWindow_Units", "hours"))
+            DomsCSVFormatter.__packValues(csv_mem_file, results)
 
-        rows.append("%s = \"%s\"" % (
-        "time_coverage_start", datetime.fromtimestamp(params["startTime"] / 1000).strftime('%Y%m%d %H:%M:%S')))
-        rows.append("%s = \"%s\"" % (
-        "time_coverage_end", datetime.fromtimestamp(params["endTime"] / 1000).strftime('%Y%m%d %H:%M:%S')))
-        rows.append("%s = \"%s\"" % ("depth_min", params["depthMin"]))
-        rows.append("%s = \"%s\"" % ("depth_max", params["depthMax"]))
-        rows.append("%s = \"%s\"" % ("platforms", params["platforms"]))
+            csv_out = csv_mem_file.getvalue()
+        finally:
+            csv_mem_file.close()
 
-        rows.append("%s = \"%s\"" % ("Matchup_SearchRadius", params["radiusTolerance"]))
-        rows.append("%s = \"%s\"" % ("Matchup_SearchRadius_Units", "m"))
+        return csv_out
 
-        rows.append("%s = \"%s\"" % ("bounding_box", params["bbox"]))
-        rows.append("%s = \"%s\"" % ("primary", params["primary"]))
-        rows.append("%s = \"%s\"" % ("secondary", ",".join(params["matchup"])))
+    @staticmethod
+    def __packValues(csv_mem_file, results):
 
-        rows.append("%s = \"%s\"" % ("Matchup_ParameterPrimary", params["parameter"] if "parameter" in params else ""))
-
-        rows.append("%s = \"%s\"" % ("time_coverage_resolution", "point"))
-
-        bbox = geo.BoundingBox(asString=params["bbox"])
-        rows.append("%s = \"%s\"" % ("geospatial_lat_max", bbox.north))
-        rows.append("%s = \"%s\"" % ("geospatial_lat_min", bbox.south))
-        rows.append("%s = \"%s\"" % ("geospatial_lon_max", bbox.east))
-        rows.append("%s = \"%s\"" % ("geospatial_lon_min", bbox.west))
-        rows.append("%s = \"%s\"" % ("geospatial_lat_resolution", "point"))
-        rows.append("%s = \"%s\"" % ("geospatial_lon_resolution", "point"))
-        rows.append("%s = \"%s\"" % ("geospatial_lat_units", "degrees_north"))
-        rows.append("%s = \"%s\"" % ("geospatial_lon_units", "degrees_east"))
-        rows.append("%s = \"%s\"" % ("geospatial_vertical_min", 0.0))
-        rows.append("%s = \"%s\"" % ("geospatial_vertical_max", params["radiusTolerance"]))
-        rows.append("%s = \"%s\"" % ("geospatial_vertical_units", "m"))
-        rows.append("%s = \"%s\"" % ("geospatial_vertical_resolution", "point"))
-        rows.append("%s = \"%s\"" % ("geospatial_vertical_positive", "down"))
-
-        rows.append("%s = \"%s\"" % ("time_to_complete", details["timeToComplete"]))
-        rows.append("%s = \"%s\"" % ("num_insitu_matched", details["numInSituMatched"]))
-        rows.append("%s = \"%s\"" % ("num_gridded_checked", details["numGriddedChecked"]))
-        rows.append("%s = \"%s\"" % ("num_gridded_matched", details["numGriddedMatched"]))
-        rows.append("%s = \"%s\"" % ("num_insitu_checked", details["numInSituChecked"]))
-
-        rows.append("%s = \"%s\"" % ("date_modified", datetime.now().strftime('%Y%m%d %H:%M:%S')))
-        rows.append("%s = \"%s\"" % ("date_created", datetime.now().strftime('%Y%m%d %H:%M:%S')))
+        writer = csv.writer(csv_mem_file)
 
         headers = [
-            "id",
-            "source",
-            "lon",
-            "lat",
-            "time",
-            "platform",
-            "depth",
-            "sea_water_salinity",
-            "sea_water_temperature",
-            "wind_speed",
-            "wind_direction",
-            "wind_u",
-            "wind_v",
-            "id",
-            "source",
-            "lon",
-            "lat",
-            "time",
-            "platform",
-            "depth",
-            "sea_water_salinity",
-            "sea_water_temperature",
-            "wind_speed",
-            "wind_direction",
-            "wind_u",
-            "wind_v"
+            # Primary
+            "id", "source", "lon", "lat", "time", "platform", "sea_water_salinity_depth", "sea_water_salinity",
+            "sea_water_temperature_depth", "sea_water_temperature", "wind_speed", "wind_direction", "wind_u", "wind_v",
+            # Match
+            "id", "source", "lon", "lat", "time", "platform", "sea_water_salinity_depth", "sea_water_salinity",
+            "sea_water_temperature_depth", "sea_water_temperature", "wind_speed", "wind_direction", "wind_u", "wind_v"
         ]
-        rows.append(",".join(headers))
 
-        for value in results:
-            DomsCSVFormatter.__packValues(value, rows)
+        writer.writerow(headers)
 
-        return "\r\n".join(rows)
+        for primaryValue in results:
+            for matchup in primaryValue["matches"]:
+                row = [
+                    # Primary
+                    primaryValue["id"], primaryValue["source"], str(primaryValue["x"]), str(primaryValue["y"]),
+                    primaryValue["time"].strftime(ISO_8601), primaryValue["platform"],
+                    primaryValue.get("sea_water_salinity_depth", ""), primaryValue.get("sea_water_salinity", ""),
+                    primaryValue.get("sea_water_temperature_depth", ""), primaryValue.get("sea_water_temperature", ""),
+                    primaryValue.get("wind_speed", ""), primaryValue.get("wind_direction", ""),
+                    primaryValue.get("wind_u", ""), primaryValue.get("wind_v", ""),
 
-    @staticmethod
-    def __pickOne(a, b):
-        v = b if a is None else a
-        return v if v is not None else ""
+                    # Matchup
+                    matchup["id"], matchup["source"], matchup["x"], matchup["y"],
+                    matchup["time"].strftime(ISO_8601), matchup["platform"],
+                    matchup.get("sea_water_salinity_depth", ""), matchup.get("sea_water_salinity", ""),
+                    matchup.get("sea_water_temperature_depth", ""), matchup.get("sea_water_temperature", ""),
+                    matchup.get("wind_speed", ""), matchup.get("wind_direction", ""),
+                    matchup.get("wind_u", ""), matchup.get("wind_v", ""),
+                ]
 
-    @staticmethod
-    def __packValues(primaryValue, rows):
-
-        for value in primaryValue["matches"]:
-            cols = []
-
-            cols.append("\"%s\"" % primaryValue["id"])
-            cols.append("\"%s\"" % primaryValue["source"])
-            cols.append(str(primaryValue["x"]))
-            cols.append(str(primaryValue["y"]))
-            cols.append("\"%s\"" % datetime.fromtimestamp(primaryValue["time"] / 1000).strftime(
-                '%Y%m%d %H:%M:%S') if "time" in primaryValue else "")
-            cols.append("\"%s\"" % primaryValue["platform"])
-            cols.append(str(DomsCSVFormatter.__pickOne(
-                primaryValue["sea_water_salinity_depth"] if "sea_water_salinity_depth" in primaryValue else None,
-                primaryValue[
-                    "sea_water_temperature_depth"] if "sea_water_temperature_depth" in primaryValue else None)))
-
-            cols.append(str(primaryValue["sea_water_salinity"] if "sea_water_salinity" in primaryValue else ""))
-            cols.append(str(primaryValue["sea_water_temperature"] if "sea_water_temperature" in primaryValue else ""))
-            cols.append(str(primaryValue["wind_speed"] if "wind_speed" in primaryValue else ""))
-            cols.append(str(primaryValue["wind_direction"] if "wind_direction" in primaryValue else ""))
-            cols.append(str(primaryValue["wind_u"] if "wind_u" in primaryValue else ""))
-            cols.append(str(primaryValue["wind_v"] if "wind_v" in primaryValue else ""))
-
-            cols.append("\"%s\"" % value["id"])
-            cols.append("\"%s\"" % value["source"])
-            cols.append(str(value["x"]))
-            cols.append(str(value["y"]))
-            cols.append("\"%s\"" % datetime.fromtimestamp(value["time"] / 1000).strftime(
-                '%Y%m%d %H:%M:%S') if "time" in value else "")
-            cols.append("\"%s\"" % value["platform"])
-            cols.append(str(DomsCSVFormatter.__pickOne(
-                value["sea_water_salinity_depth"] if "sea_water_salinity_depth" in value else None,
-                value["sea_water_temperature_depth"] if "sea_water_temperature_depth" in value else None)))
-            cols.append(str(value["sea_water_salinity"] if "sea_water_salinity" in value else ""))
-            cols.append(str(value["sea_water_temperature"] if "sea_water_temperature" in value else ""))
-            cols.append(str(value["wind_speed"] if "wind_speed" in value else ""))
-            cols.append(str(value["wind_direction"] if "wind_direction" in value else ""))
-            cols.append(str(value["wind_u"] if "wind_u" in value else ""))
-            cols.append(str(value["wind_v"] if "wind_v" in value else ""))
-
-            cols = [v if v is not None else "" for v in cols]
-
-            rows.append(",".join(cols))
+                writer.writerow(row)
 
     @staticmethod
-    def __addConstants(rows):
+    def __addConstants(csvfile):
 
-        rows.append("%s = \"%s\"" % ("bnds", "2"))
-        rows.append("%s = \"%s\"" % ("Conventions", "CF-1.6, ACDD-1.3"))
-        rows.append("%s = \"%s\"" % ("title", "DOMS satellite-insitu machup output file"))
-        rows.append(
-            "%s = \"%s\"" % ("history", "Processing_Version = V1.0, Software_Name = DOMS, Software_Version = 1.03"))
-        rows.append("%s = \"%s\"" % ("institution", "JPL, FSU, NCAR"))
-        rows.append("%s = \"%s\"" % ("source", "doms.jpl.nasa.gov"))
-        rows.append(
-            "%s = \"%s\"" % ("standard_name_vocabulary", "CF Standard Name Table v27\", \"BODC controlled vocabulary"))
-        rows.append("%s = \"%s\"" % ("cdm_data_type", "Point/Profile, Swath/Grid"))
-        rows.append("%s = \"%s\"" % ("processing_level", "4"))
-        rows.append("%s = \"%s\"" % ("platform", "Endeavor"))
-        rows.append("%s = \"%s\"" % ("instrument", "Endeavor on-board sea-bird SBE 9/11 CTD"))
-        rows.append("%s = \"%s\"" % ("project", "Distributed Oceanographic Matchup System (DOMS)"))
-        rows.append(
-            "%s = \"%s\"" % ("keywords_vocabulary", "NASA Global Change Master Directory (GCMD) Science Keywords"))
-        rows.append("%s = \"%s\"" % ("keywords", "Salinity, Upper Ocean, SPURS, CTD, Endeavor, Atlantic Ocean"))
-        rows.append("%s = \"%s\"" % ("creator_name", "NASA PO.DAAC"))
-        rows.append("%s = \"%s\"" % ("creator_email", "podaac@podaac.jpl.nasa.gov"))
-        rows.append("%s = \"%s\"" % ("creator_url", "https://podaac.jpl.nasa.gov/"))
-        rows.append("%s = \"%s\"" % ("publisher_name", "NASA PO.DAAC"))
-        rows.append("%s = \"%s\"" % ("publisher_email", "podaac@podaac.jpl.nasa.gov"))
-        rows.append("%s = \"%s\"" % ("publisher_url", "https://podaac.jpl.nasa.gov"))
-        rows.append("%s = \"%s\"" % ("acknowledgment", "DOMS is a NASA/AIST-funded project.  Grant number ####."))
+        global_attrs = [
+            {"Global Attribute": "Conventions", "Value": "CF-1.6, ACDD-1.3"},
+            {"Global Attribute": "title", "Value": "DOMS satellite-insitu machup output file"},
+            {"Global Attribute": "history",
+             "Value": "Processing_Version = V1.0, Software_Name = DOMS, Software_Version = 1.03"},
+            {"Global Attribute": "institution", "Value": "JPL, FSU, NCAR"},
+            {"Global Attribute": "source", "Value": "doms.jpl.nasa.gov"},
+            {"Global Attribute": "standard_name_vocabulary",
+             "Value": "CF Standard Name Table v27, BODC controlled vocabulary"},
+            {"Global Attribute": "cdm_data_type", "Value": "Point/Profile, Swath/Grid"},
+            {"Global Attribute": "processing_level", "Value": "4"},
+            {"Global Attribute": "project", "Value": "Distributed Oceanographic Matchup System (DOMS)"},
+            {"Global Attribute": "keywords_vocabulary",
+             "Value": "NASA Global Change Master Directory (GCMD) Science Keywords"},
+            # TODO What should the keywords be?
+            {"Global Attribute": "keywords", "Value": ""},
+            {"Global Attribute": "creator_name", "Value": "NASA PO.DAAC"},
+            {"Global Attribute": "creator_email", "Value": "podaac@podaac.jpl.nasa.gov"},
+            {"Global Attribute": "creator_url", "Value": "https://podaac.jpl.nasa.gov/"},
+            {"Global Attribute": "publisher_name", "Value": "NASA PO.DAAC"},
+            {"Global Attribute": "publisher_email", "Value": "podaac@podaac.jpl.nasa.gov"},
+            {"Global Attribute": "publisher_url", "Value": "https://podaac.jpl.nasa.gov"},
+            {"Global Attribute": "acknowledgment", "Value": "DOMS is a NASA/AIST-funded project. NRA NNH14ZDA001N."},
+        ]
+
+        writer = csv.DictWriter(csvfile, sorted(next(iter(global_attrs)).keys()))
+
+        writer.writerows(global_attrs)
+
+    @staticmethod
+    def __addDynamicAttrs(csvfile, executionId, results, params, details):
+
+        platforms = set()
+        for primaryValue in results:
+            platforms.add(primaryValue['platform'])
+            for match in primaryValue['matches']:
+                platforms.add(match['platform'])
+
+        global_attrs = [
+            {"Global Attribute": "Platform", "Value": ', '.join(platforms)},
+            {"Global Attribute": "time_coverage_start",
+             "Value": params["startTime"].strftime(ISO_8601)},
+            {"Global Attribute": "time_coverage_end",
+             "Value": params["endTime"].strftime(ISO_8601)},
+            # TODO I don't think this applies
+            # {"Global Attribute": "time_coverage_resolution", "Value": "point"},
+
+            {"Global Attribute": "geospatial_lon_min", "Value": params["bbox"].split(',')[0]},
+            {"Global Attribute": "geospatial_lat_min", "Value": params["bbox"].split(',')[1]},
+            {"Global Attribute": "geospatial_lon_max", "Value": params["bbox"].split(',')[2]},
+            {"Global Attribute": "geospatial_lat_max", "Value": params["bbox"].split(',')[3]},
+            {"Global Attribute": "geospatial_lat_resolution", "Value": "point"},
+            {"Global Attribute": "geospatial_lon_resolution", "Value": "point"},
+            {"Global Attribute": "geospatial_lat_units", "Value": "degrees_north"},
+            {"Global Attribute": "geospatial_lon_units", "Value": "degrees_east"},
+
+            {"Global Attribute": "geospatial_vertical_min", "Value": params["depthMin"]},
+            {"Global Attribute": "geospatial_vertical_max", "Value": params["depthMax"]},
+            {"Global Attribute": "geospatial_vertical_units", "Value": "m"},
+            {"Global Attribute": "geospatial_vertical_resolution", "Value": "point"},
+            {"Global Attribute": "geospatial_vertical_positive", "Value": "down"},
+
+            {"Global Attribute": "DOMS_matchID", "Value": executionId},
+            {"Global Attribute": "DOMS_TimeWindow", "Value": params["timeTolerance"] / 60 / 60},
+            {"Global Attribute": "DOMS_TimeWindow_Units", "Value": "hours"},
+            {"Global Attribute": "DOMS_depth_min", "Value": params["depthMin"]},
+            {"Global Attribute": "DOMS_depth_min_units", "Value": "m"},
+            {"Global Attribute": "DOMS_depth_max", "Value": params["depthMax"]},
+            {"Global Attribute": "DOMS_depth_max_units", "Value": "m"},
+
+            {"Global Attribute": "DOMS_platforms", "Value": params["platforms"]},
+            {"Global Attribute": "DOMS_SearchRadius", "Value": params["radiusTolerance"]},
+            {"Global Attribute": "DOMS_SearchRadius_Units", "Value": "m"},
+            {"Global Attribute": "DOMS_bounding_box", "Value": params["bbox"]},
+
+            {"Global Attribute": "DOMS_primary", "Value": params["primary"]},
+            {"Global Attribute": "DOMS_match-up", "Value": ",".join(params["matchup"])},
+            {"Global Attribute": "DOMS_ParameterPrimary", "Value": params.get("parameter", "")},
+
+            {"Global Attribute": "DOMS_time_to_complete", "Value": details["timeToComplete"]},
+            {"Global Attribute": "DOMS_time_to_complete_units", "Value": "seconds"},
+            {"Global Attribute": "DOMS_num_matchup_matched", "Value": details["numInSituMatched"]},
+            {"Global Attribute": "DOMS_num_primary_matched", "Value": details["numGriddedMatched"]},
+            {"Global Attribute": "DOMS_num_matchup_checked",
+             "Value": details["numInSituChecked"] if details["numInSituChecked"] != 0 else "N/A"},
+            {"Global Attribute": "DOMS_num_primary_checked",
+             "Value": details["numGriddedChecked"] if details["numGriddedChecked"] != 0 else "N/A"},
+
+            {"Global Attribute": "date_modified", "Value": datetime.utcnow().replace(tzinfo=UTC).strftime(ISO_8601)},
+            {"Global Attribute": "date_created", "Value": datetime.utcnow().replace(tzinfo=UTC).strftime(ISO_8601)},
+        ]
+
+        writer = csv.DictWriter(csvfile, sorted(next(iter(global_attrs)).keys()))
+
+        writer.writerows(global_attrs)
 
 
 class DomsNetCDFFormatter:
