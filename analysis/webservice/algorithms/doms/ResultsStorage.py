@@ -176,10 +176,13 @@ class ResultsRetrieval(AbstractResultsContainer):
     def __init__(self):
         AbstractResultsContainer.__init__(self)
 
-    def retrieveResults(self, id, trim_data=False):
-        params = self.__retrieveParams(id)
-        stats = self.__retrieveStats(id)
-        data = self.__retrieveData(id, trim_data=trim_data)
+    def retrieveResults(self, execution_id, trim_data=False):
+        if type(execution_id) is str:
+            execution_id = uuid.UUID(execution_id)
+
+        params = self.__retrieveParams(execution_id)
+        stats = self.__retrieveStats(execution_id)
+        data = self.__retrieveData(execution_id, trim_data=trim_data)
         return params, stats, data
 
     def __retrieveData(self, id, trim_data=False):
