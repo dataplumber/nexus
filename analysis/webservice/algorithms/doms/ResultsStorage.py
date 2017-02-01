@@ -8,6 +8,7 @@ import logging
 import uuid
 from datetime import datetime
 
+import numpy as np
 import pkg_resources
 from cassandra.cluster import Cluster
 from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
@@ -55,7 +56,7 @@ class ResultsStorage(AbstractResultsContainer):
         AbstractResultsContainer.__init__(self)
 
     def insertResults(self, results, params, stats, startTime, completeTime, userEmail, execution_id=None):
-        if type(execution_id) is str:
+        if isinstance(execution_id, basestring):
             execution_id = uuid.UUID(execution_id)
 
         execution_id = self.insertExecution(execution_id, startTime, completeTime, userEmail)
@@ -177,7 +178,7 @@ class ResultsRetrieval(AbstractResultsContainer):
         AbstractResultsContainer.__init__(self)
 
     def retrieveResults(self, execution_id, trim_data=False):
-        if type(execution_id) is str:
+        if isinstance(execution_id, basestring):
             execution_id = uuid.UUID(execution_id)
 
         params = self.__retrieveParams(execution_id)
@@ -217,23 +218,23 @@ class ResultsRetrieval(AbstractResultsContainer):
     def __rowToDataEntry(self, row, trim_data=False):
         if trim_data:
             entry = {
-                "x": str(float(row.x)),
-                "y": str(float(row.y)),
+                "x": float(row.x),
+                "y": float(row.y),
                 "source": row.source_dataset,
                 "time": row.measurement_time.replace(tzinfo=UTC)
             }
         else:
             entry = {
                 "id": row.value_id,
-                "x": str(float(row.x)),
-                "y": str(float(row.y)),
+                "x": float(row.x),
+                "y": float(row.y),
                 "source": row.source_dataset,
                 "device": row.device,
                 "platform": row.platform,
                 "time": row.measurement_time.replace(tzinfo=UTC)
             }
         for key in row.measurement_values:
-            value = str(float(row.measurement_values[key]))
+            value = float(row.measurement_values[key])
             entry[key] = value
         return entry
 
@@ -259,10 +260,10 @@ class ResultsRetrieval(AbstractResultsContainer):
             params = {
                 "primary": row.primary_dataset,
                 "matchup": row.matchup_datasets.split(","),
-                "depthMin": str(float(row.depth_min)),
-                "depthMax": str(float(row.depth_max)),
+                "depthMin": row.depth_min,
+                "depthMax": row.depth_max,
                 "timeTolerance": row.time_tolerance,
-                "radiusTolerance": str(float(row.radius_tolerance)),
+                "radiusTolerance": row.radius_tolerance,
                 "startTime": row.start_time.replace(tzinfo=UTC),
                 "endTime": row.end_time.replace(tzinfo=UTC),
                 "platforms": row.platforms,

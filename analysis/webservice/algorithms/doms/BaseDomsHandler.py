@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 
 import numpy as np
+from decimal import Decimal
 from pytz import timezone, UTC
 
 import config
@@ -53,6 +54,8 @@ class DomsEncoder(json.JSONEncoder):
             return None  # hard code string for now
         elif isinstance(obj, datetime):
             return long((obj - EPOCH).total_seconds())
+        elif isinstance(obj, Decimal):
+            return str(obj)
         else:
             return json.JSONEncoder.default(self, obj)
 
