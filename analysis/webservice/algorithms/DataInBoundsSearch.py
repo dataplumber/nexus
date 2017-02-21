@@ -176,8 +176,8 @@ class DataInBoundsResult(NexusResults):
             cols = []
 
             cols.append(str(result['data'][0]['id']))
-            cols.append(str(result['latitude']))
             cols.append(str(result['longitude']))
+            cols.append(str(result['latitude']))
             cols.append(datetime.utcfromtimestamp(result["time"]).strftime('%Y-%m-%dT%H:%M:%SZ'))
             if 'sst' in result['data'][0]:
                 cols.append(str(result['data'][0]['sst']))
