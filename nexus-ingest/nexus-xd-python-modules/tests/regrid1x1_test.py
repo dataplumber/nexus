@@ -27,7 +27,7 @@ class TestSSHData(unittest.TestCase):
         del environ['TIME']
 
     def test_ssh_grid(self):
-        environ['VARIABLE_VALID_RANGE'] = 'SLA:-100.0,100.0;SLA_ERR:-5000,5000'
+        environ['VARIABLE_VALID_RANGE'] = 'SLA:-100.0:100.0:SLA_ERR:-5000:5000'
         reload(self.module)
         test_file = '/Users/greguska/regrid/ssh_grids_v1609_1992100212.nc'  # path.join(path.dirname(__file__), 'dumped_nexustiles', 'ascatb_nonempty_nexustile.bin')
 

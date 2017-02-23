@@ -27,8 +27,9 @@ except KeyError:
 
 try:
     vvr = os.environ['VARIABLE_VALID_RANGE']
-    variable_valid_range = {varrange[0]: varrange[1].split(',') for varrange in
-                            [vr.split(':') for vr in vvr.split(';')]}
+    vvr_iter = iter(vvr.split(':'))
+    variable_valid_range = {varrange[0]: [varrange[1], varrange[2]] for varrange in
+                            zip(vvr_iter, vvr_iter, vvr_iter)}
 except KeyError:
     variable_valid_range = {}
 
