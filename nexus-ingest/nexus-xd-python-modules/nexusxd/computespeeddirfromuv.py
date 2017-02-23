@@ -18,8 +18,11 @@ except KeyError:
 
 
 def calculate_speed_direction(wind_u, wind_v):
-    speed = numpy.sqrt(numpy.add(numpy.multiply(wind_u, wind_u), numpy.multiply(wind_v, wind_v)))
-    direction = numpy.degrees(numpy.arctan2(-wind_u, -wind_v)) % 360
+    if wind_u is numpy.ma.masked or wind_v is numpy.ma.masked:
+        return numpy.ma.masked
+
+    speed = sqrt((wind_u * wind_u) + (wind_v * wind_v))
+    direction = degrees(atan2(-wind_u, -wind_v)) % 360
     return speed, direction
 
 
@@ -54,8 +57,20 @@ def transform(self, tile_data):
 
     assert wind_u.shape == wind_v.shape
 
-    # Do calculation
-    wind_speed_data, wind_dir_data = calculate_speed_direction(wind_u, wind_v)
+    wind_speed_data = numpy.ma.empty(wind_u.shape, dtype=float)
+    wind_dir_data = numpy.ma.empty(wind_u.shape, dtype=float)
+    wind_u_iter = numpy.nditer(wind_u, flags=['multi_index'])
+    while not wind_u_iter.finished:
+        u = wind_u_iter[0]
+        current_index = wind_u_iter.multi_index
+        v = wind_v[current_index]
+
+        # Calculate speed and direction values at the current index
+        wind_speed, wind_dir = calculate_speed_direction(u, v)
+        wind_speed_data[current_index] = wind_speed
+        wind_dir_data[current_index] = wind_dir
+
+        wind_u_iter.iternext()
 
     # Add wind_speed to meta data
     wind_speed_meta = the_tile_data.meta_data.add()

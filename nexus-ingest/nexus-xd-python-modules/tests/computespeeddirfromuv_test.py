@@ -13,8 +13,6 @@ from nexusproto.serialization import from_shaped_array
 
 class TestConversion(unittest.TestCase):
     def setUp(self):
-        environ['WIND_U'] = 'uwnd'
-        environ['WIND_V'] = 'vwnd'
         environ['INBOUND_PORT'] = '7890'
         environ['OUTBOUND_PORT'] = '7891'
 
@@ -22,8 +20,6 @@ class TestConversion(unittest.TestCase):
         reload(self.module)
 
     def tearDown(self):
-        del environ['WIND_U']
-        del environ['WIND_V']
         del environ['INBOUND_PORT']
         del environ['OUTBOUND_PORT']
 
