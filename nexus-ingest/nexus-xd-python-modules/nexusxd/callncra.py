@@ -9,11 +9,6 @@ import os
 from netCDF4 import Dataset, num2date
 from springxd.tcpstream import start_server, LengthHeaderTcpProcessor
 
-
-os.environ['OUTPUT_FILENAME'] = '1x1regrid-ssh_grids_v1609_%Y%m.nc'
-os.environ['TIME_VAR_NAME'] = 'Time'
-
-
 output_filename_pattern = os.environ['OUTPUT_FILENAME']
 time_var_name = os.environ['TIME_VAR_NAME']
 
@@ -21,7 +16,6 @@ try:
     glob_pattern = os.environ['FILEMATCH_PATTERN']
 except KeyError:
     glob_pattern = '*.nc'
-
 
 
 def get_datetime_from_dataset(dataset_path):
@@ -57,6 +51,4 @@ def start():
 
 
 if __name__ == "__main__":
-
-    list(call_ncra(None, '/Users/greguska/data/measures_alt/regrid/1x1regrid-ssh_grids_v1609_1992100212.nc'))
-    # start()
+    start()
