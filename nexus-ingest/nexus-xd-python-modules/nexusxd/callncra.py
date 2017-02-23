@@ -9,28 +9,42 @@ import os
 from netCDF4 import Dataset, num2date
 from springxd.tcpstream import start_server, LengthHeaderTcpProcessor
 
-output_filename = os.environ['OUTPUT_FILENAME']
-time_var_name = os.environ['TIME']
+
+os.environ['OUTPUT_FILENAME'] = '1x1regrid-ssh_grids_v1609_%Y%m.nc'
+os.environ['TIME_VAR_NAME'] = 'Time'
 
 
-def get_month_from_dataset(dataset_path):
+output_filename_pattern = os.environ['OUTPUT_FILENAME']
+time_var_name = os.environ['TIME_VAR_NAME']
+
+try:
+    glob_pattern = os.environ['FILEMATCH_PATTERN']
+except KeyError:
+    glob_pattern = '*.nc'
+
+
+
+def get_datetime_from_dataset(dataset_path):
     with Dataset(dataset_path) as dataset_in:
         time_units = getattr(dataset_in[time_var_name], 'units', None)
         calendar = getattr(dataset_in[time_var_name], 'calendar', 'standard')
-        month = num2date(dataset_in[time_var_name][:].item(), units=time_units, calendar=calendar).strftime('%m')
-    return month
+        thedatetime = num2date(dataset_in[time_var_name][:].item(), units=time_units, calendar=calendar)
+    return thedatetime
 
 
 def call_ncra(self, in_path):
-    output_path = os.path.join(os.path.dirname(in_path), output_filename)
-    target_month = get_month_from_dataset(in_path)
+    target_datetime = get_datetime_from_dataset(in_path)
+    target_yearmonth = target_datetime.strftime('%Y%m')
 
-    datasets = glob.glob(os.path.join(os.path.dirname(in_path), '*.nc'))
+    output_filename = target_datetime.strftime(output_filename_pattern)
+    output_path = os.path.join(os.path.dirname(in_path), output_filename)
+
+    datasets = glob.glob(os.path.join(os.path.dirname(in_path), glob_pattern))
 
     datasets_to_average = [dataset_path for dataset_path in datasets if
-                           get_month_from_dataset(dataset_path) == target_month]
+                           get_datetime_from_dataset(dataset_path).strftime('%Y%m') == target_yearmonth]
 
-    command = ['ncra']
+    command = ['ncra', '-O']
     command.extend(datasets_to_average)
     command.append(output_path)
     call(command)
@@ -43,4 +57,6 @@ def start():
 
 
 if __name__ == "__main__":
-    start()
+
+    list(call_ncra(None, '/Users/greguska/data/measures_alt/regrid/1x1regrid-ssh_grids_v1609_1992100212.nc'))
+    # start()
