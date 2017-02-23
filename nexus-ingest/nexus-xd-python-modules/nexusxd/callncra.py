@@ -10,7 +10,7 @@ from netCDF4 import Dataset, num2date
 from springxd.tcpstream import start_server, LengthHeaderTcpProcessor
 
 output_filename_pattern = os.environ['OUTPUT_FILENAME']
-time_var_name = os.environ['TIME_VAR_NAME']
+time_var_name = os.environ['TIME']
 
 try:
     glob_pattern = os.environ['FILEMATCH_PATTERN']
