@@ -19,11 +19,11 @@ sudo yum -y install git
 
 # Install and configure Anaconda
 echo "Downloading Anaconda"
-curl "http://repo.continuum.io/archive/Anaconda2-4.0.0-Linux-x86_64.sh" -s -O
+curl "https://repo.continuum.io/archive/Anaconda2-4.3.0-Linux-x86_64.sh" -s -O
 
-chmod +x Anaconda2-4.0.0-Linux-x86_64.sh
+chmod +x Anaconda2-4.3.0-Linux-x86_64.sh
 
-./Anaconda2-4.0.0-Linux-x86_64.sh -b -p /home/vagrant/anaconda2
+./Anaconda2-4.3.0-Linux-x86_64.sh -b -p /home/vagrant/anaconda2
 
 cat >> /home/vagrant/.bashrc << END
 # add for anaconda install
@@ -34,8 +34,8 @@ source /home/vagrant/.bashrc
 
 conda create -y --name nexus-xd-python-modules python
 source activate nexus-xd-python-modules
-conda install -y libnetcdf
-conda install -y netcdf4
+conda install -y -c conda-forge nco=4.6.4
+conda install -y libnetcdf netcdf4 scipy jpeg=8
 
 
 # Install Spring XD and launch it
