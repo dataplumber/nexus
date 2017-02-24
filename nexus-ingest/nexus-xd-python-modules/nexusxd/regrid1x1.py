@@ -3,6 +3,7 @@ Copyright (c) 2017 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 
+import os
 from datetime import datetime
 
 import numpy as np
@@ -10,7 +11,6 @@ from netCDF4 import Dataset
 from pytz import timezone
 from scipy import interpolate
 from springxd.tcpstream import start_server, LengthHeaderTcpProcessor
-import os
 
 UTC = timezone('UTC')
 ISO_8601 = '%Y-%m-%dT%H:%M:%S%z'
