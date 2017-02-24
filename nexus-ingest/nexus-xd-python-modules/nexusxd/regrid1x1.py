@@ -38,12 +38,12 @@ def regrid(self, in_filepath):
     in_path = os.path.join('/', *in_filepath.split(os.sep)[0:-1])
     out_filepath = os.path.join(in_path, filename_prefix + in_filepath.split(os.sep)[-1])
 
-    lon1deg = np.arange(0, 360, 1)
-    lat1deg = np.arange(-90, 90, 1)
-
     with Dataset(in_filepath) as inputds:
         in_lon = inputds[longitude_var_name]
         in_lat = inputds[latitude_var_name]
+
+        lon1deg = np.arange(np.floor(np.min(in_lon)), np.ceil(np.max(in_lon)), 1)
+        lat1deg = np.arange(np.floor(np.min(in_lat)), np.ceil(np.max(in_lat)), 1)
 
         with Dataset(out_filepath, mode='w') as outputds:
             outputds.createDimension(longitude_var_name, len(lon1deg))
@@ -74,8 +74,17 @@ def regrid(self, in_filepath):
                 np.ma.set_fill_value(in_data, float('NaN'))
                 in_data = in_data.T
 
-                interp_func = interpolate.interp2d(in_lon[:], in_lat[:], in_data[:], fill_value=float('NaN'))
-                out_data = interp_func(lon1deg, lat1deg).T
+                # Produces erroneous values on the edges of data
+                # interp_func = interpolate.interp2d(in_lon[:], in_lat[:], in_data[:], fill_value=float('NaN'))
+
+                x_mesh, y_mesh = np.meshgrid(in_lon[:], in_lat[:], copy=False)
+
+                # Does not work for large datasets (n > 5000)
+                # interp_func = interpolate.Rbf(x_mesh, y_mesh, in_data[:], function='linear', smooth=0)
+
+                x1_mesh, y1_mesh = np.meshgrid(lon1deg, lat1deg, copy=False)
+                out_data = interpolate.griddata(np.array([x_mesh.ravel(), y_mesh.ravel()]).T, in_data.ravel(),
+                                                (x1_mesh, y1_mesh), method='nearest').T
 
                 outputds.createVariable(variable_name, inputds[variable_name].dtype,
                                         dimensions=inputds[variable_name].dimensions)
