@@ -2,9 +2,9 @@ import StringIO
 import csv
 import json
 from datetime import datetime
-
+import colortables
 import numpy as np
-
+import math
 from webservice.NexusHandler import NexusHandler as BaseHandler
 from webservice.NexusHandler import nexus_handler
 from webservice.webmodel import NexusResults
@@ -25,6 +25,77 @@ class MapFetchHandler(BaseHandler):
     def __init__(self):
         BaseHandler.__init__(self)
 
+    def __tile_to_image(self, tile, min, max, table=colortables.grayscale):
+        width = len(tile.longitudes)
+        height = len(tile.latitudes)
+        img = Image.new("RGBA", (width, height), "white")
+        img_data = img.getdata()
+
+        for y in range(0, height):
+            for x in range(0, width):
+                value = tile.data[0][y][x]
+                if np.nan != value:
+                    value255 = int(round((value - min) / (max - min) * 255.0))
+                    rgba = self.__get_color(value255, table)
+                    img_data.putpixel((x, height - y - 1), (rgba[0], rgba[1], rgba[2], 255))
+                else:
+                    img_data.putpixel((x, height - y - 1), (0, 0, 0, 0))
+
+        return img
+
+
+
+    def __create_global(self, nexus_tiles, width=2048, height=1024, table=colortables.grayscale):
+        img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+
+        data_min = 100000
+        data_max = -1000000
+        for tile in nexus_tiles:
+            data_min = np.min((data_min, np.ma.min(tile.data)))
+            data_max = np.max((data_max, np.ma.max(tile.data)))
+
+        for tile in nexus_tiles:
+            tile_img = self.__tile_to_image(tile, data_min, data_max, table)
+
+            paste_y0 = int(round(((1.0 - (tile.bbox.max_lat + 90.0) / 180.0) * height)))
+            paste_x0 = int(round(((tile.bbox.min_lon + 180.0) / 360.0) * width))
+
+            x_res = (tile.bbox.max_lon - tile.bbox.min_lon) / len(tile.longitudes)
+            y_res = (tile.bbox.max_lat - tile.bbox.min_lat) / len(tile.latitudes)
+
+            paste_y1 = int(round(((1.0 - (tile.bbox.min_lat - y_res + 90.0) / 180.0) * height)))
+            paste_x1 = int(round(((tile.bbox.max_lon + x_res + 180.0) / 360.0) * width))
+
+            tile_img = tile_img.resize((paste_x1 - paste_x0, paste_y1 - paste_y0), Image.BICUBIC)
+            img.paste(tile_img, (paste_x0, paste_y0, paste_x1, paste_y1))
+
+        return img
+
+    def __get_color(self, value, table):
+        index = (float(value) / float(255)) * (len(table) - 1)
+        prev = int(math.floor(index))
+        next = int(math.ceil(index))
+
+        f = index - prev
+        prevColor = table[prev]
+        nextColor = table[next]
+
+        r = int(round(nextColor[0] * f + (prevColor[0] * (1.0 - f))))
+        g = int(round(nextColor[1] * f + (prevColor[1] * (1.0 - f))))
+        b = int(round(nextColor[2] * f + (prevColor[2] * (1.0 - f))))
+
+        return (r, g, b, 255)
+
+    def __colorize(self, img, table):
+        data = img.getdata()
+
+        for x in range(0, img.width):
+            for y in range(0, img.height):
+                if data[x + (y * img.width)][3] == 255:
+                    value = data[x + (y * img.width)][0]
+                    rgba = self.__get_color(value, table)
+                    data.putpixel((x, y), (rgba[0], rgba[1], rgba[2], 255))
+
     def calc(self, computeOptions, **args):
         ds = computeOptions.get_argument("ds", None)
         dataTimeStart = 1480492800.0 - 86400.0#computeOptions.get_datetime_arg("t", None)
@@ -36,22 +107,10 @@ class MapFetchHandler(BaseHandler):
                                                                                daysinrange[0])
 
         # Probably won't allow for user-specified dimensions. Probably.
-        width = 1024
-        height = 512
+        width = 4096
+        height = 2048
 
-        img = Image.new("RGB", (width, height), "white")
-        data = img.getdata()
-
-        data_min = 100000
-        data_max = -1000000
-        for tile in ds1_nexus_tiles:
-            data_min = np.min((data_min, np.ma.min(tile.data)))
-            data_max = np.max((data_max, np.ma.max(tile.data)))
-
-        """
-            TODO: Do useful map creation stuff here
-        """
-
+        img = self.__create_global(ds1_nexus_tiles, width, height, colortables.smap)
 
         imgByteArr = io.BytesIO()
         img.save(imgByteArr, format='PNG')
