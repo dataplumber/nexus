@@ -1,6 +1,7 @@
 
 import json
 from datetime import datetime
+import time
 import colortables
 import numpy as np
 import math
@@ -32,7 +33,7 @@ class MapFetchHandler(BaseHandler):
         for y in range(0, height):
             for x in range(0, width):
                 value = tile.data[0][y][x]
-                if np.nan != value:
+                if not np.isnan(value):
                     value = np.max((min, value))
                     value = np.min((max, value))
                     value255 = int(round((value - min) / (max - min) * 255.0))
@@ -102,8 +103,17 @@ class MapFetchHandler(BaseHandler):
 
     def calc(self, computeOptions, **args):
         ds = computeOptions.get_argument("ds", None)
-        dataTimeStart = 1480492800.0 - 86400.0#computeOptions.get_datetime_arg("t", None)
-        dataTimeEnd = 1480492800.0
+
+        dataTimeEnd = computeOptions.get_datetime_arg("t", None)
+        if dataTimeEnd is None:
+            raise Exception("Missing 't' option for time")
+
+        dataTimeEnd = time.mktime(dataTimeEnd.timetuple())
+        dataTimeStart = dataTimeEnd - 86400.0
+
+        color_table_name = computeOptions.get_argument("ct", "smap")
+        color_table = colortables.__dict__[color_table_name]
+
         daysinrange = self._tile_service.find_days_in_range_asc(-90.0, 90.0, -180.0, 180.0, ds, dataTimeStart, dataTimeEnd)
 
         ds1_nexus_tiles = self._tile_service.get_tiles_bounded_by_box_at_time(-90.0, 90.0, -180.0, 180.0,
@@ -117,7 +127,7 @@ class MapFetchHandler(BaseHandler):
         width = 4096
         height = 2048
 
-        img = self.__create_global(ds1_nexus_tiles, width, height, force_min, force_max, colortables.smap)
+        img = self.__create_global(ds1_nexus_tiles, width, height, force_min, force_max, color_table)
 
         imgByteArr = io.BytesIO()
         img.save(imgByteArr, format='PNG')

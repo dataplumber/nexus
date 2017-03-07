@@ -2,6 +2,7 @@ import StringIO
 import csv
 import json
 from datetime import datetime
+import time
 import colortables
 import numpy as np
 import math
@@ -26,9 +27,10 @@ class ColorBarHandler(BaseHandler):
         BaseHandler.__init__(self)
 
 
-    def __get_dataset_minmax(self, ds):
-        dataTimeStart = 1480492800.0 - 86400.0  # computeOptions.get_datetime_arg("t", None)
-        dataTimeEnd = 1480492800.0
+    def __get_dataset_minmax(self, ds, dataTime):
+        dataTimeStart = dataTime - 86400.0  # computeOptions.get_datetime_arg("t", None)
+        dataTimeEnd = dataTime
+
         daysinrange = self._tile_service.find_days_in_range_asc(-90.0, 90.0, -180.0, 180.0, ds, dataTimeStart,
                                                                 dataTimeEnd)
 
@@ -75,6 +77,15 @@ class ColorBarHandler(BaseHandler):
     def calc(self, computeOptions, **args):
         ds = computeOptions.get_argument("ds", None)
 
+        dataTime = computeOptions.get_datetime_arg("t", None)
+        if dataTime is None:
+            raise Exception("Missing 't' option for time")
+
+        dataTime = time.mktime(dataTime.timetuple())
+
+        color_table_name = computeOptions.get_argument("ct", "smap")
+        color_table = colortables.__dict__[color_table_name]
+
         min = computeOptions.get_float_arg("min", np.nan)
         max = computeOptions.get_float_arg("max", np.nan)
 
@@ -83,14 +94,14 @@ class ColorBarHandler(BaseHandler):
         units = computeOptions.get_argument("units", "")
 
         if np.isnan(min) or np.isnan(max):
-            data_min, data_max = self.__get_dataset_minmax(ds)
+            data_min, data_max = self.__get_dataset_minmax(ds, dataTime)
 
             if np.isnan(min):
                 min = data_min
             if np.isnan(max):
                 max = data_max
 
-        colors, labels, values = self.__produce_color_list(colortables.ghrsst, num_colors, min, max, units)
+        colors, labels, values = self.__produce_color_list(color_table, num_colors, min, max, units)
 
         obj = {
             "scale": {
