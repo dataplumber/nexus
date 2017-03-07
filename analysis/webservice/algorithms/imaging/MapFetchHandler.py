@@ -1,5 +1,4 @@
-import StringIO
-import csv
+
 import json
 from datetime import datetime
 import colortables
@@ -7,7 +6,6 @@ import numpy as np
 import math
 from webservice.NexusHandler import NexusHandler as BaseHandler
 from webservice.NexusHandler import nexus_handler
-from webservice.webmodel import NexusResults
 
 from nexustiles.model.nexusmodel import get_approximate_value_for_lat_lon
 
@@ -35,6 +33,8 @@ class MapFetchHandler(BaseHandler):
             for x in range(0, width):
                 value = tile.data[0][y][x]
                 if np.nan != value:
+                    value = np.max((min, value))
+                    value = np.min((max, value))
                     value255 = int(round((value - min) / (max - min) * 255.0))
                     rgba = self.__get_color(value255, table)
                     img_data.putpixel((x, height - y - 1), (rgba[0], rgba[1], rgba[2], 255))
@@ -45,14 +45,18 @@ class MapFetchHandler(BaseHandler):
 
 
 
-    def __create_global(self, nexus_tiles, width=2048, height=1024, table=colortables.grayscale):
+    def __create_global(self, nexus_tiles, width=2048, height=1024, force_min=np.nan, force_max=np.nan, table=colortables.grayscale):
         img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
 
-        data_min = 100000
-        data_max = -1000000
-        for tile in nexus_tiles:
-            data_min = np.min((data_min, np.ma.min(tile.data)))
-            data_max = np.max((data_max, np.ma.max(tile.data)))
+        data_min = 100000 if np.isnan(force_min) else force_min
+        data_max = -1000000 if np.isnan(force_max) else force_max
+
+        if np.isnan(force_min) or np.isnan(force_max):
+            for tile in nexus_tiles:
+                if np.isnan(force_min):
+                    data_min = np.min((data_min, np.ma.min(tile.data)))
+                if np.isnan(force_max):
+                    data_max = np.max((data_max, np.ma.max(tile.data)))
 
         for tile in nexus_tiles:
             tile_img = self.__tile_to_image(tile, data_min, data_max, table)
@@ -106,11 +110,14 @@ class MapFetchHandler(BaseHandler):
                                                                                ds,
                                                                                daysinrange[0])
 
+        force_min = computeOptions.get_float_arg("min", np.nan)
+        force_max = computeOptions.get_float_arg("max", np.nan)
+
         # Probably won't allow for user-specified dimensions. Probably.
         width = 4096
         height = 2048
 
-        img = self.__create_global(ds1_nexus_tiles, width, height, colortables.smap)
+        img = self.__create_global(ds1_nexus_tiles, width, height, force_min, force_max, colortables.smap)
 
         imgByteArr = io.BytesIO()
         img.save(imgByteArr, format='PNG')
