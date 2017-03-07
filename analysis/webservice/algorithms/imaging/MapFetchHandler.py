@@ -12,6 +12,8 @@ from nexustiles.model.nexusmodel import get_approximate_value_for_lat_lon
 
 import io
 from PIL import Image
+from PIL import ImageFont
+from PIL import ImageDraw
 
 @nexus_handler
 class MapFetchHandler(BaseHandler):
@@ -57,13 +59,15 @@ class MapFetchHandler(BaseHandler):
     }
     singleton = True
 
+    NO_DATA_IMAGE = None
+
     def __init__(self):
         BaseHandler.__init__(self)
 
     def __tile_to_image(self, tile, min, max, table=colortables.grayscale):
         width = len(tile.longitudes)
         height = len(tile.latitudes)
-        img = Image.new("RGBA", (width, height), "white")
+        img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         img_data = img.getdata()
 
         for y in range(0, height):
@@ -75,8 +79,6 @@ class MapFetchHandler(BaseHandler):
                     value255 = int(round((value - min) / (max - min) * 255.0))
                     rgba = self.__get_color(value255, table)
                     img_data.putpixel((x, height - y - 1), (rgba[0], rgba[1], rgba[2], 255))
-                else:
-                    img_data.putpixel((x, height - y - 1), (0, 0, 0, 0))
 
         return img
 
@@ -147,6 +149,21 @@ class MapFetchHandler(BaseHandler):
 
 
 
+    def __create_no_data(self, width, height):
+
+        if MapFetchHandler.NO_DATA_IMAGE is None:
+            img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+
+            fnt = ImageFont.truetype('webservice/algorithms/imaging/Roboto/Roboto-Bold.ttf', 40)
+
+            for x in range(0, width, 500):
+                for y in range(0, height, 500):
+                    draw.text((x, y), "NO DATA", (180, 180, 180), font=fnt)
+            MapFetchHandler.NO_DATA_IMAGE = img
+
+        return MapFetchHandler.NO_DATA_IMAGE
+
     def calc(self, computeOptions, **args):
         ds = computeOptions.get_argument("ds", None)
 
@@ -162,20 +179,23 @@ class MapFetchHandler(BaseHandler):
 
         interpolation = computeOptions.get_argument("interp", "nearest")
 
-        daysinrange = self._tile_service.find_days_in_range_asc(-90.0, 90.0, -180.0, 180.0, ds, dataTimeStart, dataTimeEnd)
-
-        ds1_nexus_tiles = self._tile_service.get_tiles_bounded_by_box_at_time(-90.0, 90.0, -180.0, 180.0,
-                                                                               ds,
-                                                                               daysinrange[0])
-
-        force_min = computeOptions.get_float_arg("min", np.nan)
-        force_max = computeOptions.get_float_arg("max", np.nan)
-
         # Probably won't allow for user-specified dimensions. Probably.
         width = 4096
         height = 2048
 
-        img = self.__create_global(ds1_nexus_tiles, width, height, force_min, force_max, color_table, interpolation)
+        daysinrange = self._tile_service.find_days_in_range_asc(-90.0, 90.0, -180.0, 180.0, ds, dataTimeStart, dataTimeEnd)
+
+        if len(daysinrange) > 0:
+            ds1_nexus_tiles = self._tile_service.get_tiles_bounded_by_box_at_time(-90.0, 90.0, -180.0, 180.0,
+                                                                                   ds,
+                                                                                   daysinrange[0])
+
+            force_min = computeOptions.get_float_arg("min", np.nan)
+            force_max = computeOptions.get_float_arg("max", np.nan)
+
+            img = self.__create_global(ds1_nexus_tiles, width, height, force_min, force_max, color_table, interpolation)
+        else:
+            img = self.__create_no_data(width, height)
 
         imgByteArr = io.BytesIO()
         img.save(imgByteArr, format='PNG')
