@@ -1,26 +1,43 @@
-import StringIO
-import csv
 import json
-from datetime import datetime
 import time
 import colortables
 import numpy as np
 import math
 from webservice.NexusHandler import NexusHandler as BaseHandler
 from webservice.NexusHandler import nexus_handler
-from webservice.webmodel import NexusResults
-
-from nexustiles.model.nexusmodel import get_approximate_value_for_lat_lon
-
-import io
-
 
 @nexus_handler
 class ColorBarHandler(BaseHandler):
     name = "ColorBarHandler"
     path = "/colorbar"
-    description = "Creates a colorbar spec for a dataset"
-    params = {}
+    description = "Creates a CMC colorbar spec for a dataset"
+    params = {
+        "ds": {
+            "name": "Dataset",
+            "type": "string",
+            "description": "A supported dataset shortname identifier"
+        },
+        "t": {
+            "name": "Time",
+            "type": "int",
+            "description": "Data observation date if not specifying a min/max"
+        },
+        "min": {
+            "name": "Minimum Value",
+            "type": "float",
+            "description": "Minimum value to use when computing color scales. Will be computed if not specified"
+        },
+        "max": {
+            "name": "Maximum Value",
+            "type": "float",
+            "description": "Maximum value to use when computing color scales. Will be computed if not specified"
+        },
+        "ct": {
+            "name": "Color Table",
+            "type": "string",
+            "description": "Identifier of a supported color table"
+        }
+    }
     singleton = True
 
     def __init__(self):

@@ -18,7 +18,43 @@ class MapFetchHandler(BaseHandler):
     name = "MapFetchHandler"
     path = "/map"
     description = "Creates a map image"
-    params = {}
+    params = {
+        "ds": {
+            "name": "Dataset",
+            "type": "string",
+            "description": "A supported dataset shortname identifier"
+        },
+        "t": {
+            "name": "Time",
+            "type": "int",
+            "description": "Data observation date"
+        },
+        "output": {
+            "name": "Output Format",
+            "type": "string",
+            "description": "Output format. Use 'PNG' for this endpoint"
+        },
+        "min": {
+            "name": "Minimum Value",
+            "type": "float",
+            "description": "Minimum value to use when computing color scales"
+        },
+        "max": {
+            "name": "Maximum Value",
+            "type": "float",
+            "description": "Maximum value to use when computing color scales"
+        },
+        "ct": {
+            "name": "Color Table",
+            "type": "string",
+            "description": "Identifier of a supported color table"
+        },
+        "interp": {
+            "name": "Interpolation filter",
+            "type": "string",
+            "description": "Interpolation filter to use when rescaling image data. Can be 'nearest', 'lanczos', 'bilinear', or 'bicubic'."
+        }
+    }
     singleton = True
 
     def __init__(self):
@@ -44,9 +80,17 @@ class MapFetchHandler(BaseHandler):
 
         return img
 
+    def __translate_interpolation(self, interp):
+        if interp.upper() == "LANCZOS":
+            return Image.LANCZOS
+        elif interp.upper() == "BILINEAR":
+            return Image.BILINEAR
+        elif interp.upper() == "BICUBIC":
+            return Image.BICUBIC
+        else:
+            return Image.NEAREST
 
-
-    def __create_global(self, nexus_tiles, width=2048, height=1024, force_min=np.nan, force_max=np.nan, table=colortables.grayscale):
+    def __create_global(self, nexus_tiles, width=2048, height=1024, force_min=np.nan, force_max=np.nan, table=colortables.grayscale, interpolation="nearest"):
         img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
 
         data_min = 100000 if np.isnan(force_min) else force_min
@@ -71,7 +115,7 @@ class MapFetchHandler(BaseHandler):
             paste_y1 = int(round(((1.0 - (tile.bbox.min_lat - y_res + 90.0) / 180.0) * height)))
             paste_x1 = int(round(((tile.bbox.max_lon + x_res + 180.0) / 360.0) * width))
 
-            tile_img = tile_img.resize((paste_x1 - paste_x0, paste_y1 - paste_y0), Image.BICUBIC)
+            tile_img = tile_img.resize((paste_x1 - paste_x0, paste_y1 - paste_y0), self.__translate_interpolation(interpolation))
             img.paste(tile_img, (paste_x0, paste_y0, paste_x1, paste_y1))
 
         return img
@@ -101,6 +145,8 @@ class MapFetchHandler(BaseHandler):
                     rgba = self.__get_color(value, table)
                     data.putpixel((x, y), (rgba[0], rgba[1], rgba[2], 255))
 
+
+
     def calc(self, computeOptions, **args):
         ds = computeOptions.get_argument("ds", None)
 
@@ -113,6 +159,8 @@ class MapFetchHandler(BaseHandler):
 
         color_table_name = computeOptions.get_argument("ct", "smap")
         color_table = colortables.__dict__[color_table_name]
+
+        interpolation = computeOptions.get_argument("interp", "nearest")
 
         daysinrange = self._tile_service.find_days_in_range_asc(-90.0, 90.0, -180.0, 180.0, ds, dataTimeStart, dataTimeEnd)
 
@@ -127,7 +175,7 @@ class MapFetchHandler(BaseHandler):
         width = 4096
         height = 2048
 
-        img = self.__create_global(ds1_nexus_tiles, width, height, force_min, force_max, color_table)
+        img = self.__create_global(ds1_nexus_tiles, width, height, force_min, force_max, color_table, interpolation)
 
         imgByteArr = io.BytesIO()
         img.save(imgByteArr, format='PNG')
