@@ -35,3 +35,26 @@ class TestSSHData(unittest.TestCase):
 
         self.assertEquals(1, len(results))
 
+class TestGRACEData(unittest.TestCase):
+    def setUp(self):
+        environ['REGRID_VARIABLES'] = 'lwe_thickness'
+        environ['LATITUDE'] = 'lat'
+        environ['LONGITUDE'] = 'lon'
+        environ['TIME'] = 'time'
+
+        self.module = importlib.import_module('nexusxd.regrid1x1')
+
+    def tearDown(self):
+        del environ['REGRID_VARIABLES']
+        del environ['LATITUDE']
+        del environ['LONGITUDE']
+        del environ['TIME']
+
+    def test_lwe_grid(self):
+        # environ['VARIABLE_VALID_RANGE'] = 'SLA:-100.0:100.0:SLA_ERR:-5000:5000'
+        # reload(self.module)
+        test_file = '/Users/greguska/regrid/GRCTellus.JPL.200204_201608.GLO.RL05M_1.MSCNv02CRIv02.nc'  # path.join(path.dirname(__file__), 'dumped_nexustiles', 'ascatb_nonempty_nexustile.bin')
+
+        results = list(self.module.regrid(None, test_file))
+
+        self.assertEquals(1, len(results))

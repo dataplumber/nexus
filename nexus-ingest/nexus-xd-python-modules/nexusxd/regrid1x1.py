@@ -41,9 +41,11 @@ def regrid(self, in_filepath):
     with Dataset(in_filepath) as inputds:
         in_lon = inputds[longitude_var_name]
         in_lat = inputds[latitude_var_name]
+        in_time = inputds[time_var_name]
 
         lon1deg = np.arange(np.floor(np.min(in_lon)), np.ceil(np.max(in_lon)), 1)
         lat1deg = np.arange(np.floor(np.min(in_lat)), np.ceil(np.max(in_lat)), 1)
+        out_time = np.array(in_time)
 
         with Dataset(out_filepath, mode='w') as outputds:
             outputds.createDimension(longitude_var_name, len(lon1deg))
@@ -51,40 +53,27 @@ def regrid(self, in_filepath):
             outputds[longitude_var_name][:] = lon1deg
             outputds[longitude_var_name].setncatts(
                 {attrname: inputds[longitude_var_name].getncattr(attrname) for attrname in
-                 inputds[longitude_var_name].ncattrs() if str(attrname) != 'bounds'})
+                 inputds[longitude_var_name].ncattrs() if str(attrname) not in ['bounds', 'valid_min', 'valid_max']})
 
             outputds.createDimension(latitude_var_name, len(lat1deg))
             outputds.createVariable(latitude_var_name, in_lat.dtype, dimensions=(latitude_var_name,))
             outputds[latitude_var_name][:] = lat1deg
             outputds[latitude_var_name].setncatts(
                 {attrname: inputds[latitude_var_name].getncattr(attrname) for attrname in
-                 inputds[latitude_var_name].ncattrs() if str(attrname) != 'bounds'})
+                 inputds[latitude_var_name].ncattrs() if str(attrname) not in ['bounds', 'valid_min', 'valid_max']})
 
             outputds.createDimension(time_var_name)
             outputds.createVariable(time_var_name, inputds[time_var_name].dtype, dimensions=(time_var_name,))
-            outputds[time_var_name][:] = inputds[time_var_name][:]
+            outputds[time_var_name][:] = out_time
             outputds[time_var_name].setncatts(
                 {attrname: inputds[time_var_name].getncattr(attrname) for attrname in inputds[time_var_name].ncattrs()
                  if
                  str(attrname) != 'bounds'})
 
             for variable_name in variables_to_regrid.split(','):
-                in_data = inputds[variable_name][:]
-                in_data = np.squeeze(in_data)
-                np.ma.set_fill_value(in_data, float('NaN'))
-                in_data = in_data.T
 
-                # Produces erroneous values on the edges of data
-                # interp_func = interpolate.interp2d(in_lon[:], in_lat[:], in_data[:], fill_value=float('NaN'))
-
-                x_mesh, y_mesh = np.meshgrid(in_lon[:], in_lat[:], copy=False)
-
-                # Does not work for large datasets (n > 5000)
-                # interp_func = interpolate.Rbf(x_mesh, y_mesh, in_data[:], function='linear', smooth=0)
-
-                x1_mesh, y1_mesh = np.meshgrid(lon1deg, lat1deg, copy=False)
-                out_data = interpolate.griddata(np.array([x_mesh.ravel(), y_mesh.ravel()]).T, in_data.ravel(),
-                                                (x1_mesh, y1_mesh), method='nearest').T
+                # If longitude is the first dimension, we need to transpose the dimensions
+                transpose_dimensions = inputds[variable_name].dimensions == (time_var_name, longitude_var_name, latitude_var_name)
 
                 outputds.createVariable(variable_name, inputds[variable_name].dtype,
                                         dimensions=inputds[variable_name].dimensions)
@@ -95,7 +84,28 @@ def regrid(self, in_filepath):
                     outputds[variable_name].valid_range = [
                         np.array([variable_valid_range[variable_name][0]], dtype=inputds[variable_name].dtype).item(),
                         np.array([variable_valid_range[variable_name][1]], dtype=inputds[variable_name].dtype).item()]
-                outputds[variable_name][:] = out_data[np.newaxis, :]
+
+                for ti in xrange(0, len(out_time)):
+                    in_data = inputds[variable_name][ti, :, :]
+                    if transpose_dimensions:
+                        in_data = in_data.T
+
+                    # Produces erroneous values on the edges of data
+                    # interp_func = interpolate.interp2d(in_lon[:], in_lat[:], in_data[:], fill_value=float('NaN'))
+
+                    x_mesh, y_mesh = np.meshgrid(in_lon[:], in_lat[:], copy=False)
+
+                    # Does not work for large datasets (n > 5000)
+                    # interp_func = interpolate.Rbf(x_mesh, y_mesh, in_data[:], function='linear', smooth=0)
+
+                    x1_mesh, y1_mesh = np.meshgrid(lon1deg, lat1deg, copy=False)
+                    out_data = interpolate.griddata(np.array([x_mesh.ravel(), y_mesh.ravel()]).T, in_data.ravel(),
+                                                    (x1_mesh, y1_mesh), method='nearest')
+
+                    if transpose_dimensions:
+                        out_data = out_data.T
+
+                    outputds[variable_name][ti, :] = out_data[np.newaxis, :]
 
             global_atts = {
                 'geospatial_lon_min': np.float(np.min(lon1deg)),
@@ -104,11 +114,11 @@ def regrid(self, in_filepath):
                 'geospatial_lat_max': np.float(np.max(lat1deg)),
                 'Conventions': 'CF-1.6',
                 'date_created': datetime.utcnow().replace(tzinfo=UTC).strftime(ISO_8601),
-                'title': getattr(inputds, 'title', None),
-                'time_coverage_start': getattr(inputds, 'time_coverage_start', None),
-                'time_coverage_end': getattr(inputds, 'time_coverage_end', None),
-                'Institution': getattr(inputds, 'Institution', None),
-                'summary': getattr(inputds, 'summary', None),
+                'title': getattr(inputds, 'title', ''),
+                'time_coverage_start': getattr(inputds, 'time_coverage_start', ''),
+                'time_coverage_end': getattr(inputds, 'time_coverage_end', ''),
+                'Institution': getattr(inputds, 'Institution', ''),
+                'summary': getattr(inputds, 'summary', ''),
             }
 
             outputds.setncatts(global_atts)
