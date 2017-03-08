@@ -75,6 +75,9 @@ class NexusTileService(object):
         return self._solr.find_days_in_range_asc(min_lat, max_lat, min_lon, max_lon, dataset, start_time, end_time,
                                                  **kwargs)
 
+    def get_dataset_overall_stats(self, ds):
+        return self._solr.get_data_series_stats(ds)
+
     @tile_data()
     def find_tile_by_polygon_and_most_recent_day_of_year(self, bounding_polygon, ds, day_of_year, **kwargs):
         """

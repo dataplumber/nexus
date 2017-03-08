@@ -1,14 +1,11 @@
 
 import json
-from datetime import datetime
 import time
 import colortables
 import numpy as np
 import math
 from webservice.NexusHandler import NexusHandler as BaseHandler
 from webservice.NexusHandler import nexus_handler
-
-from nexustiles.model.nexusmodel import get_approximate_value_for_lat_lon
 
 import io
 from PIL import Image
@@ -55,6 +52,16 @@ class MapFetchHandler(BaseHandler):
             "name": "Interpolation filter",
             "type": "string",
             "description": "Interpolation filter to use when rescaling image data. Can be 'nearest', 'lanczos', 'bilinear', or 'bicubic'."
+        },
+        "width": {
+            "name": "Width",
+            "type": "int",
+            "description": "Output image width (max: 8192)"
+        },
+        "height": {
+            "name": "Height",
+            "type": "int",
+            "description": "Output image height (max: 8192)"
         }
     }
     singleton = True
@@ -64,25 +71,32 @@ class MapFetchHandler(BaseHandler):
     def __init__(self):
         BaseHandler.__init__(self)
 
-    def __tile_to_image(self, tile, min, max, table=colortables.grayscale):
+    @staticmethod
+    def __tile_to_image(img_data, tile, min, max, table, x_res, y_res):
         width = len(tile.longitudes)
         height = len(tile.latitudes)
-        img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-        img_data = img.getdata()
+
+        d = np.ma.filled(tile.data[0], np.nan)
 
         for y in range(0, height):
             for x in range(0, width):
-                value = tile.data[0][y][x]
-                if not np.isnan(value):
+                value = d[y][x]
+                if not np.isnan(value) and value != -99999:
+
+                    lat = tile.latitudes[y]
+                    lon = tile.longitudes[x]
+
+                    pixel_y = int(math.floor(180.0 - ((lat + 90.0) * y_res)))
+                    pixel_x = int(math.floor((lon + 180.0) * x_res))
+
                     value = np.max((min, value))
                     value = np.min((max, value))
                     value255 = int(round((value - min) / (max - min) * 255.0))
-                    rgba = self.__get_color(value255, table)
-                    img_data.putpixel((x, height - y - 1), (rgba[0], rgba[1], rgba[2], 255))
+                    rgba = MapFetchHandler.__get_color(value255, table)
+                    img_data.putpixel((pixel_x, pixel_y), (rgba[0], rgba[1], rgba[2], 255))
 
-        return img
-
-    def __translate_interpolation(self, interp):
+    @staticmethod
+    def __translate_interpolation(interp):
         if interp.upper() == "LANCZOS":
             return Image.LANCZOS
         elif interp.upper() == "BILINEAR":
@@ -92,37 +106,41 @@ class MapFetchHandler(BaseHandler):
         else:
             return Image.NEAREST
 
-    def __create_global(self, nexus_tiles, width=2048, height=1024, force_min=np.nan, force_max=np.nan, table=colortables.grayscale, interpolation="nearest"):
+    @staticmethod
+    def __make_tile_img(tile):
+        width = len(tile.longitudes)
+        height = len(tile.latitudes)
         img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-
-        data_min = 100000 if np.isnan(force_min) else force_min
-        data_max = -1000000 if np.isnan(force_max) else force_max
-
-        if np.isnan(force_min) or np.isnan(force_max):
-            for tile in nexus_tiles:
-                if np.isnan(force_min):
-                    data_min = np.min((data_min, np.ma.min(tile.data)))
-                if np.isnan(force_max):
-                    data_max = np.max((data_max, np.ma.max(tile.data)))
-
-        for tile in nexus_tiles:
-            tile_img = self.__tile_to_image(tile, data_min, data_max, table)
-
-            paste_y0 = int(round(((1.0 - (tile.bbox.max_lat + 90.0) / 180.0) * height)))
-            paste_x0 = int(round(((tile.bbox.min_lon + 180.0) / 360.0) * width))
-
-            x_res = (tile.bbox.max_lon - tile.bbox.min_lon) / len(tile.longitudes)
-            y_res = (tile.bbox.max_lat - tile.bbox.min_lat) / len(tile.latitudes)
-
-            paste_y1 = int(round(((1.0 - (tile.bbox.min_lat - y_res + 90.0) / 180.0) * height)))
-            paste_x1 = int(round(((tile.bbox.max_lon + x_res + 180.0) / 360.0) * width))
-
-            tile_img = tile_img.resize((paste_x1 - paste_x0, paste_y1 - paste_y0), self.__translate_interpolation(interpolation))
-            img.paste(tile_img, (paste_x0, paste_y0, paste_x1, paste_y1))
-
         return img
 
-    def __get_color(self, value, table):
+    @staticmethod
+    def __get_xy_resolution(tile):
+        x_res = abs(tile.longitudes[0] - tile.longitudes[1])
+        y_res = abs(tile.latitudes[0] - tile.latitudes[1])
+        return x_res, y_res
+
+    @staticmethod
+    def __create_global(nexus_tiles, stats, width=2048, height=1024, force_min=np.nan, force_max=np.nan, table=colortables.grayscale, interpolation="nearest"):
+
+        data_min = stats["minValue"] if np.isnan(force_min) else force_min
+        data_max = stats["maxValue"] if np.isnan(force_max) else force_max
+
+        x_res, y_res = MapFetchHandler.__get_xy_resolution(nexus_tiles[0])
+
+        canvas_width = int(360.0 / x_res)
+        canvas_height = int(180.0 / y_res)
+        img = Image.new("RGBA", (canvas_width, canvas_height), (0, 0, 0, 0))
+        img_data = img.getdata()
+
+        for tile in nexus_tiles:
+            MapFetchHandler.__tile_to_image(img_data, tile, data_min, data_max, table, x_res, y_res)
+
+        final_image = img.resize((width, height), MapFetchHandler.__translate_interpolation(interpolation))
+
+        return final_image
+
+    @staticmethod
+    def __get_color(value, table):
         index = (float(value) / float(255)) * (len(table) - 1)
         prev = int(math.floor(index))
         next = int(math.ceil(index))
@@ -137,19 +155,19 @@ class MapFetchHandler(BaseHandler):
 
         return (r, g, b, 255)
 
-    def __colorize(self, img, table):
+    @staticmethod
+    def __colorize(img, table):
         data = img.getdata()
 
         for x in range(0, img.width):
             for y in range(0, img.height):
                 if data[x + (y * img.width)][3] == 255:
                     value = data[x + (y * img.width)][0]
-                    rgba = self.__get_color(value, table)
+                    rgba = MapFetchHandler.__get_color(value, table)
                     data.putpixel((x, y), (rgba[0], rgba[1], rgba[2], 255))
 
-
-
-    def __create_no_data(self, width, height):
+    @staticmethod
+    def __create_no_data(width, height):
 
         if MapFetchHandler.NO_DATA_IMAGE is None:
             img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
@@ -179,9 +197,13 @@ class MapFetchHandler(BaseHandler):
 
         interpolation = computeOptions.get_argument("interp", "nearest")
 
-        # Probably won't allow for user-specified dimensions. Probably.
-        width = 4096
-        height = 2048
+        force_min = computeOptions.get_float_arg("min", np.nan)
+        force_max = computeOptions.get_float_arg("max", np.nan)
+
+        width = np.min([8192, computeOptions.get_int_arg("width", 1024)])
+        height = np.min([8192, computeOptions.get_int_arg("height", 512)])
+
+        stats = self._tile_service.get_dataset_overall_stats(ds)
 
         daysinrange = self._tile_service.find_days_in_range_asc(-90.0, 90.0, -180.0, 180.0, ds, dataTimeStart, dataTimeEnd)
 
@@ -190,10 +212,7 @@ class MapFetchHandler(BaseHandler):
                                                                                    ds,
                                                                                    daysinrange[0])
 
-            force_min = computeOptions.get_float_arg("min", np.nan)
-            force_max = computeOptions.get_float_arg("max", np.nan)
-
-            img = self.__create_global(ds1_nexus_tiles, width, height, force_min, force_max, color_table, interpolation)
+            img = self.__create_global(ds1_nexus_tiles, stats, width, height, force_min, force_max, color_table, interpolation)
         else:
             img = self.__create_no_data(width, height)
 

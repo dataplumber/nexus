@@ -104,6 +104,39 @@ class SolrProxy(object):
 
         return results[0]['tile_max_time_dt']
 
+    def get_data_series_stats(self, ds):
+        search = "dataset_s:%s"%ds
+        params = {
+            "facet": "true",
+            "facet.field": ["dataset_s", "tile_max_time_dt"],
+            "facet.limit": "-1",
+            "facet.mincount": "1",
+            "facet.pivot": "{!stats=piv1}dataset_s",
+            "stats": "on",
+            "stats.field": ["{!tag=piv1 min=true max=true sum=false}tile_max_time_dt","{!tag=piv1 min=true max=false sum=false}tile_min_val_d","{!tag=piv1 min=false max=true sum=false}tile_max_val_d"]
+        }
+
+        response = self.do_query_raw(*(search, None, None, False, None), **params)
+
+        stats = {}
+
+        for g in response.facet_counts["facet_pivot"]["dataset_s"]:
+            if g["value"] == ds:
+                stats["start"] = time.mktime(g["stats"]["stats_fields"]["tile_max_time_dt"]["min"].timetuple()) * 1000
+                stats["end"] = time.mktime(g["stats"]["stats_fields"]["tile_max_time_dt"]["max"].timetuple()) * 1000
+                stats["minValue"] = g["stats"]["stats_fields"]["tile_min_val_d"]["min"]
+                stats["maxValue"] = g["stats"]["stats_fields"]["tile_max_val_d"]["max"]
+
+
+        stats["availableDates"] = []
+        for dt in response.facet_counts["facet_fields"]["tile_max_time_dt"]:
+            stats["availableDates"].append(time.mktime(datetime.strptime(dt, "%Y-%m-%dT%H:%M:%SZ").timetuple()) * 1000)
+
+        stats["availableDates"] = sorted(stats["availableDates"])
+
+        return stats
+
+
     def get_data_series_list(self):
         search = "*:*"
         params = {

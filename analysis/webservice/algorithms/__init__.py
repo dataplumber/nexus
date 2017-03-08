@@ -18,3 +18,4 @@ import TimeAvgMap
 import TimeSeries
 import TimeSeriesSolr
 import StandardDeviationSearch
+import DatasetDetails
