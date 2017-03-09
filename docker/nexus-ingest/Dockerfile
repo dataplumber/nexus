@@ -1,44 +1,33 @@
-FROM centos:7
-
-
-
-# To enable systemd. See https://github.com/docker-library/docs/tree/master/centos
-# ENV container docker
-# RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == \
-# systemd-tmpfiles-setup.service ] || rm -f $i; done); \
-# rm -f /lib/systemd/system/multi-user.target.wants/*;\
-# rm -f /etc/systemd/system/*.wants/*;\
-# rm -f /lib/systemd/system/local-fs.target.wants/*; \
-# rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
-# rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
-# rm -f /lib/systemd/system/basic.target.wants/*;\
-# rm -f /lib/systemd/system/anaconda.target.wants/*;
-# VOLUME [ "/sys/fs/cgroup" ]
+FROM nexusjpl/nexusbase
 
 WORKDIR /tmp
 
-RUN yum -y install wget git which
+RUN yum -y install unzip
 
-# Install Oracle JDK 1.8u121-b13
-RUN wget -q --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" "http://download.oracle.com/otn-pub/java/jdk/8u121-b13/e9e7ea248e2c4826b92b3f075a80e441/jdk-8u121-linux-x64.rpm"
-RUN yum -y install jdk-8u121-linux-x64.rpm
-ENV JAVA_HOME /usr/java/default
+# Create conda environment and install dependencies
+RUN conda create -y --name nexus-xd-python-modules python && \
+    source activate nexus-xd-python-modules && \
+    conda install -y scipy=0.18.1 && \
+    conda install -y -c conda-forge nco=4.6.4 netcdf4=1.2.7
+    
+# Install Spring XD
+WORKDIR /usr/local/spring-xd
+RUN wget -q "http://repo.spring.io/libs-release/org/springframework/xd/spring-xd/1.3.1.RELEASE/spring-xd-1.3.1.RELEASE-dist.zip" && \
+    unzip spring-xd-1.3.1.RELEASE-dist.zip && \
+    rm spring-xd-1.3.1.RELEASE-dist.zip && \
+    ln -s spring-xd-1.3.1.RELEASE current && \
+    mkdir current/xd/lib/none
+ENV PATH $PATH:/usr/local/spring-xd/current/xd/bin:/usr/local/spring-xd/current/shell/bin
+COPY xd-singlenode-logback.groovy /usr/local/spring-xd/current/xd/config/xd-singlenode-logback.groovy
+VOLUME ["/usr/local/spring-xd/current/xd/config"]
+EXPOSE 9393
 
 # ########################
-# # Apache Maven   #
+# # nexus-ingest code   #
 # ########################
-ENV M2_HOME /usr/local/apache-maven
-ENV M2 $M2_HOME/bin 
-ENV PATH $PATH:$M2
+WORKDIR /tmp
+COPY install-custom-software.sh /tmp/install-custom-software.sh
+RUN /bin/bash install-custom-software.sh
+VOLUME ["/usr/local/data/nexus"]
 
-RUN mkdir $M2_HOME
-RUN wget -q http://mirror.stjschools.org/public/apache/maven/maven-3/3.3.9/binaries/apache-maven-3.3.9-bin.tar.gz && \
-    tar -xvzf apache-maven-3.3.9-bin.tar.gz -C $M2_HOME --strip-components=1 && \
-    rm -f apache-maven-3.3.9-bin.tar.gz
-
-# ########################
-# # Anaconda   #
-# ########################
-RUN wget -q https://repo.continuum.io/archive/Anaconda2-4.3.0-Linux-x86_64.sh
-RUN chmod +x Anaconda2-4.3.0-Linux-x86_64.sh
-RUN ./Anaconda2-4.3.0-Linux-x86_64.sh -b -p /usr/local/anaconda2
+CMD ["xd-singlenode", "--hadoopDistro none"]
