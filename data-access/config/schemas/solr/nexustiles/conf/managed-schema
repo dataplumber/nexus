@@ -28,7 +28,7 @@
   <fieldType name="doubles" class="solr.TrieDoubleField" positionIncrementGap="0" multiValued="true" precisionStep="0"/>
   <fieldType name="float" class="solr.TrieFloatField" positionIncrementGap="0" precisionStep="0"/>
   <fieldType name="floats" class="solr.TrieFloatField" positionIncrementGap="0" multiValued="true" precisionStep="0"/>
-  <fieldType name="geo" class="solr.SpatialRecursivePrefixTreeFieldType" geo="true" precisionModel="fixed" maxDistErr="0.000009" spatialContextFactory="com.spatial4j.core.context.jts.JtsSpatialContextFactory" precisionScale="1000" distErrPct="0.025" units="degrees"/>
+  <fieldType name="geo" class="solr.SpatialRecursivePrefixTreeFieldType" geo="true" precisionModel="fixed" maxDistErr="0.000009" spatialContextFactory="com.spatial4j.core.context.jts.JtsSpatialContextFactory" precisionScale="1000" distErrPct="0.025" distanceUnits="degrees"/>
   <fieldType name="ignored" class="solr.StrField" indexed="false" stored="false" multiValued="true"/>
   <fieldType name="int" class="solr.TrieIntField" positionIncrementGap="0" precisionStep="0"/>
   <fieldType name="ints" class="solr.TrieIntField" positionIncrementGap="0" multiValued="true" precisionStep="0"/>
