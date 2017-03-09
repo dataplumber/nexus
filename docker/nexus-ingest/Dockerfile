@@ -30,4 +30,5 @@ COPY install-custom-software.sh /tmp/install-custom-software.sh
 RUN /bin/bash install-custom-software.sh
 VOLUME ["/usr/local/data/nexus"]
 
-CMD ["xd-singlenode", "--hadoopDistro none"]
+COPY nexus-ingest.sh /tmp/nexus-ingest.sh
+CMD ["/bin/bash", "nexus-ingest.sh"]
