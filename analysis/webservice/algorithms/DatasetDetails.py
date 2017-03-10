@@ -28,24 +28,37 @@ class DatasetDetailsHandler(BaseHandler):
         stats = self._tile_service.get_dataset_overall_stats(ds)
         return stats
 
+
+    def __get_dataset_details_for_list(self, ds_list):
+        stats = []
+        for ds in ds_list:
+            ds_stats = self.__get_dataset_details(ds)
+            stats.append({"id": ds, "stats": ds_stats})
+
+        return stats
+
     """
         This one will take a while...
     """
     def __get_all_dataset_details(self):
         ds_list = self._tile_service.get_dataseries_list(simple=True)
-        stats = []
-        for ds in ds_list:
-            print ds["shortName"]
-            ds_stats = self.__get_dataset_details(ds["shortName"])
-            stats.append({"id": ds["shortName"], "stats": ds_stats})
 
+        ds_id_list = []
+        for ds in ds_list:
+            ds_id_list.append(ds["shortName"])
+
+        stats = self.__get_dataset_details_for_list(ds_id_list)
         return stats
 
     def calc(self, computeOptions, **args):
         ds = computeOptions.get_argument("ds", None)
 
         if ds is not None:
-            stats = self.__get_dataset_details(ds)
+            ds_list = ds.split(",")
+            if len(ds_list) == 1:
+                stats = self.__get_dataset_details(ds_list[0])
+            else:
+                stats = self.__get_dataset_details_for_list(ds_list)
         else:
             stats = self.__get_all_dataset_details()
 
