@@ -105,7 +105,7 @@ class DailyDifferenceAverageImpl(NexusHandler):
         else:
 
             result = NexusResults(
-                results=[[{'time': dayms * 1000, 'mean': avg, 'ds': 0}] for dayms, avg in averagebyday],
+                results=[[{'time': dayms, 'mean': avg, 'ds': 0}] for dayms, avg in averagebyday],
                 stats={},
                 meta=self.get_meta())
 
