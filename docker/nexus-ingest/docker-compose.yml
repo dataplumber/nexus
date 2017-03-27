@@ -1,0 +1,48 @@
+version: '3'
+
+networks:
+  ingestnetwork:
+
+services:
+
+    mysqldb:
+        image: mysql:8
+        container_name: mysqldb
+        expose:
+            - "3306"
+        environment:
+            - MYSQL_RANDOM_ROOT_PASSWORD=yes
+            - MYSQL_DATABASE=xdjob
+            - MYSQL_USER=xd
+            - MYSQL_PASSWORD
+        networks:
+            - ingestnetwork
+    
+    redis:
+        image: redis:3
+        container_name: redis
+        expose:
+            - "6397"
+        networks:
+            - ingestnetwork
+
+    xd-container:
+        image: ab9a6a1bc4dd
+        container_name: xd-container
+        command: [-c]
+        environment:
+            - MYSQL_PORT_3306_TCP_ADDR=mysqldb
+            - MYSQL_PORT_3306_TCP_PORT=3306
+            - MYSQL_USER=xd
+            - MYSQL_PASSWORD
+            - REDIS_ADDR=redis
+            - REDIS_PORT=6397
+            - ZOOKEEPER_CONNECT=zkhost:2181
+            - ZOOKEEPER_XD_CHROOT=springxd
+        depends_on:
+            - mysqldb
+            - redis
+        extra_hosts:
+            - "zkhost:$ZK_HOST_IP"
+        networks:
+            - ingestnetwork
