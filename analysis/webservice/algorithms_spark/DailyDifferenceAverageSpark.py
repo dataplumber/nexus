@@ -9,6 +9,7 @@ import numpy as np
 import pytz
 from nexustiles.nexustiles import NexusTileService
 from shapely import wkt
+from shapely.geometry import Polygon
 
 from webservice.NexusHandler import nexus_handler, SparkHandler
 from webservice.webmodel import NexusResults, NexusProcessingException
@@ -67,15 +68,30 @@ class DailyDifferenceAverageSparkImpl(SparkHandler):
         try:
             bounding_polygon = request.get_bounding_polygon()
         except:
-            raise NexusProcessingException(
-                reason="'b' argument is required. Must be comma-delimited float formatted as Minimum (Western) Longitude, Minimum (Southern) Latitude, Maximum (Eastern) Longitude, Maximum (Northern) Latitude",
-                code=400)
+            try:
+                minLat = request.get_min_lat()
+                maxLat = request.get_max_lat()
+                minLon = request.get_min_lon()
+                maxLon = request.get_max_lon()
+                bounding_polygon = Polygon([(minLon, minLat),  # (west, south)
+                                            (maxLon, minLat),  # (east, south)
+                                            (maxLon, maxLat),  # (east, north)
+                                            (minLon, maxLat),  # (west, north)
+                                            (minLon, minLat)]) # (west, south)
+            except:
+                raise NexusProcessingException(
+                    reason="'b' argument or 'minLon', 'minLat', 'maxLon', and 'maxLat' arguments are required. If 'b' is used, it must be comma-delimited float formatted as Minimum (Western) Longitude, Minimum (Southern) Latitude, Maximum (Eastern) Longitude, Maximum (Northern) Latitude",
+                    code=400)
         dataset = request.get_argument('dataset', None)
         if dataset is None:
-            raise NexusProcessingException(reason="'dataset' argument is required", code=400)
+            dataset = request.get_argument('ds1', None)
+        if dataset is None:
+            raise NexusProcessingException(reason="'dataset' or 'ds1' argument is required", code=400)
         climatology = request.get_argument('climatology', None)
         if climatology is None:
-            raise NexusProcessingException(reason="'climatology' argument is required", code=400)
+            climatology = request.get_argument('ds2', None)
+        if climatology is None:
+            raise NexusProcessingException(reason="'climatology' or 'ds2' argument is required", code=400)
 
         try:
             start_time = request.get_start_datetime()
