@@ -1,18 +1,20 @@
-FROM java
-MAINTAINER Namrata Malarout “namrata.malarout@jpl.nasa.gov”
-# Install packages
-RUN apt-get update
-RUN apt-get install -y yum
-RUN apt-get install -y lsof
+FROM solr:6.4.1
+MAINTAINER Nga Quach "Nga.T.Chung@jpl.nasa.gov"
 
-ENV SOLR solr-5.3.1
-ADD solr-5.3.1.tgz /opt/
-RUN ln -s /opt/$SOLR /opt/solr
+USER root
 
-EXPOSE 8983
+RUN apt-get update && apt-get -y install git && rm -rf /var/lib/apt/lists/*
 
-RUN adduser solr
-RUN chown -Rf solr.solr /opt
-USER solr
+RUN cd / && git clone https://github.com/dataplumber/nexus.git && cp -r /nexus/data-access/config/schemas/solr/nexustiles . && rm -rf /nexus
 
-CMD [“/bin/bash”, “-c”, “cd /opt/solr; ./bin/solr start”]
+RUN cd / && wget https://downloads.sourceforge.net/project/jts-topo-suite/jts/1.14/jts-1.14.zip && unzip jts-1.14.zip -d /jts-1.14 && rm jts-1.14.zip
+
+USER $SOLR_USER
+
+RUN cp /jts-1.14/lib/jts-1.14.jar /opt/solr/server/lib/jts-1.14.jar
+
+RUN cp /jts-1.14/lib/jtsio-1.14.jar /opt/solr/server/lib/jtsio-1.14.jar
+
+RUN cp -r /nexustiles /opt/solr/server/solr/.
+
+VOLUME ["/opt/solr/server/solr/nexustiles/data"]
