@@ -1,6 +1,6 @@
 # Run example: docker run --net=host -p 5050:5050 spark-mesos-master
 
-FROM spark-mesos-base
+FROM nexusjpl/spark-mesos-base
 
 MAINTAINER Joseph Jacob "Joseph.Jacob@jpl.nasa.gov"
 

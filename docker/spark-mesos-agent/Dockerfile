@@ -1,7 +1,7 @@
 # Run example: docker run --net=host -e MESOS_AGENT_PORT=5051 spark-mesos-agent
 # docker run --net=host -e MESOS_AGENT_PORT=5053 -e MESOS_IP=128.149.122.201 spark-mesos-agent
 
-FROM spark-mesos-base
+FROM nexusjpl/spark-mesos-base
 
 MAINTAINER Joseph Jacob "Joseph.Jacob@jpl.nasa.gov"
 

@@ -1,6 +1,6 @@
 # Run example: docker run -it --net=host -p 8083:8083 -e MASTER=mesos://127.0.0.1:5050 nexus-webapp
 
-FROM spark-mesos-base
+FROM nexusjpl/spark-mesos-base
 
 MAINTAINER Joseph Jacob "Joseph.Jacob@jpl.nasa.gov"
 
