@@ -53,30 +53,32 @@ def hd5_copy(source, dest):
 
 
 def netcdf_subset(source, dest):
-    dtime = dest.createDimension(dimname='time', size=4)
-    dlat = dest.createDimension(dimname='latitude', size=38)
-    dlon = dest.createDimension(dimname='longitude', size=87)
+    dtime = dest.createDimension(dimname=TIME, size=TIME_SLICE.stop - TIME_SLICE.start)
+    dlat = dest.createDimension(dimname=LATITUDE, size=LATITUDE_SLICE.stop - LATITUDE_SLICE.start)
+    dlon = dest.createDimension(dimname=LONGITUDE, size=LONGITUDE_SLICE.stop - LONGITUDE_SLICE.start)
 
     dest.setncatts(source.__dict__)
 
     for variable in source.variables:
         variable = source[variable]
 
-        if variable.name == 'time':
+        if variable.name == TIME:
             dvar = dest.createVariable(varname=variable.name, datatype=variable.dtype, dimensions=(dtime.name,))
-            dvar[:] = variable[0:4]
-        elif variable.name == 'longitude':
+            dest[variable.name].setncatts(variable.__dict__)
+            dvar[:] = variable[TIME_SLICE]
+        elif variable.name == LONGITUDE:
             dvar = dest.createVariable(varname=variable.name, datatype=variable.dtype, dimensions=(dlon.name,))
-            dvar[:] = variable[0:87]
-        elif variable.name == 'latitude':
+            dest[variable.name].setncatts(variable.__dict__)
+            dvar[:] = variable[LONGITUDE_SLICE]
+        elif variable.name == LATITUDE:
             dvar = dest.createVariable(varname=variable.name, datatype=variable.dtype, dimensions=(dlat.name,))
-            dvar[:] = variable[0:38]
+            dest[variable.name].setncatts(variable.__dict__)
+            dvar[:] = variable[LATITUDE_SLICE]
         else:
             dvar = dest.createVariable(varname=variable.name, datatype=variable.dtype,
-                                       dimensions=(dtime.name, dlat.name, dlon.name))
-            dvar[:] = variable[0:4, 0:38, 0:87]
-
-        dest[variable.name].setncatts(variable.__dict__)
+                                       dimensions=(dtime.name, dlon.name, dlat.name))
+            dest[variable.name].setncatts(variable.__dict__)
+            dvar[:] = variable[TIME_SLICE, LONGITUDE_SLICE, LATITUDE_SLICE]
 
     dest.sync()
     dest.close()
@@ -84,11 +86,19 @@ def netcdf_subset(source, dest):
 
 from netCDF4 import Dataset
 
+LATITUDE = 'Latitude'
+LATITUDE_SLICE = slice(0, 26)
+LONGITUDE = 'Longitude'
+LONGITUDE_SLICE = slice(0, 80)
+TIME = 'Time'
+TIME_SLICE = slice(0, 1)
+
+
 hinput = Dataset(
-    '/Users/greguska/githubprojects/nexus/nexus-ingest/developer-box/data/ccmp/CCMP_Wind_Analysis_20160101_V02.0_L3.0_RSS.nc',
+    '/Users/greguska/data/measures_alt/avg-regrid1x1-ssh_grids_v1609_201701.nc',
     'r')
 houtput = Dataset(
-    '/Users/greguska/githubprojects/nexus/nexus-ingest/developer-box/data/ccmp/CCMP_Wind_Analysis_20160101_V02.0_L3.0_RSS.split.nc',
+    '/Users/greguska/data/measures_alt/avg-regrid1x1-ssh_grids_v1609_201701.split.nc',
     mode='w')
 
 netcdf_subset(hinput, houtput)
