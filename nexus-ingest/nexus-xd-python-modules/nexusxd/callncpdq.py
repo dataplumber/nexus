@@ -3,14 +3,13 @@ Copyright (c) 2017 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 
-from subprocess import call
-import glob
-import os
 import logging
-from netCDF4 import Dataset, num2date
+import os
+from subprocess import call
+
 from springxd.tcpstream import start_server, LengthHeaderTcpProcessor
 
-dimension_order = os.environ['DIMENSION_ORDER']
+dimension_order = os.environ['DIMENSION_ORDER'].split(':')
 
 try:
     output_prefix = os.environ['OUTPUT_PREFIX']
@@ -36,7 +35,7 @@ def call_ncpdq(self, in_path):
     output_filename = output_prefix + os.path.basename(in_path)
     output_path = os.path.join(os.path.dirname(in_path), output_filename)
 
-    command = ['ncpdq', '-a', dimension_order]
+    command = ['ncpdq', '-a', ','.join(dimension_order)]
 
     if permute_variable:
         command.append('-v')

@@ -22,12 +22,11 @@ class TestMeasuresData(unittest.TestCase):
 
     @unittest.skipIf(int(subprocess.call(["ncpdq"])) == 127, "requires ncpdq")
     def test_permute_all_variables(self):
-        environ['DIMENSION_ORDER'] = 'Time,Latitude,Longitude'
-        environ['PERMUTE_VARIABLE'] = 'SLA'
+        environ['DIMENSION_ORDER'] = 'Time:Latitude:Longitude'
         self.module = importlib.import_module('nexusxd.callncpdq')
         reload(self.module)
 
-        expected_dimensions = environ['DIMENSION_ORDER'].split(',')
+        expected_dimensions = environ['DIMENSION_ORDER'].split(':')
 
         test_file = path.join(path.dirname(__file__), 'datafiles', 'not_empty_measures_alt.nc')
 
@@ -42,12 +41,12 @@ class TestMeasuresData(unittest.TestCase):
 
     @unittest.skipIf(int(subprocess.call(["ncpdq"])) == 127, "requires ncpdq")
     def test_permute_one_variable(self):
-        environ['DIMENSION_ORDER'] = 'Time,Latitude,Longitude'
+        environ['DIMENSION_ORDER'] = 'Time:Latitude:Longitude'
         environ['PERMUTE_VARIABLE'] = 'SLA'
         self.module = importlib.import_module('nexusxd.callncpdq')
         reload(self.module)
 
-        expected_dimensions = environ['DIMENSION_ORDER'].split(',')
+        expected_dimensions = environ['DIMENSION_ORDER'].split(':')
 
         test_file = path.join(path.dirname(__file__), 'datafiles', 'not_empty_measures_alt.nc')
 
