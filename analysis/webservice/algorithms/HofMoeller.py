@@ -2,9 +2,9 @@
 Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
-import traceback
-import logging
 import itertools
+import logging
+import traceback
 from cStringIO import StringIO
 from datetime import datetime
 from multiprocessing.dummy import Pool, Manager
@@ -21,6 +21,7 @@ from webservice.webmodel import NexusProcessingException, NexusResults
 SENTINEL = 'STOP'
 LATITUDE = 0
 LONGITUDE = 1
+
 
 class LongitudeHofMoellerCalculator(object):
     def longitude_time_hofmoeller_stats(self, tile, index):
@@ -46,6 +47,7 @@ class LongitudeHofMoellerCalculator(object):
             })
 
         return stat
+
 
 class LatitudeHofMoellerCalculator(object):
     def latitude_time_hofmoeller_stats(self, tile, index):
@@ -102,7 +104,7 @@ class BaseHoffMoellerHandlerImpl(NexusHandler):
         return results
 
 
-# @nexus_handler
+@nexus_handler
 class LatitudeTimeHoffMoellerHandlerImpl(BaseHoffMoellerHandlerImpl):
     name = "Latitude/Time HofMoeller"
     path = "/latitudeTimeHofMoeller"
@@ -168,7 +170,7 @@ class LatitudeTimeHoffMoellerHandlerImpl(BaseHoffMoellerHandlerImpl):
         return result
 
 
-# @nexus_handler
+@nexus_handler
 class LongitudeTimeHoffMoellerHandlerImpl(BaseHoffMoellerHandlerImpl):
     name = "Longitude/Time HofMoeller"
     path = "/longitudeTimeHofMoeller"
@@ -339,6 +341,7 @@ class HoffMoellerResults(NexusResults):
             return self.createLongitudeHoffmueller(res, meta)
         else:
             raise Exception("Unsupported HoffMoeller Plot Type")
+
 
 def pool_worker(type, work_queue, done_queue):
     try:
