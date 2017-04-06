@@ -43,7 +43,7 @@ RUN /bin/bash install-custom-software.sh
 RUN chown -R springxd:springxd /usr/local/spring-xd/spring-xd-1.3.1.RELEASE
 VOLUME ["/usr/local/data/nexus"]
 
-COPY nexus-ingest.sh /tmp/nexus-ingest.sh
+COPY nexus-ingest.sh /usr/local/nexus-ingest.sh
 USER springxd
-ENTRYPOINT ["/tmp/nexus-ingest.sh"]
-CMD [""]
+ENTRYPOINT ["/usr/local/nexus-ingest.sh"]
+CMD ["--help"]
