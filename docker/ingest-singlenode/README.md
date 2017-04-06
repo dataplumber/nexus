@@ -14,13 +14,13 @@ You can then connect to the Admin UI with http://localhost:9393/admin-ui.
 
 # XD Shell
 
-##Using Docker Exec
+## Using Docker Exec
 
 Once the nexus-ingest container is running you can use docker exec to start an XD Shell that communicates with the singlenode server:
 
     docker exec -it nexus-ingest xd-shell
 
-##Using Standalone Container
+## Using Standalone Container
 
 You can use the springxd shell docker image to start a seperate container running XD shell connected to the singlenode server:
 

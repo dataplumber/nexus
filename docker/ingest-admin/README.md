@@ -30,43 +30,43 @@ To start the server use:
 
 This mode requires a number of Environment Variables to be defined.
 
-##### `MYSQL_PORT_3306_TCP_ADDR`
+#####  `MYSQL_PORT_3306_TCP_ADDR`
 
 Address to a running MySQL service
 
-##### `MYSQL_PORT_3306_TCP_PORT`
+#####  `MYSQL_PORT_3306_TCP_PORT`
 
 Port for running MySQL service
 
-##### `MYSQL_USER`
+#####  `MYSQL_USER`
 
 Username to connnect to MySQL service
 
-##### `MYSQL_PASSWORD`
+#####  `MYSQL_PASSWORD`
 
 Password for connecting to MySQL service
 
-##### `ZOOKEEPER_CONNECT`
+#####  `ZOOKEEPER_CONNECT`
 
 Zookeeper connect string. Can be a comma-delimmited list of host:port values.
 
-##### `ZOOKEEPER_XD_CHROOT`
+#####  `ZOOKEEPER_XD_CHROOT`
 
 Zookeeper root node for spring-xd
 
-##### `REDIS_ADDR`
+#####  `REDIS_ADDR`
 
 Address to a running Redis service
 
-##### `REDIS_PORT`
+#####  `REDIS_PORT`
 
 Port for running Redis service
 
-##### `KAFKA_BROKERS`
+#####  `KAFKA_BROKERS`
 
 Comma-delimmited list of host:port values which define the list of Kafka brokers used for transport.
 
-##### `KAFKA_ZKADDRESS`
+#####  `KAFKA_ZKADDRESS`
 
 Specifies the ZooKeeper connection string in the form hostname:port where host and port are the host and port of a ZooKeeper server.  
 
@@ -74,13 +74,13 @@ The server may also have a ZooKeeper chroot path as part of its ZooKeeper connec
 
 # XD Shell
 
-##Using Docker Exec
+## Using Docker Exec
 
 Once the xd-admin container is running you can use docker exec to start an XD Shell that communicates with the xd-admin server:
 
     docker exec -it xd-admin xd-shell
 
-##Using Standalone Container
+## Using Standalone Container
 You can use the springxd shell docker image to start a seperate container running XD shell connected to the xd-admin server:
 
     docker run -it --network container:xd-admin springxd/shell
