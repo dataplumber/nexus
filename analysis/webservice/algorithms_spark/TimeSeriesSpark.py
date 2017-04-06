@@ -14,6 +14,7 @@ from nexustiles.nexustiles import NexusTileService
 from pyspark import SparkContext,SparkConf
 from scipy import stats
 from webservice.NexusHandler import nexus_handler, SparkHandler, DEFAULT_PARAMETERS_SPEC
+from webservice import Filtering as filt
 from webservice.webmodel import NexusResults, NoDataException
 
 SENTINEL = 'STOP'
@@ -88,8 +89,8 @@ class TimeSeriesHandlerImpl(SparkHandler):
     def getTimeSeriesStatsForBoxSingleDataSet(self, min_lat, max_lat, 
                                               min_lon, max_lon, ds, 
                                               start_time=0, end_time=-1,
-                                              applySeasonalFilter=False, 
-                                              applyLowPass=False,
+                                              applySeasonalFilter=True, 
+                                              applyLowPass=True,
                                               fill=-9999.,
                                               spark_master="local[1]",
                                               spark_nexecs = 1,
@@ -120,9 +121,9 @@ class TimeSeriesHandlerImpl(SparkHandler):
         results = list(itertools.chain.from_iterable(results))
         results = sorted(results, key=lambda entry: entry["time"])
 
-        #filt.applyAllFiltersOnField(results, 'mean', applySeasonal=applySeasonalFilter, applyLowPass=applyLowPass)
-        #filt.applyAllFiltersOnField(results, 'max', applySeasonal=applySeasonalFilter, applyLowPass=applyLowPass)
-        #filt.applyAllFiltersOnField(results, 'min', applySeasonal=applySeasonalFilter, applyLowPass=applyLowPass)
+        filt.applyAllFiltersOnField(results, 'mean', applySeasonal=applySeasonalFilter, applyLowPass=applyLowPass)
+        filt.applyAllFiltersOnField(results, 'max', applySeasonal=applySeasonalFilter, applyLowPass=applyLowPass)
+        filt.applyAllFiltersOnField(results, 'min', applySeasonal=applySeasonalFilter, applyLowPass=applyLowPass)
 
         self._create_nc_file_time1d(np.array(results), 'ts.nc', 'mean',
                                     fill=-9999.)
