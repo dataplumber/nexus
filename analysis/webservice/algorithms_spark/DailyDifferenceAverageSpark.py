@@ -77,7 +77,7 @@ class DailyDifferenceAverageSparkImpl(SparkHandler):
                                             (maxLon, minLat),  # (east, south)
                                             (maxLon, maxLat),  # (east, north)
                                             (minLon, maxLat),  # (west, north)
-                                            (minLon, minLat)]) # (west, south)
+                                            (minLon, minLat)])  # (west, south)
             except:
                 raise NexusProcessingException(
                     reason="'b' argument or 'minLon', 'minLat', 'maxLon', and 'maxLat' arguments are required. If 'b' is used, it must be comma-delimited float formatted as Minimum (Western) Longitude, Minimum (Southern) Latitude, Maximum (Eastern) Longitude, Maximum (Northern) Latitude",
@@ -136,10 +136,11 @@ class DailyDifferenceAverageSparkImpl(SparkHandler):
             raise NexusProcessingException(reason="An unknown error occurred while computing average differences",
                                            code=500)
 
-        averagebyday = spark_result
+        average_and_std_by_day = spark_result
 
         result = DDAResult(
-            results=[[{'time': dayms, 'mean': avg, 'ds': 0}] for dayms, avg in averagebyday],
+            results=[[{'time': dayms, 'mean': avg_std[0], 'std': avg_std[1], 'ds': 0}] for dayms, avg_std in
+                     average_and_std_by_day],
             stats={},
             meta=self.get_meta())
 
@@ -183,7 +184,6 @@ class DDAResult(NexusResults):
 
 from threading import Lock
 from shapely.geometry import box
-import operator
 
 DRIVER_LOCK = Lock()
 
@@ -217,13 +217,31 @@ def spark_anomolies_driver(tile_ids, bounding_wkt, dataset, climatology, sc=None
         rdd = sc.parallelize(tile_ids, determine_parllelism(len(tile_ids)))
 
     def add_tuple_elements(tuple1, tuple2):
-        return tuple(map(operator.add, tuple1, tuple2))
+        cumulative_sum = tuple1[0] + tuple2[0]
+        cumulative_count = tuple1[1] + tuple2[1]
+
+        avg_1 = tuple1[0] / tuple1[1]
+        avg_2 = tuple2[0] / tuple2[1]
+
+        cumulative_var = parallel_variance(avg_1, tuple1[1], tuple1[2], avg_2, tuple2[1], tuple2[2])
+        return cumulative_sum, cumulative_count, cumulative_var
+
+    def parallel_variance(avg_a, count_a, var_a, avg_b, count_b, var_b):
+        # Thanks Wikipedia https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
+        delta = avg_b - avg_a
+        m_a = var_a * (count_a - 1)
+        m_b = var_b * (count_b - 1)
+        M2 = m_a + m_b + delta ** 2 * count_a * count_b / (count_a + count_b)
+        return M2 / (count_a + count_b - 1)
+
+    def compute_avg_and_std(sum_cnt_var_tuple):
+        return sum_cnt_var_tuple[0] / sum_cnt_var_tuple[1], np.sqrt(sum_cnt_var_tuple[2])
 
     result = rdd \
         .mapPartitions(partial(calculate_diff, bounding_wkt=bounding_wkt_b, dataset=dataset_b,
                                climatology=climatology_b)) \
         .reduceByKey(add_tuple_elements) \
-        .mapValues(lambda x: x[0] / x[1]) \
+        .mapValues(compute_avg_and_std) \
         .sortByKey() \
         .collect()
 
@@ -233,7 +251,7 @@ def spark_anomolies_driver(tile_ids, bounding_wkt, dataset, climatology, sc=None
 def calculate_diff(tile_ids, bounding_wkt, dataset, climatology):
     from itertools import chain
 
-    # Construct a list of generators that yield (day, sum, count)
+    # Construct a list of generators that yield (day, sum, count, variance)
     diff_generators = []
 
     tile_ids = list(tile_ids)
@@ -317,6 +335,7 @@ def generate_diff(data_tile, climatology_tile):
 
     diff = np.subtract(data_tile.data, climatology_tile.data)
     diff_sum = np.nansum(diff)
+    diff_var = np.nanvar(diff)
     diff_ct = diff.size - np.count_nonzero(np.isnan(diff))
 
     date_in_seconds = int((datetime.combine(data_tile.min_time.date(), datetime.min.time()).replace(
@@ -325,4 +344,4 @@ def generate_diff(data_tile, climatology_tile):
     print "%s Time to generate diff between %s and %s" % (
         str(datetime.now() - the_time), data_tile.tile_id, climatology_tile.tile_id)
 
-    yield (date_in_seconds, (diff_sum, diff_ct))
+    yield (date_in_seconds, (diff_sum, diff_ct, diff_var))
