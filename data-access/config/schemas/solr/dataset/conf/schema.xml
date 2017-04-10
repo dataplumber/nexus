@@ -156,6 +156,35 @@
    <field name="GridSpatialResolution" type="tdouble" indexed="true" stored="true" multiValued="false" />
    <field name="SwathSpatialResolution" type="tdouble" indexed="true" stored="true" multiValued="false" />
    <field name="source" type="string" indexed="true" stored="true" multiValued="false" />
+   <field name="CollectionAssociation-ShortName" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="CollectionAssociation-LongName" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="CollectionAssociation-VersionId" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="CollectionAssociation-CollectionType" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="CollectionAssociation-CollectionUse" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="CollectionAssociation-URL" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="GlobalAttrNexusShortName" type="string" indexed="true" stored="true" multiValued="true" />
+   <field name="GlobalAttrTitle" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="GlobalAttrDescription" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="GlobalAttrSource" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="GlobalAttrContact" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="GlobalAttrUnits" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="InternalVersion" type="int" indexed="true" stored="true" multiValued="false" />
+   <field name="InDAT" type="boolean" indexed="true" stored="true" multiValued="false" />
+   <field name="DATOrder" type="int" indexed="true" stored="true" multiValued="false" />
+   <field name="PublicationReferences-Title" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="PublicationReferences-Publisher" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="PublicationReferences-DOI" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="PublicationReferences-Author" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="PublicationReferences-PublicationDate" type="date" indexed="false" stored="true" multiValued="true" />
+   <field name="PublicationReferences-Series" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="PublicationReferences-Edition" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="PublicationReferences-Volume" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="PublicationReferences-Issue" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="PublicationReferences-ReportNumber" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="PublicationReferences-PublicationPlace" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="PublicationReferences-Pages" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="PublicationReferences-ISBN" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="PublicationReferences-OtherReferenceDetails" type="string" indexed="false" stored="true" multiValued="true" />
    <!--
    <field name="WestBoundingCoordinate" type="double" indexed="true" stored="true" multiValued="true" />
    <field name="NorthBoundingCoordinate" type="double" indexed="true" stored="true" multiValued="true" />
