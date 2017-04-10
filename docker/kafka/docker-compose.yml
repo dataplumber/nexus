@@ -1,0 +1,53 @@
+version: '3'
+
+networks:
+  nexus:
+      external: true
+      
+      
+services:
+    
+    kafka1:
+        image: nexusjpl/kafka
+        container_name: kafka1
+        command: ["/usr/local/kafka/current/config/server1.properties"]
+        extra_hosts:
+            - "zkhost1:$ZK_HOST1_IP"
+            - "zkhost2:$ZK_HOST2_IP"
+            - "zkhost3:$ZK_HOST3_IP"
+        networks:
+            - nexus
+        deploy:
+            placement:
+              constraints:
+                - node.labels.kafka-node
+        
+    kafka2:
+        image: nexusjpl/kafka
+        container_name: kafka2
+        command: ["/usr/local/kafka/current/config/server2.properties"]
+        extra_hosts:
+            - "zkhost1:$ZK_HOST1_IP"
+            - "zkhost2:$ZK_HOST2_IP"
+            - "zkhost3:$ZK_HOST3_IP"
+        networks:
+            - nexus
+        deploy:
+            placement:
+              constraints:
+                - node.labels.kafka-node
+        
+    kafka3:
+        image: nexusjpl/kafka
+        container_name: kafka3
+        command: ["/usr/local/kafka/current/config/server3.properties"]
+        extra_hosts:
+            - "zkhost1:$ZK_HOST1_IP"
+            - "zkhost2:$ZK_HOST2_IP"
+            - "zkhost3:$ZK_HOST3_IP"
+        networks:
+            - nexus
+        deploy:
+            placement:
+              constraints:
+                - node.labels.kafka-node

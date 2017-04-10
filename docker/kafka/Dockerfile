@@ -21,6 +21,6 @@ RUN wget -q http://apache.claz.org/kafka/0.9.0.1/kafka_2.11-0.9.0.1.tgz && \
 ENV PATH $PATH:/usr/local/kafka/current/bin
     
 USER kafka
-COPY server.properties /usr/local/kafka/current/config/server.properties
+COPY server?.properties /usr/local/kafka/current/config/
 
-CMD ["kafka-server-start.sh", "/usr/local/kafka/current/config/server.properties"]
+ENTRYPOINT ["kafka-server-start.sh"]
