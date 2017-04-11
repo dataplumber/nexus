@@ -10,7 +10,7 @@ services:
     kafka1:
         image: nexusjpl/kafka
         container_name: kafka1
-        command: ["/usr/local/kafka/current/config/server1.properties"]
+        command: ["/usr/local/kafka/current/config/kafka1.properties"]
         extra_hosts:
             - "zkhost1:$ZK_HOST1_IP"
             - "zkhost2:$ZK_HOST2_IP"
@@ -20,12 +20,12 @@ services:
         deploy:
             placement:
               constraints:
-                - node.labels.kafka-node
+                - node.labels.nexus.type == kafka
         
     kafka2:
         image: nexusjpl/kafka
         container_name: kafka2
-        command: ["/usr/local/kafka/current/config/server2.properties"]
+        command: ["/usr/local/kafka/current/config/kafka2.properties"]
         extra_hosts:
             - "zkhost1:$ZK_HOST1_IP"
             - "zkhost2:$ZK_HOST2_IP"
@@ -35,12 +35,12 @@ services:
         deploy:
             placement:
               constraints:
-                - node.labels.kafka-node
+                - node.labels.nexus.type == kafka
         
     kafka3:
         image: nexusjpl/kafka
         container_name: kafka3
-        command: ["/usr/local/kafka/current/config/server3.properties"]
+        command: ["/usr/local/kafka/current/config/kafka3.properties"]
         extra_hosts:
             - "zkhost1:$ZK_HOST1_IP"
             - "zkhost2:$ZK_HOST2_IP"
@@ -50,4 +50,4 @@ services:
         deploy:
             placement:
               constraints:
-                - node.labels.kafka-node
+                - node.labels.nexus.type == kafka
