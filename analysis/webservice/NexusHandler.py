@@ -216,7 +216,8 @@ class NexusHandler(CalcHandler):
 
         for entry in resultsData:
 
-            frmtdTime = datetime.fromtimestamp(entry["time"] ).strftime("%Y-%m")
+            #frmtdTime = datetime.fromtimestamp(entry["time"] ).strftime("%Y-%m")
+            frmtdTime = entry["time"]
 
             if not frmtdTime in resultsMap:
                 resultsMap[frmtdTime] = []
