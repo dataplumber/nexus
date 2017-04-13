@@ -3,6 +3,8 @@ version: '3'
 networks:
   ingestadmin_ingestnetwork:
       external: true
+  nexus:
+      external: true
 
 volumes:
   data-volume:
@@ -33,6 +35,10 @@ services:
         networks:
             - default
             - ingestadmin_ingestnetwork
+            - nexus
         volumes:
               - data-volume:/usr/local/data/nexus
-            
+        deploy:
+            placement:
+                constraints:
+                    - node.labels.nexus.type == ingest
