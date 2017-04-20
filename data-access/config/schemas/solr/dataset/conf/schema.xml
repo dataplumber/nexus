@@ -185,6 +185,8 @@
    <field name="PublicationReferences-Pages" type="string" indexed="false" stored="true" multiValued="true" />
    <field name="PublicationReferences-ISBN" type="string" indexed="false" stored="true" multiValued="true" />
    <field name="PublicationReferences-OtherReferenceDetails" type="string" indexed="false" stored="true" multiValued="true" />
+   <field name="IsClimatology" type="boolean" indexed="true" stored="true" multiValued="false" />
+   <field name="Climatology" type="string" indexed="true" stored="true" multiValued="true" />
    <!--
    <field name="WestBoundingCoordinate" type="double" indexed="true" stored="true" multiValued="true" />
    <field name="NorthBoundingCoordinate" type="double" indexed="true" stored="true" multiValued="true" />
