@@ -39,12 +39,6 @@ RUN wget --quiet http://d3kbcqa49mib13.cloudfront.net/${SPARK_PACKAGE}.tgz && \
     chown -R root.root ${SPARK_PACKAGE} && \
     ln -s ${SPARK_PACKAGE} ${SPARK_DIR}
 
-# RUN wget --quiet http://d3kbcqa49mib13.cloudfront.net/${SPARK_PACKAGE}.tgz && \
-#     tar -xzf ${SPARK_PACKAGE}.tgz -C ${INSTALL_LOC} && \
-#     cd ${INSTALL_LOC} && chown -R root.root ${SPARK_PACKAGE} && \
-#     ln -s ${SPARK_PACKAGE} ${SPARK_DIR} && \
-#     rm -f ${SPARK_PACKAGE}.tgz
-
 # Set up Mesos
 
 COPY install_mesos.sh .
