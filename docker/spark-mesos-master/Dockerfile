@@ -1,4 +1,4 @@
-# Run example: docker run --net=host -p 5050:5050 spark-mesos-master
+# Run example: docker run --net=nexus --name mesos-master -p 5050:5050 nexusjpl/spark-mesos-master
 
 FROM nexusjpl/spark-mesos-base
 
