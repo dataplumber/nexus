@@ -12,7 +12,8 @@ ENV INSTALL_LOC=/usr/local \
     MESOS_VER=1.2.0 \
     MESOS_PORT=5050 \
     MESOS_WORKDIR=/var/lib/mesos \
-    MESOS_IP=0.0.0.0
+    MESOS_IP=0.0.0.0 \
+    MESOS_MASTER_NAME=mesos-master
 
 ENV HADOOP_PACKAGE=hadoop-${HADOOP_VERSION}.tar.gz \
     SPARK_DIR=spark-${SPARK_VERSION} \

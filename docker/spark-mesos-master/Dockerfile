@@ -10,4 +10,4 @@ EXPOSE 5050
 
 WORKDIR ${MESOS_HOME}/build
 
-CMD ["/bin/bash", "-c", "./bin/mesos-master.sh --ip=${MESOS_IP} --work_dir=${MESOS_WORKDIR}"]
+CMD ["/bin/bash", "-c", "./bin/mesos-master.sh --ip=${MESOS_IP} --hostname=${MESOS_MASTER_NAME} --work_dir=${MESOS_WORKDIR}"]

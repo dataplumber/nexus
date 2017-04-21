@@ -12,4 +12,4 @@ ENV MESOS_AGENT_PORT=5050
 WORKDIR ${MESOS_HOME}/build
 
 #CMD ["/bin/bash", "-c", "./bin/mesos-agent.sh --master=${MESOS_IP}:${MESOS_PORT} --port=${MESOS_AGENT_PORT} --work_dir=${MESOS_WORKDIR} --no-systemd_enable_support --launcher=posix --no-switch_user --resources='cpus:2;mem:3000;disk:5000'"]
-CMD ["/bin/bash", "-c", "./bin/mesos-agent.sh --master=${MESOS_IP}:${MESOS_PORT} --port=${MESOS_AGENT_PORT} --work_dir=${MESOS_WORKDIR} --no-systemd_enable_support --launcher=posix --no-switch_user"]
+CMD ["/bin/bash", "-c", "./bin/mesos-agent.sh --master=${MESOS_MASTER_NAME}:${MESOS_PORT} --port=${MESOS_AGENT_PORT} --work_dir=${MESOS_WORKDIR} --no-systemd_enable_support --launcher=posix --no-switch_user"]
