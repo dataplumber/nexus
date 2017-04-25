@@ -7,17 +7,19 @@ import logging
 import traceback
 from cStringIO import StringIO
 from datetime import datetime
+
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 from nexustiles.nexustiles import NexusTileService
-from pyspark import SparkContext,SparkConf
 from scipy import stats
-from webservice.NexusHandler import nexus_handler, SparkHandler, DEFAULT_PARAMETERS_SPEC
+
 from webservice import Filtering as filt
-from webservice.webmodel import NexusResults, NoDataException
+from webservice.NexusHandler import nexus_handler, SparkHandler, DEFAULT_PARAMETERS_SPEC
+from webservice.webmodel import NexusResults, NoDataException, NexusProcessingException
 
 SENTINEL = 'STOP'
+
 
 @nexus_handler
 class TimeSeriesHandlerImpl(SparkHandler):
@@ -44,9 +46,12 @@ class TimeSeriesHandlerImpl(SparkHandler):
         if type(ds) != list and type(ds) != tuple:
             ds = (ds,)
 
+        if next(iter([clim for clim in ds if 'CLIM' in clim])):
+            raise NexusProcessingException(reason="Cannot compute time series on a climatology", code=400)
+
         resultsRaw = []
 
-        spark_master,spark_nexecs,spark_nparts = computeOptions.get_spark_cfg()
+        spark_master, spark_nexecs, spark_nparts = computeOptions.get_spark_cfg()
         for shortName in ds:
             results, meta = self.getTimeSeriesStatsForBoxSingleDataSet(computeOptions.get_min_lat(),
                                                                        computeOptions.get_max_lat(),
@@ -82,24 +87,24 @@ class TimeSeriesHandlerImpl(SparkHandler):
         for singleRes in resultsRaw:
             meta.append(singleRes[1])
 
-        res = TimeSeriesResults(results=results, meta=meta, stats=stats, 
+        res = TimeSeriesResults(results=results, meta=meta, stats=stats,
                                 computeOptions=computeOptions)
         return res
 
-    def getTimeSeriesStatsForBoxSingleDataSet(self, min_lat, max_lat, 
-                                              min_lon, max_lon, ds, 
+    def getTimeSeriesStatsForBoxSingleDataSet(self, min_lat, max_lat,
+                                              min_lon, max_lon, ds,
                                               start_time=0, end_time=-1,
-                                              applySeasonalFilter=True, 
+                                              applySeasonalFilter=True,
                                               applyLowPass=True,
                                               fill=-9999.,
                                               spark_master="local[1]",
-                                              spark_nexecs = 1,
-                                              spark_nparts = 1):
+                                              spark_nexecs=1,
+                                              spark_nparts=1):
 
-        daysinrange = self._tile_service.find_days_in_range_asc(min_lat, 
-                                                                max_lat, 
-                                                                min_lon, 
-                                                                max_lon, ds, 
+        daysinrange = self._tile_service.find_days_in_range_asc(min_lat,
+                                                                max_lat,
+                                                                min_lon,
+                                                                max_lon, ds,
                                                                 start_time,
                                                                 end_time)
 
@@ -107,15 +112,15 @@ class TimeSeriesHandlerImpl(SparkHandler):
             raise NoDataException(reason="No data found for selected timeframe")
 
         self.log.debug('Found {0} days in range'.format(len(daysinrange)))
-        for i,d in enumerate(daysinrange):
+        for i, d in enumerate(daysinrange):
             self.log.debug('{0}, {1}'.format(i, datetime.utcfromtimestamp(d)))
-        nexus_tiles_spark = [(min_lat, max_lat, min_lon, max_lon, ds, 
+        nexus_tiles_spark = [(min_lat, max_lat, min_lon, max_lon, ds,
                               list(daysinrange_part), fill)
                              for daysinrange_part
                              in np.array_split(daysinrange, spark_nparts)]
 
         # Launch Spark computations
-        rdd = self._sc.parallelize(nexus_tiles_spark,spark_nparts)
+        rdd = self._sc.parallelize(nexus_tiles_spark, spark_nparts)
         results = rdd.map(TimeSeriesCalculator.calc_average_on_day).collect()
         #
         results = list(itertools.chain.from_iterable(results))
@@ -277,23 +282,23 @@ class TimeSeriesCalculator(SparkHandler):
 
     @staticmethod
     def calc_average_on_day(tile_in_spark):
-        (min_lat, max_lat, min_lon, max_lon, dataset, 
+        (min_lat, max_lat, min_lon, max_lon, dataset,
          timestamps, fill) = tile_in_spark
         start_time = timestamps[0]
         end_time = timestamps[-1]
         tile_service = NexusTileService()
-        #ds1_nexus_tiles = \
+        # ds1_nexus_tiles = \
         #    tile_service.get_tiles_bounded_by_box_at_time(min_lat, max_lat, 
         #                                                  min_lon, max_lon, 
         #                                                  dataset, 
         #                                                  timeinseconds)
         ds1_nexus_tiles = \
-            tile_service.get_tiles_bounded_by_box(min_lat, max_lat, 
-                                                  min_lon, max_lon, 
-                                                  dataset, 
+            tile_service.get_tiles_bounded_by_box(min_lat, max_lat,
+                                                  min_lon, max_lon,
+                                                  dataset,
                                                   timestamps[0],
                                                   timestamps[-1])
-        #ds1_nexus_tiles = TimeSeriesCalculator.query_by_parts(tile_service, 
+        # ds1_nexus_tiles = TimeSeriesCalculator.query_by_parts(tile_service,
         #                                                      min_lat, 
         #                                                      max_lat, 
         #                                                      min_lon, 
@@ -305,12 +310,12 @@ class TimeSeriesCalculator(SparkHandler):
         stats_arr = []
         for timeinseconds in timestamps:
             tile_data_agg = np.ma.array([tile.data.flatten() \
-                                             for tile in ds1_nexus_tiles \
-                                             if (tile.times[0] == timeinseconds)])
+                                         for tile in ds1_nexus_tiles \
+                                         if (tile.times[0] == timeinseconds)])
             lats_agg = np.array([np.repeat(tile.latitudes,
                                            len(tile.longitudes))
-                                 for tile in ds1_nexus_tiles 
-                                 if (tile.times[0] == 
+                                 for tile in ds1_nexus_tiles
+                                 if (tile.times[0] ==
                                      timeinseconds)])
             if (len(tile_data_agg) == 0) or tile_data_agg.mask.all():
                 data_min = fill
@@ -321,14 +326,14 @@ class TimeSeriesCalculator(SparkHandler):
             else:
                 data_min = np.ma.min(tile_data_agg)
                 data_max = np.ma.max(tile_data_agg)
-                #daily_mean = np.ma.mean(tile_data_agg).item()
+                # daily_mean = np.ma.mean(tile_data_agg).item()
                 daily_mean = \
                     np.ma.average(tile_data_agg,
                                   weights=np.cos(np.radians(lats_agg))).item()
                 data_count = np.ma.count(tile_data_agg)
                 data_std = np.ma.std(tile_data_agg)
-                
-        # Return Stats by day
+
+                # Return Stats by day
             stat = {
                 'min': data_min,
                 'max': data_max,
@@ -336,7 +341,7 @@ class TimeSeriesCalculator(SparkHandler):
                 'cnt': data_count,
                 'std': data_std,
                 'time': int(timeinseconds)
-                }
+            }
             stats_arr.append(stat)
         return stats_arr
 
