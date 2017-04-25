@@ -21,7 +21,7 @@ class SolrProxy(object):
         with SOLR_CON_LOCK:
             solrcon = getattr(thread_local, 'solrcon', None)
             if solrcon is None:
-                solrcon = solr.Solr('http://%s/solr/%s' % (self.solrUrl, self.solrCore), debug=True)
+                solrcon = solr.Solr('http://%s/solr/%s' % (self.solrUrl, self.solrCore), debug=False)
                 thread_local.solrcon = solrcon
 
             self.solrcon = solrcon

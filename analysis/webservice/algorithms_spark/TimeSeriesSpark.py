@@ -46,7 +46,7 @@ class TimeSeriesHandlerImpl(SparkHandler):
         if type(ds) != list and type(ds) != tuple:
             ds = (ds,)
 
-        if next(iter([clim for clim in ds if 'CLIM' in clim])):
+        if next(iter([clim for clim in ds if 'CLIM' in clim]), False):
             raise NexusProcessingException(reason="Cannot compute time series on a climatology", code=400)
 
         resultsRaw = []

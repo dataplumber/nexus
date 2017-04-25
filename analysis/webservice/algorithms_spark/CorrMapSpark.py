@@ -169,7 +169,7 @@ class CorrMapSparkHandlerImpl(SparkHandler):
             raise NexusProcessingException(
                 reason="Requires two datasets for comparison. Specify request parameter ds=Dataset_1,Dataset_2",
                 code=400)
-        if next(iter([clim for clim in self._ds if 'CLIM' in clim])):
+        if next(iter([clim for clim in self._ds if 'CLIM' in clim]), False):
             raise NexusProcessingException(reason="Cannot compute correlation on a climatology", code=400)
 
         nexus_tiles = self._find_global_tile_set()
