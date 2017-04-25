@@ -142,20 +142,57 @@ class DailyDifferenceAverageSparkImpl(SparkHandler):
             results=[[{'time': dayms, 'mean': avg_std[0], 'std': avg_std[1], 'ds': 0}] for dayms, avg_std in
                      average_and_std_by_day],
             stats={},
-            meta=self.get_meta())
+            meta=self.get_meta(dataset))
 
         min_lon, min_lat, max_lon, max_lat = bounding_polygon.bounds
         result.extendMeta(min_lat, max_lat, min_lon, max_lon, "", start_time, end_time)
-        result.meta()['label'] = u'Difference from 5-Day mean (\u00B0C)'
-
         return result
 
-    def get_meta(self):
-        meta = {
-            "title": "Sea Surface Temperature (SST) Anomalies",
-            "description": "SST anomolies are departures from the 5-day pixel mean",
-            "units": u'\u00B0C',
-        }
+    def get_meta(self, dataset):
+
+        # TODO yea this is broken
+        if 'sst' in dataset.lower():
+            meta = {
+                "title": "Sea Surface Temperature (SST) Anomalies",
+                "description": "SST anomalies are departures from the 5-day pixel mean",
+                "units": u'\u00B0C',
+                "label": u'Difference from 5-Day mean (\u00B0C)'
+            }
+        elif 'chl' in dataset.lower():
+            meta = {
+                "title": "Chlorophyll Concentration Anomalies",
+                "description": "Chlorophyll Concentration anomalies are departures from the 5-day pixel mean",
+                "units": u'mg m^-3',
+                "label": u'Difference from 5-Day mean (mg m^-3)'
+            }
+        elif 'sla' in dataset.lower():
+            meta = {
+                "title": "Sea Level Anomaly Estimate (SLA) Anomalies",
+                "description": "SLA anomalies are departures from the 5-day pixel mean",
+                "units": u'm',
+                "label": u'Difference from 5-Day mean (m)'
+            }
+        elif 'sss' in dataset.lower():
+            meta = {
+                "title": "Sea Surface Salinity (SSS) Anomalies",
+                "description": "SSS anomalies are departures from the 5-day pixel mean",
+                "units": u'psu',
+                "label": u'Difference from 5-Day mean (psu)'
+            }
+        elif 'CCMP_V2.0_L3.0' == dataset:
+            meta = {
+                "title": "Wind Speed Anomalies",
+                "description": "Wind Speed anomalies are departures from the 5-day pixel mean",
+                "units": u'm/s',
+                "label": u'Difference from 5-Day mean (m/s)'
+            }
+        else:
+            meta = {
+                "title": "Anomalies",
+                "description": "Anomalies are departures from the 5-day pixel mean",
+                "units": u'',
+                "label": u'Difference from 5-Day mean'
+            }
         return meta
 
 

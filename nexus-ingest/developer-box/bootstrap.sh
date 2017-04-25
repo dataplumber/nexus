@@ -13,6 +13,9 @@ M2=\$M2_HOME/bin
 PATH=\$M2:\$PATH
 END
 
+# Install nco tools
+sudo yum -y install epel-release
+sudo yum -y install nco-devel
 
 # Install git
 sudo yum -y install git
@@ -34,8 +37,7 @@ source /home/vagrant/.bashrc
 
 conda create -y --name nexus-xd-python-modules python
 source activate nexus-xd-python-modules
-conda install -y -c conda-forge nco=4.6.4
-conda install -y libnetcdf netcdf4 scipy jpeg=8
+conda install -y scipy=0.18.1 netcdf4
 
 
 # Install Spring XD and launch it

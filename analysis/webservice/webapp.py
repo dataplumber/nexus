@@ -40,6 +40,7 @@ class BaseHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     def get(self):
 
+        self.logger.info("Received request %s" % self._request_summary())
         self.request_thread_pool.apply_async(self.run)
 
     def run(self):
@@ -142,7 +143,7 @@ class ModularNexusHandlerWrapper(BaseHandler):
 
 if __name__ == "__main__":
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt="%Y-%m-%dT%H:%M:%S", stream=sys.stdout)
 

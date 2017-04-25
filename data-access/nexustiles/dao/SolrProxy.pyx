@@ -1,13 +1,12 @@
-import itertools
+import json
 import logging
 import threading
 import time
 from datetime import datetime
-from shapely import wkt
-import requests
-import json
 
+import requests
 import solr
+from shapely import wkt
 
 SOLR_CON_LOCK = threading.Lock()
 thread_local = threading.local()
@@ -22,7 +21,7 @@ class SolrProxy(object):
         with SOLR_CON_LOCK:
             solrcon = getattr(thread_local, 'solrcon', None)
             if solrcon is None:
-                solrcon = solr.Solr('http://%s/solr/%s' % (self.solrUrl, self.solrCore))
+                solrcon = solr.Solr('http://%s/solr/%s' % (self.solrUrl, self.solrCore), debug=True)
                 thread_local.solrcon = solrcon
 
             self.solrcon = solrcon
@@ -72,7 +71,7 @@ class SolrProxy(object):
         kwargs['sort'] = ['tile_min_time_dt asc']
         additionalparams = {
             'fq': [
-                "{!terms f=id}%s" % ','.join(tile_ids)
+                "{!terms f=id}%s" % ','.join(tile_ids) if len(tile_ids) > 0 else ''
             ]
         }
 
@@ -94,7 +93,7 @@ class SolrProxy(object):
         kwargs['sort'] = ['tile_max_time_dt desc']
         additionalparams = {
             'fq': [
-                "{!terms f=id}%s" % ','.join(tile_ids)
+                "{!terms f=id}%s" % ','.join(tile_ids) if len(tile_ids) > 0 else ''
             ]
         }
 
@@ -105,36 +104,22 @@ class SolrProxy(object):
         return results[0]['tile_max_time_dt']
 
     def get_data_series_list(self):
-        search = "*:*"
-        params = {
-            "facet": "true",
-            "facet.field": "dataset_s",
-            "facet.pivot": "{!stats=piv1}dataset_s",
-            "stats": "on",
-            "stats.field": "{!tag=piv1 min=true max=true sum=false}tile_max_time_dt"
-        }
 
-        response = self.do_query_raw(*(search, None, None, False, None), **params)
+        datasets = self.get_data_series_list_simple()
 
-        l = []
-        for g in response.facet_counts["facet_pivot"]["dataset_s"]:
-            shortName = g["value"]
-            startTime = time.mktime(g["stats"]["stats_fields"]["tile_max_time_dt"]["min"].timetuple()) * 1000
-            endTime = time.mktime(g["stats"]["stats_fields"]["tile_max_time_dt"]["max"].timetuple()) * 1000
-            l.append({
-                "shortName": shortName,
-                "title": shortName,
-                "start": startTime,
-                "end": endTime
-            })
-        l = sorted(l, key=lambda entry: entry["title"])
-        return l
+        for dataset in datasets:
+            dataset['start'] = time.mktime(self.find_min_date_from_tiles([], ds=dataset['title']).timetuple()) * 1000
+            dataset['end'] = time.mktime(self.find_max_date_from_tiles([], ds=dataset['title']).timetuple()) * 1000
+
+        return datasets
 
     def get_data_series_list_simple(self):
         search = "*:*"
         params = {
+            'rows': 0,
             "facet": "true",
-            "facet.field": "dataset_s"
+            "facet.field": "dataset_s",
+            "facet.mincount": "1"
         }
 
         response = self.do_query_raw(*(search, None, None, False, None), **params)
