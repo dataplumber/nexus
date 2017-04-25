@@ -7,10 +7,14 @@ One Class for each dataset containing static methods and constants/templates, et
 
 import sys, os, re, datetime
 
+import numpy as np
+
 from split import splitByNDaysKeyed, groupByKeys, extractKeys
 
+
 def splitModisAod(seq, n):
-    return splitByNDaysKeyed(seq, n, re.compile(r'(....)(..)(..)'), lambda y, m, d: ymd2doy(y,m,d))
+    return splitByNDaysKeyed(seq, n, re.compile(r'(....)(..)(..)'), lambda y, m, d: ymd2doy(y, m, d))
+
 
 def splitAvhrrSst(seq, n):
     return splitByNDays_Avhrr(seq, n, re.compile(r'^(....)(..)(..)'))
@@ -29,7 +33,7 @@ class ModisSst:
     OutputClimTemplate = ''
 
     @staticmethod
-    def keysTransformer(s): return (s[1], s[0], s[2])      # DOY, YEAR, N=night / S=day
+    def keysTransformer(s): return (s[1], s[0], s[2])  # DOY, YEAR, N=night / S=day
 
     @staticmethod
     def getKeys(url):
@@ -41,12 +45,13 @@ class ModisSst:
 
     @staticmethod
     def genOutputName(doy, variable, nEpochs, averagingConfig):
-        return 'A%03d.L3m_%s_%dday_clim_%s.nc' % (doy, variable, nEpochs, averagingConfig['name'])    # mark each file with first day in period
+        return 'A%03d.L3m_%s_%dday_clim_%s.nc' % (
+            doy, variable, nEpochs, averagingConfig['name'])  # mark each file with first day in period
 
 
 class ModisChlor:
     ExpectedRunTime = "11m"
-    UrlsPath = "/data/share/datasets/MODIS_L3m_DAY_CHL_chlor_a_4km/daily_data/A*chlor*.nc"
+    UrlsPath = "/Users/greguska/githubprojects/nexus/nexus-ingest/developer-box/data/modis_aqua_chl/A*chlor*.nc"
     ExampleFileName = "A2013187.L3m_DAY_CHL_chlor_a_4km.nc"
     GetKeysRegex = r'A(....)(...).L3m.*CHL'
 
@@ -57,7 +62,7 @@ class ModisChlor:
     OutputClimTemplate = ''
 
     @staticmethod
-    def keysTransformer(s): return (s[1], s[0])      # DOY, YEAR
+    def keysTransformer(s): return (s[1], s[0])  # DOY, YEAR
 
     @staticmethod
     def getKeys(url):
@@ -69,7 +74,8 @@ class ModisChlor:
 
     @staticmethod
     def genOutputName(doy, variable, nEpochs, averagingConfig):
-        return 'A%03d.L3m_%s_%dday_clim_%s.nc' % (doy, variable, nEpochs, averagingConfig['name'])    # mark each file with first day in period
+        return 'A%03d.L3m_%s_%dday_clim_%s.nc' % (
+            doy, variable, nEpochs, averagingConfig['name'])  # mark each file with first day in period
 
 
 class MeasuresSsh:
@@ -78,14 +84,14 @@ class MeasuresSsh:
     ExampleFileName = "ssh_grids_v1609_2006120812.nc"
     GetKeysRegex = r'ssh.*v1609_(....)(..)(..)12.nc'
 
-    Variable = 'SLA'   # sea level anomaly estimate
+    Variable = 'SLA'  # sea level anomaly estimate
     Mask = None
-    Coordinates = ['Longitude', 'Latitude']    # Time is first (len=1) coordinate, will be removed
+    Coordinates = ['Longitude', 'Latitude']  # Time is first (len=1) coordinate, will be removed
 
     OutputClimTemplate = ''
 
     @staticmethod
-    def keysTransformer(s): return (ymd2doy(s[0], s[1], s[2]), s[0])      # DOY, YEAR
+    def keysTransformer(s): return (ymd2doy(s[0], s[1], s[2]), s[0])  # DOY, YEAR
 
     @staticmethod
     def getKeys(url):
@@ -104,16 +110,17 @@ class CCMPWind:
     ExpectedRunTime = "?"
     UrlsPath = "/data/share/datasets/CCMP_V2.0_L3.0/daily_data/CCMP_Wind*_V02.0_L3.0_RSS_uncompressed.nc"
     ExampleFileName = "CCMP_Wind_Analysis_20160522_V02.0_L3.0_RSS_uncompressed.nc"
-    GetKeysRegex = r'CCMP_Wind_Analysis_(....)(..)(..)_V*.nc'
+    GetKeysRegex = r'CCMP_Wind_Analysis_(....)(..)(..)_V.*.nc'
 
-    Variable = 'Wind_Magnitude'   # to be computed as sqrt(uwnd^2 + vwnd^2)
+    Variable = 'Wind_Magnitude'  # to be computed as sqrt(uwnd^2 + vwnd^2)
     Mask = None
-    Coordinates = ['time', 'latitude', 'longitude']    # time (len=4), winds every 6 hours during day
+    Coordinates = ['latitude', 'longitude']
 
     OutputClimTemplate = ''
 
     @staticmethod
-    def keysTransformer(s): return (ymd2doy(s[0], s[1], s[2]), s[0])      # DOY, YEAR
+    def keysTransformer(s):
+        return (ymd2doy(s[0], s[1], s[2]), s[0])  # DOY, YEAR
 
     @staticmethod
     def getKeys(url):
@@ -125,7 +132,49 @@ class CCMPWind:
 
     @staticmethod
     def genOutputName(doy, variable, nEpochs, averagingConfig):
-        return "CCMP_Wind_Analysis_V02.0_L3.0_RSS_%03d_%dday_clim_%s" % (int(doy), nEpochs, averagingConfig['name'])
+        return "CCMP_Wind_Analysis_V02.0_L3.0_RSS_%03d_%dday_clim_%s.nc" % (int(doy), nEpochs, averagingConfig['name'])
+
+    @staticmethod
+    def readAndMask(url, variable, mask=None, cachePath='/tmp/cache', hdfsPath=None):
+        """
+        Read a variable from a netCDF or HDF file and return a numpy masked array.
+        If the URL is remote or HDFS, first retrieve the file into a cache directory.
+        """
+        from variables import getVariables, close
+        v = None
+        if mask:
+            variables = [variable, mask]
+        else:
+            variables = [variable]
+        try:
+            from cache import retrieveFile
+            path = retrieveFile(url, cachePath, hdfsPath)
+        except:
+            print >> sys.stderr, 'readAndMask: Error, continuing without file %s' % url
+            return v
+
+        if CCMPWind.Variable in variables:
+            var, fh = getVariables(path, ['uwnd','vwnd'], arrayOnly=True,
+                                   set_auto_mask=True)  # return dict of variable objects by name
+            uwnd_avg = np.average(var['uwnd'], axis=0)
+            vwnd_avg = np.average(var['vwnd'], axis=0)
+            wind_magnitude = np.sqrt(np.add(np.multiply(uwnd_avg, uwnd_avg), np.multiply(vwnd_avg, vwnd_avg)))
+            v = wind_magnitude
+            if v.shape[0] == 1: v = v[0]  # throw away trivial time dimension for CF-style files
+            close(fh)
+        else:
+            try:
+                print >> sys.stderr, 'Reading variable %s from %s' % (variable, path)
+                var, fh = getVariables(path, variables, arrayOnly=True,
+                                       set_auto_mask=True)  # return dict of variable objects by name
+                v = var[
+                    variable]  # could be masked array
+                if v.shape[0] == 1: v = v[0]  # throw away trivial time dimension for CF-style files
+                close(fh)
+            except:
+                print >> sys.stderr, 'readAndMask: Error, cannot read variable %s from file %s' % (variable, path)
+
+        return v
 
 
 DatasetList = {'ModisSst': ModisSst, 'ModisChlor': ModisChlor,
@@ -136,16 +185,19 @@ DatasetList = {'ModisSst': ModisSst, 'ModisChlor': ModisChlor,
 def ymd2doy(year, mon, day):
     return datetime2doy(ymd2datetime(year, mon, day))
 
+
 def ymd2datetime(y, m, d):
     y, m, d = map(int, (y, m, d))
     return datetime.datetime(y, m, d)
 
+
 def datetime2doy(dt):
     return int(dt.strftime('%j'))
+
 
 def doy2datetime(year, doy):
     '''Convert year and DOY (day of year) to datetime object.'''
     return datetime.datetime(int(year), 1, 1) + datetime.timedelta(int(doy) - 1)
 
-def doy2month(year, doy): return doy2datetime(year, doy).strftime('%m')
 
+def doy2month(year, doy): return doy2datetime(year, doy).strftime('%m')

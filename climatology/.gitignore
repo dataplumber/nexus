@@ -5,3 +5,7 @@ dist
 build
 
 *.egg-info
+
+*_f.so*
+
+*.nc
