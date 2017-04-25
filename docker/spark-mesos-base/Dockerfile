@@ -26,6 +26,11 @@ ENV HADOOP_HOME=${INSTALL_LOC}/hadoop-${HADOOP_VERSION} \
     SPARK_HOME=${INSTALL_LOC}/${SPARK_DIR} \
     MESOS_HOME=${INSTALL_LOC}/mesos-${MESOS_VER}
     
+ENV SPARK_CLASSPATH="${HADOOP_HOME}/etc/hadoop:${HADOOP_HOME}/share/hadoop/common/lib/*:${HADOOP_HOME}/share/hadoop/common/*:${HADOOP_HOME}/share/hadoop/hdfs:${HADOOP_HOME}/share/hadoop/hdfs/lib/*:${HADOOP_HOME}/share/hadoop/hdfs/*:${HADOOP_HOME}/share/hadoop/yarn/lib/*:${HADOOP_HOME}/share/hadoop/yarn/*:${HADOOP_HOME}/share/hadoop/mapreduce/lib/*:${HADOOP_HOME}/share/hadoop/mapreduce/*:${HADOOP_HOME}/contrib/capacity-scheduler/*.jar" \
+    MESOS_NATIVE_JAVA_LIBRARY=${INSTALL_LOC}/lib/libmesos.so \
+    SPARK_EXECUTOR_URI=${INSTALL_LOC}/spark-2.1.0-bin-without-hadoop.tgz \
+    HADOOP_CONF_DIR=${HADOOP_HOME}/etc/hadoop
+
 WORKDIR ${INSTALL_LOC}
 
 # Set up Hadoop
@@ -40,11 +45,6 @@ RUN wget --quiet http://d3kbcqa49mib13.cloudfront.net/${SPARK_PACKAGE}.tgz && \
     tar -xzf ${SPARK_PACKAGE}.tgz && \
     chown -R root.root ${SPARK_PACKAGE} && \
     ln -s ${SPARK_PACKAGE} ${SPARK_DIR}
-
-ENV SPARK_DIST_CLASSPATH="${HADOOP_HOME}/etc/hadoop/*:${HADOOP_HOME}/share/hadoop/common/lib/*:${HADOOP_HOME}/share/hadoop/common/*:${HADOOP_HOME}/share/hadoop/hdfs/*:${HADOOP_HOME}/share/hadoop/hdfs/lib/*:${HADOOP_HOME}/share/hadoop/hdfs/*:${HADOOP_HOME}/share/hadoop/yarn/lib/*:${HADOOP_HOME}/share/hadoop/yarn/*:${HADOOP_HOME}/share/hadoop/mapreduce/lib/*:${HADOOP_HOME}/share/hadoop/mapreduce/*:${HADOOP_HOME}/share/hadoop/tools/lib/*" \
-    MESOS_NATIVE_JAVA_LIBRARY=${INSTALL_LOC}/lib/libmesos.so \
-    SPARK_EXECUTOR_URI=${INSTALL_LOC}/spark-2.1.0-bin-without-hadoop.tgz \
-    HADOOP_CONF_DIR=${HADOOP_HOME}/etc/hadoop
 
 # Set up Mesos
 
