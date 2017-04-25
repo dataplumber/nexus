@@ -23,7 +23,7 @@ ENV PATH=${CONDA_HOME}/bin:${PATH}:${HADOOP_HOME}/bin:${SPARK_HOME}/bin \
     PYSPARK_DRIVER_PYTHON=${CONDA_HOME}/bin/python \
     PYSPARK_PYTHON=${CONDA_HOME}/bin/python \
     PYSPARK_SUBMIT_ARGS="--driver-memory=4g pyspark-shell" \
-    SPARK_LOCAL_IP=127.0.0.1
+    SPARK_LOCAL_IP=nexus-webapp
 
 # Set up Anaconda environment
     
