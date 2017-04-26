@@ -4,6 +4,10 @@ California Institute of Technology.  All rights reserved
 """
 
 import math
+
+import logging
+import traceback
+
 import numpy as np
 from scipy import stats
 from scipy.fftpack import fft
@@ -12,11 +16,15 @@ from scipy.interpolate import UnivariateSpline
 from scipy.signal import wiener, filtfilt, butter, gaussian, freqz
 from scipy.ndimage import filters
 
+log = logging.getLogger('Filtering')
+
+
 def __fieldToList(results, field):
     a = np.zeros(len(results))
     for n in range(0, len(results)):
         a[n] = results[n][field]
     return a
+
 
 def __listToField(results, l, field):
     if results is None or l is None:
@@ -42,12 +50,16 @@ def applySeasonalCycleFilter1d(l):
             l[b] -= avg
     return l
 
+
 def applySeasonalCycleFilter2d(l):
     return l
+
 
 '''
     Implements monthly filtering of seasonal cycles.
 '''
+
+
 def applySeasonalCycleFilter(l):
     if len(np.shape(l)) == 1:
         return applySeasonalCycleFilter1d(l)
@@ -55,6 +67,7 @@ def applySeasonalCycleFilter(l):
         return applySeasonalCycleFilter2d(l)
     else:
         raise Exception("Cannot apply seasonal cycle filter: Unsupported array shape")
+
 
 def applySeasonalCycleFilterOnResultsField(results, field):
     l = __fieldToList(results, field)
@@ -69,17 +82,20 @@ def applySeasonalCycleFilterOnResults(results):
 '''
 http://www.nehalemlabs.net/prototype/blog/2013/04/05/an-introduction-to-smoothing-time-series-in-python-part-i-filtering-theory/
 '''
+
+
 def applyLowPassFilter(y, lowcut=12.0, order=9.0):
     if len(y) - 12 <= lowcut:
         lowcut = 3
     nyq = 0.5 * len(y)
     low = lowcut / nyq
-    #high = highcut / nyq
+    # high = highcut / nyq
     b, a = butter(order, low)
     m = min([len(y), len(a), len(b)])
     padlen = 30 if m >= 30 else m
     fl = filtfilt(b, a, y, padlen=padlen)
     return fl
+
 
 def applyFiltersOnField(results, field, applySeasonal=False, applyLowPass=False, append=""):
     x = __fieldToList(results, field)
@@ -88,18 +104,33 @@ def applyFiltersOnField(results, field, applySeasonal=False, applyLowPass=False,
         x = applySeasonalCycleFilter(x)
     if applyLowPass:
         x = applyLowPassFilter(x)
-    __listToField(results, x, "%s%s"%(field, append))
+    __listToField(results, x, "%s%s" % (field, append))
 
 
 def applyAllFiltersOnField(results, field, applySeasonal=True, applyLowPass=True):
-    if applySeasonal:
-        applyFiltersOnField(results, field, applySeasonal=True, applyLowPass=False, append="Seasonal")
+    try:
+        if applySeasonal:
+            applyFiltersOnField(results, field, applySeasonal=True, applyLowPass=False, append="Seasonal")
+    except Exception as e:
+        # If it doesn't work log the error but ignore it
+        tb = traceback.format_exc()
+        log.warn("Error calculating Seasonal filter:\n%s" % tb)
 
-    if applyLowPass:
-        applyFiltersOnField(results, field, applySeasonal=False, applyLowPass=True, append="LowPass")
+    try:
+        if applyLowPass:
+            applyFiltersOnField(results, field, applySeasonal=False, applyLowPass=True, append="LowPass")
+    except Exception as e:
+        # If it doesn't work log the error but ignore it
+        tb = traceback.format_exc()
+        log.warn("Error calculating LowPass filter:\n%s" % tb)
 
-    if applySeasonal and applyLowPass:
-        applyFiltersOnField(results, field, applySeasonal=True, applyLowPass=True, append="SeasonalLowPass")
+    try:
+        if applySeasonal and applyLowPass:
+            applyFiltersOnField(results, field, applySeasonal=True, applyLowPass=True, append="SeasonalLowPass")
+    except Exception as e:
+        # If it doesn't work log the error but ignore it
+        tb = traceback.format_exc()
+        log.warn("Error calculating SeasonalLowPass filter:\n%s" % tb)
 
 
 '''
