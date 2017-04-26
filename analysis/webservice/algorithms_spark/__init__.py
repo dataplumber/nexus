@@ -48,6 +48,11 @@ if module_exists("pyspark"):
     except ImportError:
         pass
 
+    try:
+        import HofMoellerSpark
+    except ImportError:
+        pass
+
 
 else:
     log.warn("pyspark not found. Skipping algorithms in %s" % os.path.dirname(__file__))
