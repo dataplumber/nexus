@@ -1575,4 +1575,37 @@
     <defaultQuery>*:*</defaultQuery>
   </admin>
 
+  <!-- Solr Replication
+
+       The SolrReplicationHandler supports replicating indexes from a
+       "master" used for indexing and "slaves" used for queries.
+
+       http://wiki.apache.org/solr/SolrReplication
+
+       It is also necessary for SolrCloud to function (in Cloud mode, the
+       replication handler is used to bulk transfer segments when nodes
+       are added or need to recover).
+
+       https://wiki.apache.org/solr/SolrCloud/
+    -->
+  <requestHandler name="/replication" class="solr.ReplicationHandler" >
+    <!--
+       To enable simple master/slave replication, uncomment one of the
+       sections below, depending on whether this solr instance should be
+       the "master" or a "slave".  If this instance is a "slave" you will
+       also need to fill in the masterUrl to point to a real machine.
+    -->
+      <lst name="master">
+         <str name="enable">${enable.master:false}</str>
+         <str name="replicateAfter">commit</str>
+         <str name="replicateAfter">startup</str>
+         <str name="confFiles">schema.xml,stopwords.txt</str>
+      </lst>
+      <lst name="slave">
+         <str name="enable">${enable.slave:false}</str>
+         <str name="masterUrl">http://localhost:8983/solr/${solr.core.name}</str>
+         <str name="pollInterval">00:00:60</str>
+      </lst>
+  </requestHandler>
+
 </config>
