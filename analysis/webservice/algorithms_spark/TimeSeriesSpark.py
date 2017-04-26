@@ -284,6 +284,8 @@ class TimeSeriesCalculator(SparkHandler):
     def calc_average_on_day(tile_in_spark):
         (min_lat, max_lat, min_lon, max_lon, dataset,
          timestamps, fill) = tile_in_spark
+        if len(timestamps) == 0:
+            return []
         start_time = timestamps[0]
         end_time = timestamps[-1]
         tile_service = NexusTileService()
