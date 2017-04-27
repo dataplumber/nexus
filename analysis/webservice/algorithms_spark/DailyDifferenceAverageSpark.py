@@ -179,12 +179,12 @@ class DailyDifferenceAverageSparkImpl(SparkHandler):
                 "units": u'psu',
                 "label": u'Difference from 5-Day mean (psu)'
             }
-        elif 'CCMP_V2.0_L3.0' == dataset:
+        elif 'ccmp' in dataset.lower():
             meta = {
                 "title": "Wind Speed Anomalies",
-                "description": "Wind Speed anomalies are departures from the 5-day pixel mean",
+                "description": "Wind Speed anomalies are departures from the 1-day pixel mean",
                 "units": u'm/s',
-                "label": u'Difference from 5-Day mean (m/s)'
+                "label": u'Difference from 1-Day mean (m/s)'
             }
         else:
             meta = {
