@@ -70,16 +70,33 @@ class TimeSeriesHandlerImpl(SparkHandler):
         results = self._mergeResults(resultsRaw)
 
         if len(ds) == 2:
-            stats = self.calculateComparisonStats(results, suffix="")
+            try:
+                stats = self.calculateComparisonStats(results, suffix="")
+            except Exception:
+                stats = {}
+                tb = traceback.format_exc()
+                self.log.warn("Error when calculating comparison stats:\n%s" % tb)
             if computeOptions.get_apply_seasonal_cycle_filter():
-                s = self.calculateComparisonStats(results, suffix="Seasonal")
-                stats = self._mergeDicts(stats, s)
+                try:
+                    s = self.calculateComparisonStats(results, suffix="Seasonal")
+                    stats = self._mergeDicts(stats, s)
+                except Exception:
+                    tb = traceback.format_exc()
+                    self.log.warn("Error when calculating Seasonal comparison stats:\n%s" % tb)
             if computeOptions.get_apply_low_pass_filter():
-                s = self.calculateComparisonStats(results, suffix="LowPass")
-                stats = self._mergeDicts(stats, s)
+                try:
+                    s = self.calculateComparisonStats(results, suffix="LowPass")
+                    stats = self._mergeDicts(stats, s)
+                except Exception:
+                    tb = traceback.format_exc()
+                    self.log.warn("Error when calculating LowPass comparison stats:\n%s" % tb)
             if computeOptions.get_apply_seasonal_cycle_filter() and computeOptions.get_apply_low_pass_filter():
-                s = self.calculateComparisonStats(results, suffix="SeasonalLowPass")
-                stats = self._mergeDicts(stats, s)
+                try:
+                    s = self.calculateComparisonStats(results, suffix="SeasonalLowPass")
+                    stats = self._mergeDicts(stats, s)
+                except Exception:
+                    tb = traceback.format_exc()
+                    self.log.warn("Error when calculating SeasonalLowPass comparison stats:\n%s" % tb)
         else:
             stats = {}
 

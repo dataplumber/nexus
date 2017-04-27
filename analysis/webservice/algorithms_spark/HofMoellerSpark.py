@@ -162,6 +162,7 @@ class LatitudeTimeHoffMoellerSparkHandlerImpl(BaseHoffMoellerHandlerImpl):
         rdd = self._sc.parallelize(nexus_tiles_spark, determine_parllelism(len(nexus_tiles_spark)))
         results = rdd.map(LatitudeHofMoellerCalculator.latitude_time_hofmoeller_stats).collect()
 
+        results = filter(None, results)
         results = sorted(results, key=lambda entry: entry["time"])
 
         results = self.applyDeseasonToHofMoeller(results)
@@ -195,6 +196,7 @@ class LongitudeTimeHoffMoellerSparkHandlerImpl(BaseHoffMoellerHandlerImpl):
         rdd = self._sc.parallelize(nexus_tiles_spark, determine_parllelism(len(nexus_tiles_spark)))
         results = rdd.map(LongitudeHofMoellerCalculator.longitude_time_hofmoeller_stats).collect()
 
+        results = filter(None, results)
         results = sorted(results, key=lambda entry: entry["time"])
 
         results = self.applyDeseasonToHofMoeller(results, pivot="lons")
