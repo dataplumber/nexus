@@ -108,19 +108,22 @@ class TimeSeriesHandlerImpl(SparkHandler):
                                                                 start_time,
                                                                 end_time)
 
-        if len(daysinrange) == 0:
+        ndays = len(daysinrange)
+        if ndays == 0:
             raise NoDataException(reason="No data found for selected timeframe")
 
-        self.log.debug('Found {0} days in range'.format(len(daysinrange)))
+        self.log.debug('Found {0} days in range'.format(ndays))
         for i, d in enumerate(daysinrange):
             self.log.debug('{0}, {1}'.format(i, datetime.utcfromtimestamp(d)))
+        spark_nparts_needed = min(spark_nparts, ndays)
         nexus_tiles_spark = [(min_lat, max_lat, min_lon, max_lon, ds,
                               list(daysinrange_part), fill)
                              for daysinrange_part
-                             in np.array_split(daysinrange, spark_nparts)]
+                             in np.array_split(daysinrange, 
+                                               spark_nparts_needed)]
 
         # Launch Spark computations
-        rdd = self._sc.parallelize(nexus_tiles_spark, spark_nparts)
+        rdd = self._sc.parallelize(nexus_tiles_spark, spark_nparts_needed)
         results = rdd.map(TimeSeriesCalculator.calc_average_on_day).collect()
         #
         results = list(itertools.chain.from_iterable(results))
@@ -284,6 +287,8 @@ class TimeSeriesCalculator(SparkHandler):
     def calc_average_on_day(tile_in_spark):
         (min_lat, max_lat, min_lon, max_lon, dataset,
          timestamps, fill) = tile_in_spark
+        if len(timestamps) == 0:
+            return []
         start_time = timestamps[0]
         end_time = timestamps[-1]
         tile_service = NexusTileService()
