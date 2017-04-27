@@ -176,9 +176,39 @@ class CCMPWind:
 
         return v
 
+class SMAP_L3M_SSS:
+    ExpectedRunTime = "28m"
+    UrlsPath = "/data/share/datasets/SMAP_L3_SSS/monthly/RSS_smap_SSS_monthly_*.nc"
+    ExampleFileName = 'RSS_smap_SSS_monthly_2015_04_v02.0.nc'
+    GetKeysRegex = r'RSS_smap_SSS_monthly_(....)_(..)_v02'
+
+    Variable = 'sss_smap'
+    Mask = None
+    Coordinates = ['lat', 'lon']
+
+    OutputClimTemplate = ''
+
+    @staticmethod
+    def keysTransformer(s):
+#        return (ymd2doy(s[0], s[1], 1),s[0])  # DOY, YEAR
+        return (s[1],s[0])  # MONTH, YEAR
+
+    @staticmethod
+    def getKeys(url):
+        return extractKeys(url, SMAP_L3M_SSS.GetKeysRegex, SMAP_L3M_SSS.keysTransformer)
+
+    @staticmethod
+    def split(seq, n):
+        return [u for u in splitByNDaysKeyed(seq, n, SMAP_L3M_SSS.GetKeysRegex, SMAP_L3M_SSS.keysTransformer)]
+
+    @staticmethod
+    def genOutputName(month, variable, nEpochs, averagingConfig):
+        return '%s_L3m_clim_month%02d_nepochs%d_%s.nc' % (
+            variable, month, nEpochs, averagingConfig['name'])  # mark each file with month
 
 DatasetList = {'ModisSst': ModisSst, 'ModisChlor': ModisChlor,
-               'MeasuresSsh': MeasuresSsh, 'CCMPWind': CCMPWind}
+               'MeasuresSsh': MeasuresSsh, 'CCMPWind': CCMPWind,
+               'SMAP_L3M_SSS': SMAP_L3M_SSS}
 
 
 # Utils follow.
