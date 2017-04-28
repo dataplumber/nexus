@@ -202,8 +202,11 @@ class SMAP_L3M_SSS:
 
     @staticmethod
     def genOutputName(month, variable, nEpochs, averagingConfig):
-        return '%s_L3m_clim_month%02d_nepochs%d_%s.nc' % (
-            variable, month, nEpochs, averagingConfig['name'])  # mark each file with month
+        # Here we use the 15th of the month to get DOY and just use any
+        # non-leap year.
+        doy = datetime2doy(ymd2datetime(2017, month, 15))
+        return '%s_L3m_clim_doy%03d_month%02d_nepochs%d_%s.nc' % (
+            variable, doy, month, nEpochs, averagingConfig['name'])  # mark each file with month
 
 DatasetList = {'ModisSst': ModisSst, 'ModisChlor': ModisChlor,
                'MeasuresSsh': MeasuresSsh, 'CCMPWind': CCMPWind,
