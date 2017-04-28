@@ -190,7 +190,6 @@ class SMAP_L3M_SSS:
 
     @staticmethod
     def keysTransformer(s):
-#        return (ymd2doy(s[0], s[1], 1),s[0])  # DOY, YEAR
         return (s[1],s[0])  # MONTH, YEAR
 
     @staticmethod
