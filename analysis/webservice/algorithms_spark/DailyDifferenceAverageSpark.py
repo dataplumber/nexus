@@ -186,6 +186,13 @@ class DailyDifferenceAverageSparkImpl(SparkHandler):
                 "units": u'm/s',
                 "label": u'Difference from 1-Day mean (m/s)'
             }
+        elif 'trmm' in dataset.lower():
+            meta = {
+                "title": "Precipitation Anomalies",
+                "description": "Precipitation anomalies are departures from the 5-day pixel mean",
+                "units": u'mm',
+                "label": u'Difference from 5-Day mean (mm)'
+            }
         else:
             meta = {
                 "title": "Anomalies",
