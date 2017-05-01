@@ -1,4 +1,4 @@
-#Reuirements
+# Reuirements
 
 * Vagrant (https://www.vagrantup.com/downloads.html) minimum version 1.8.1
   * The [vagrant-vbguest](https://github.com/dotless-de/vagrant-vbguest) plugin is also required. Once vagrant is installed, run `vagrant plugin install vagrant-vbguest`
