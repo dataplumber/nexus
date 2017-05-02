@@ -331,14 +331,20 @@ class TimeSeriesCalculator(SparkHandler):
 
         stats_arr = []
         for timeinseconds in timestamps:
-            tile_data_agg = np.ma.array([tile.data.flatten() \
-                                         for tile in ds1_nexus_tiles \
-                                         if (tile.times[0] == timeinseconds)])
-            lats_agg = np.array([np.repeat(tile.latitudes,
-                                           len(tile.longitudes))
-                                 for tile in ds1_nexus_tiles
-                                 if (tile.times[0] ==
-                                     timeinseconds)])
+            tile_data_agg = \
+                np.ma.array(data=np.hstack([tile.data.data.flatten() 
+                                            for tile in ds1_nexus_tiles
+                                            if (tile.times[0] == 
+                                                timeinseconds)]),
+                            mask=np.hstack([tile.data.mask.flatten() 
+                                            for tile in ds1_nexus_tiles
+                                            if (tile.times[0] == 
+                                                timeinseconds)]))
+            lats_agg = np.hstack([np.repeat(tile.latitudes,
+                                            len(tile.longitudes))
+                                  for tile in ds1_nexus_tiles
+                                  if (tile.times[0] ==
+                                      timeinseconds)])
             if (len(tile_data_agg) == 0) or tile_data_agg.mask.all():
                 continue
             else:
