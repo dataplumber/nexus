@@ -340,11 +340,7 @@ class TimeSeriesCalculator(SparkHandler):
                                  if (tile.times[0] ==
                                      timeinseconds)])
             if (len(tile_data_agg) == 0) or tile_data_agg.mask.all():
-                data_min = fill
-                data_max = fill
-                daily_mean = fill
-                data_count = 0
-                data_std = 0.
+                continue
             else:
                 data_min = np.ma.min(tile_data_agg)
                 data_max = np.ma.max(tile_data_agg)
