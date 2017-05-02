@@ -1,16 +1,12 @@
 /*****************************************************************************
-* Copyright (c) 2016 Jet Propulsion Laboratory,
-* California Institute of Technology.  All rights reserved
-*****************************************************************************/
+ * Copyright (c) 2016 Jet Propulsion Laboratory,
+ * California Institute of Technology.  All rights reserved
+ *****************************************************************************/
 package org.nasa.jpl.nexus.ingest.nexussink
 
-import org.apache.commons.lang.NotImplementedException
-import org.apache.solr.client.solrj.request.AbstractUpdateRequest
-import org.apache.solr.client.solrj.request.UpdateRequest
 import org.apache.solr.common.SolrInputDocument
 import org.apache.solr.common.SolrInputField
 import org.nasa.jpl.nexus.ingest.wiretypes.NexusContent
-import org.nasa.jpl.nexus.ingest.wiretypes.NexusContent.GridTile
 import org.nasa.jpl.nexus.ingest.wiretypes.NexusContent.NexusTile
 import org.nasa.jpl.nexus.ingest.wiretypes.NexusContent.TileSummary
 import org.slf4j.Logger
@@ -28,13 +24,12 @@ import java.text.SimpleDateFormat
  */
 class NexusService {
 
-    @Resource
     private Environment environment;
 
     private Logger log = LoggerFactory.getLogger(NexusService.class)
 
-    private static final def iso = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm'Z'")
-    static{
+    private static final def iso = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+    static {
         iso.setTimeZone(TimeZone.getTimeZone("UTC"))
     }
 
@@ -42,20 +37,25 @@ class NexusService {
     private CassandraOperations cassandraTemplate
 
     //TODO This will be refactored at some point to be dynamic per-message. Or maybe per-group.
-    private String tableName="sea_surface_temp"
+    private String tableName = "sea_surface_temp"
 
     public NexusService(SolrOperations solr, CassandraOperations cassandraTemplate) {
         this.solr = solr
         this.cassandraTemplate = cassandraTemplate
     }
 
+    @Resource
+    void setEnvironment(Environment environment) {
+        this.environment = environment
+    }
+
     def saveToNexus(Collection<NexusTile> nexusTiles) {
 
-        def solrdocs = nexusTiles.collect { nexusTile -> getSolrDocFromTileSummary(nexusTile.summary)}
+        def solrdocs = nexusTiles.collect { nexusTile -> getSolrDocFromTileSummary(nexusTile.summary) }
         solr.saveDocuments(solrdocs, environment.getProperty("solrCommitWithin", Integer.class, 1000))
 
         def query = "insert into ${tableName} (tile_id, tile_blob) VALUES (?, ?)"
-        cassandraTemplate.ingest(query, nexusTiles.collect{ nexusTile -> getCassandraRowFromTileData(nexusTile.tile)})
+        cassandraTemplate.ingest(query, nexusTiles.collect { nexusTile -> getCassandraRowFromTileData(nexusTile.tile) })
 
     }
 
@@ -65,9 +65,9 @@ class NexusService {
         def stats = summary.getStats()
 
         def startCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
-        startCal.setTime(new Date(stats.minTime*1000))
+        startCal.setTime(new Date(stats.minTime * 1000))
         def endCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
-        endCal.setTime(new Date(stats.maxTime*1000))
+        endCal.setTime(new Date(stats.maxTime * 1000))
 
         def minTime = iso.format(startCal.getTime())
         def maxTime = iso.format(endCal.getTime())
@@ -96,14 +96,14 @@ class NexusService {
         ]
 
         summary.globalAttributesList.forEach { attribute ->
-            doc["${attribute.name}"] = attribute.valuesCount==1?attribute.getValues(0):attribute.getValuesList().toList()
+            doc["${attribute.name}"] = attribute.valuesCount == 1 ? attribute.getValues(0) : attribute.getValuesList().toList()
         }
 
         def solrdoc = toSolrInputDocument(doc)
         return solrdoc
     }
 
-    private determineGeo(def summary){
+    private determineGeo(def summary) {
         //Solr cannot index a POLYGON where all corners are the same point or when there are only 2 distinct points (line).
         //Solr is configured for a specific precision so we need to round to that precision before checking equality.
         def geoPrecision = environment.getProperty("solrGeoPrecision", Integer.class, 3)
@@ -113,22 +113,22 @@ class NexusService {
         def lonMax = summary.bbox.lonMax.round(geoPrecision)
         def geo
         //If lat min = lat max and lon min = lon max, index the 'geo' bounding box as a POINT instead of a POLYGON
-        if(latMin == latMax && lonMin == lonMax){
+        if (latMin == latMax && lonMin == lonMax) {
             geo = "POINT(${lonMin} ${latMin})"
             log.debug("${summary.tileId}\t${summary.granule}[${summary.sectionSpec}] geo=$geo")
         }
         //If lat min = lat max but lon min != lon max, then we essentially have a line.
-        else if(latMin == latMax){
+        else if (latMin == latMax) {
             geo = "LINESTRING (${lonMin} ${latMin}, ${lonMax} ${latMin})"
             log.debug("${summary.tileId}\t${summary.granule}[${summary.sectionSpec}] geo=$geo")
         }
         //Same if lon min = lon max but lat min != lat max
-        else if(lonMin == lonMax){
+        else if (lonMin == lonMax) {
             geo = "LINESTRING (${lonMin} ${latMin}, ${lonMin} ${latMax})"
             log.debug("${summary.tileId}\t${summary.granule}[${summary.sectionSpec}] geo=$geo")
         }
         //All other cases should use POLYGON
-        else{
+        else {
             geo = "POLYGON((" +
                     "${lonMin} ${latMin}, " +
                     "${lonMax} ${latMin}, " +
@@ -159,7 +159,7 @@ class NexusService {
         return row
     }
 
-    public static void main(String... args){
+    public static void main(String... args) {
 
     }
 }
