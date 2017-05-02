@@ -12,6 +12,11 @@ RUN conda create -y --name nexus-xd-python-modules python && \
     
 # Install Spring XD
 RUN groupadd -r springxd && useradd -r -g springxd springxd
+ENV PATH $PATH:/usr/local/anaconda2/bin
+ENV M2_HOME /usr/local/apache-maven
+ENV M2 $M2_HOME/bin 
+ENV PATH $PATH:$M2
+
 WORKDIR /usr/local/spring-xd
 RUN wget -q "http://repo.spring.io/libs-release/org/springframework/xd/spring-xd/1.3.1.RELEASE/spring-xd-1.3.1.RELEASE-dist.zip" && \
     unzip spring-xd-1.3.1.RELEASE-dist.zip && \
@@ -40,7 +45,8 @@ USER root
 WORKDIR /tmp
 COPY install-custom-software.sh /tmp/install-custom-software.sh
 RUN /bin/bash install-custom-software.sh
-RUN chown -R springxd:springxd /usr/local/spring-xd/spring-xd-1.3.1.RELEASE
+RUN chown -R springxd:springxd /usr/local/spring-xd/spring-xd-1.3.1.RELEASE && \
+    chown -R springxd:springxd /usr/local/anaconda2/envs/nexus-xd-python-modules/
 VOLUME ["/usr/local/data/nexus"]
 
 COPY nexus-ingest.sh /usr/local/nexus-ingest.sh
