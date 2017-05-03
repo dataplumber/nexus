@@ -329,21 +329,32 @@ class TimeSeriesCalculator(SparkHandler):
         #                                                      timestamps[0],
         #                                                      timestamps[-1])
 
+        tile_dict = {}
+        for timeinseconds in timestamps:
+            tile_dict[timeinseconds] = []
+
+        for i in range(len(ds1_nexus_tiles)):
+            tile = ds1_nexus_tiles[i]
+            tile_dict[tile.times[0]].append(i)
+            
         stats_arr = []
         for timeinseconds in timestamps:
+            cur_tile_list = tile_dict[timeinseconds]
+            if len(cur_tile_list) == 0:
+                continue
             tile_data_agg = \
-                np.ma.array(data=np.hstack([tile.data.data.flatten() 
-                                            for tile in ds1_nexus_tiles
-                                            if (tile.times[0] == 
+                np.ma.array(data=np.hstack([ds1_nexus_tiles[i].data.data.flatten() 
+                                            for i in cur_tile_list
+                                            if (ds1_nexus_tiles[i].times[0] == 
                                                 timeinseconds)]),
-                            mask=np.hstack([tile.data.mask.flatten() 
-                                            for tile in ds1_nexus_tiles
-                                            if (tile.times[0] == 
+                            mask=np.hstack([ds1_nexus_tiles[i].data.mask.flatten() 
+                                            for i in cur_tile_list
+                                            if (ds1_nexus_tiles[i].times[0] == 
                                                 timeinseconds)]))
-            lats_agg = np.hstack([np.repeat(tile.latitudes,
-                                            len(tile.longitudes))
-                                  for tile in ds1_nexus_tiles
-                                  if (tile.times[0] ==
+            lats_agg = np.hstack([np.repeat(ds1_nexus_tiles[i].latitudes,
+                                            len(ds1_nexus_tiles[i].longitudes))
+                                  for i in cur_tile_list
+                                  if (ds1_nexus_tiles[i].times[0] ==
                                       timeinseconds)])
             if (len(tile_data_agg) == 0) or tile_data_agg.mask.all():
                 continue
