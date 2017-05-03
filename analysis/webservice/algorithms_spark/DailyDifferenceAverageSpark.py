@@ -380,7 +380,7 @@ def generate_diff(data_tile, climatology_tile):
     diff = np.subtract(data_tile.data, climatology_tile.data)
     diff_sum = np.nansum(diff)
     diff_var = np.nanvar(diff)
-    diff_ct = diff.size - np.count_nonzero(np.isnan(diff))
+    diff_ct = np.ma.count(diff)
 
     date_in_seconds = int((datetime.combine(data_tile.min_time.date(), datetime.min.time()).replace(
         tzinfo=pytz.UTC) - EPOCH).total_seconds())
