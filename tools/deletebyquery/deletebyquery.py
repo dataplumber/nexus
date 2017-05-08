@@ -53,11 +53,15 @@ def delete_by_query(args):
     if args.query:
         se = SearchOptions()
         se.commonparams.q(args.query) \
-            .fq(args.filterquery) \
             .fl('id')
+
+        for fq in args.filterquery if args.filterquery is not None else []:
+            se.commonparams.fq(fq)
+
         query = se
     elif args.jsonparams:
-        se = SearchOptions(**json.loads(args.jsonparams)).commonparams.fl('id')
+        se = SearchOptions(**json.loads(args.jsonparams))
+        se.commonparams.fl('id')
         query = se
     else:
         raise RuntimeError("either query or jsonparams is required")
@@ -182,7 +186,7 @@ def parse_args():
                         help='The hostname(s) or IP(s) of the Cassandra server(s).',
                         required=True,
                         nargs='+',
-                        metavar='127.0.0.x')
+                        metavar=('127.0.0.100', '127.0.0.101'))
 
     parser.add_argument('-k', '--cassandraKeyspace',
                         help='The Cassandra keyspace.',
