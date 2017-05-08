@@ -41,6 +41,10 @@ except KeyError:
     start_of_day = None
     start_of_day_pattern = None
 
+try:
+    time_offset = long(environ['TIME_OFFSET'])
+except KeyError:
+    time_offset = None
 
 @contextmanager
 def closing(thing):
@@ -88,7 +92,7 @@ def slices_from_spec(spec):
     return spec, dimtoslice
 
 
-def to_seconds_from_epoch(date, timeunits=None, start_day=None):
+def to_seconds_from_epoch(date, timeunits=None, start_day=None, timeoffset=None):
     try:
         date = num2date(date, units=timeunits)
     except ValueError:
@@ -101,7 +105,10 @@ def to_seconds_from_epoch(date, timeunits=None, start_day=None):
     else:
         date = timezone('UTC').localize(datetime.datetime.strptime(str(date), '%Y-%m-%d %H:%M:%S'))
 
-    return long((date - EPOCH).total_seconds())
+    if timeoffset is not None:
+        return long((date - EPOCH).total_seconds()) + timeoffset
+    else:
+        return long((date - EPOCH).total_seconds())
 
 
 def get_ordered_slices(ds, variable, dimension_to_slice):
@@ -152,7 +159,7 @@ def read_grid_data(self, section_spec_dataset):
             if time is not None:
                 timevar = ds[time]
                 # Note assumption is that index of time is start value in dimtoslice
-                tile.time = to_seconds_from_epoch(timevar[dimtoslice[time].start], timeunits=timevar.getncattr('units'))
+                tile.time = to_seconds_from_epoch(timevar[dimtoslice[time].start], timeunits=timevar.getncattr('units'), timeoffset=time_offset)
 
             nexus_tile = new_nexus_tile(file_path, section_spec)
             nexus_tile.tile.grid_tile.CopyFrom(tile)
@@ -192,7 +199,7 @@ def read_swath_data(self, section_spec_dataset):
 
             for index in numpy.ndindex(timetile.shape):
                 timetile[index] = to_seconds_from_epoch(timetile[index].item(), timeunits=timeunits,
-                                                        start_day=start_of_day_date)
+                                                        start_day=start_of_day_date, timeoffset=time_offset)
 
             tile.time.CopyFrom(to_shaped_array(timetile))
 
