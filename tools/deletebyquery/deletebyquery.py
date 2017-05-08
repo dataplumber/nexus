@@ -212,7 +212,7 @@ def parse_args():
                         default='sea_surface_temp')
 
     parser.add_argument('-p', '--cassandraPort',
-                        help='The version of the Cassandra protocol the driver should use.',
+                        help='The port used to connect to Cassandra.',
                         required=False,
                         default='9042')
 
