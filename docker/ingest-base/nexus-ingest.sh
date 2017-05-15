@@ -28,6 +28,9 @@ done
 
 if [ "$SINGLENODE" = true ]; then
     source activate nexus-xd-python-modules
+    
+    export JAVA_OPTS="-Dgrape.root=/usr/local/repositories/.groovy/grapes -Dgroovy.root=/usr/local/repositories/.groovy/ -Dgrape.config=/usr/local/repositories/.groovy/grapeConfig.xml"
+    
     xd-singlenode --hadoopDistro none
 elif [ "$CONTAINER"  = true ]; then
     source activate nexus-xd-python-modules
@@ -52,6 +55,7 @@ elif [ "$CONTAINER"  = true ]; then
     export XD_MESSAGEBUS_KAFKA_DEFAULT_QUEUESIZE=4
     export XD_MESSAGEBUS_KAFKA_DEFAULT_FETCHSIZE=2048576
     
+    export JAVA_OPTS="-Dgrape.root=/usr/local/repositories/.groovy/grapes -Dgroovy.root=/usr/local/repositories/.groovy/ -Dgrape.config=/usr/local/repositories/.groovy/grapeConfig.xml"
     
     xd-container --hadoopDistro none
 elif [ "$ADMIN"  = true ]; then
@@ -76,6 +80,9 @@ elif [ "$ADMIN"  = true ]; then
     export XD_MESSAGEBUS_KAFKA_SOCKETBUFFERSIZE=3097152
     export XD_MESSAGEBUS_KAFKA_DEFAULT_QUEUESIZE=4
     export XD_MESSAGEBUS_KAFKA_DEFAULT_FETCHSIZE=2048576
+    
+    export JAVA_OPTS="-Dgrape.root=/usr/local/repositories/.groovy/grapes -Dgroovy.root=/usr/local/repositories/.groovy/ -Dgrape.config=/usr/local/repositories/.groovy/grapeConfig.xml"
+    
     xd-admin --hadoopDistro none
 else
     echo "One of -s, -c, or -a is required."

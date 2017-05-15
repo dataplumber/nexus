@@ -11,11 +11,7 @@ RUN conda create -y --name nexus-xd-python-modules python && \
     conda install -y -c conda-forge nco=4.6.4 netcdf4=1.2.7
     
 # Install Spring XD
-RUN groupadd -r springxd && useradd -r -g springxd springxd
-ENV PATH $PATH:/usr/local/anaconda2/bin
-ENV M2_HOME /usr/local/apache-maven
-ENV M2 $M2_HOME/bin 
-ENV PATH $PATH:$M2
+RUN groupadd -r springxd && adduser -r -g springxd springxd
 
 WORKDIR /usr/local/spring-xd
 RUN wget -q "http://repo.spring.io/libs-release/org/springframework/xd/spring-xd/1.3.1.RELEASE/spring-xd-1.3.1.RELEASE-dist.zip" && \
@@ -38,15 +34,25 @@ COPY xd-singlenode-logback.groovy /usr/local/spring-xd/current/xd/config/xd-sing
 VOLUME ["/usr/local/spring-xd/current/xd/config"]
 EXPOSE 9393
 
+# Configure Java Library Repositories
+ENV PATH $PATH:/usr/local/anaconda2/bin
+ENV M2_HOME /usr/local/apache-maven
+ENV M2 $M2_HOME/bin 
+ENV PATH $PATH:$M2
+USER root
+COPY maven_settings.xml $M2_HOME/conf/settings.xml
+COPY ivy_settings.xml /usr/local/repositories/.groovy/grapeConfig.xml
+RUN mkdir -p /usr/local/repositories/.m2 && mkdir -p /usr/local/repositories/.groovy && chown -R springxd:springxd /usr/local/repositories
+
 # ########################
 # # nexus-ingest code   #
 # ########################
-USER root
 WORKDIR /tmp
 COPY install-custom-software.sh /tmp/install-custom-software.sh
 RUN /bin/bash install-custom-software.sh
 RUN chown -R springxd:springxd /usr/local/spring-xd/spring-xd-1.3.1.RELEASE && \
-    chown -R springxd:springxd /usr/local/anaconda2/envs/nexus-xd-python-modules/
+    chown -R springxd:springxd /usr/local/anaconda2/envs/nexus-xd-python-modules/ && \
+    chown -R springxd:springxd /usr/local/repositories
 VOLUME ["/usr/local/data/nexus"]
 
 COPY nexus-ingest.sh /usr/local/nexus-ingest.sh
