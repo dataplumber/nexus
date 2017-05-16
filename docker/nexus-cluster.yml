@@ -1,0 +1,103 @@
+version: '3'
+
+networks:
+  nexus:
+      external: true
+
+services:
+
+    mysqldb:
+        image: mysql:8
+        command: [--character-set-server=latin1, --collation-server=latin1_swedish_ci]
+        hostname: mysqldb
+        environment:
+            - MYSQL_RANDOM_ROOT_PASSWORD=yes
+            - MYSQL_DATABASE=xdjob
+            - MYSQL_USER=xd
+            - MYSQL_PASSWORD=admin
+        networks:
+            - nexus
+        ports:
+            - "3306"
+        deploy:
+            restart_policy:
+                condition: any
+                delay: 5s
+                max_attempts: 3
+                window: 120s
+            placement:
+                constraints:
+                    - node.labels.nexus.ingest-admin == true
+                    
+    redis:
+        image: redis:3
+        hostname: redis
+        networks:
+            - nexus
+        ports:
+            - "6379"
+        deploy:
+            restart_policy:
+                condition: any
+                delay: 5s
+                max_attempts: 3
+                window: 120s
+            placement:
+                constraints:
+                    - node.labels.nexus.ingest-admin == true
+                    
+    xd-admin:
+        image: nexusjpl/ingest-admin
+        hostname: xd-admin
+        networks:
+            - nexus
+        ports:
+            - "9393"
+        environment:
+            - MYSQL_PORT_3306_TCP_ADDR=mysqldb
+            - MYSQL_PORT_3306_TCP_PORT=3306
+            - MYSQL_USER=xd
+            - MYSQL_PASSWORD=admin
+            - REDIS_ADDR=redis
+            - REDIS_PORT=6379
+            - ZOOKEEPER_CONNECT=zk1:2181,zk2:2181,zk3:2181
+            - ZOOKEEPER_XD_CHROOT=springxd
+            - KAFKA_BROKERS=kafka1:9092,kafka2:9092,kafka3:9092
+            - KAFKA_ZKADDRESS=zk1:2181,zk2:2181,zk3:2181/kafka
+        deploy:
+            restart_policy:
+                condition: any
+                delay: 5s
+                max_attempts: 3
+                window: 120s
+            placement:
+                constraints:
+                    - node.labels.nexus.ingest-admin == true
+  
+    xd-container:
+        image: nexusjpl/ingest-container
+        networks:
+            - nexus
+        volumes:
+            - /efs/data/share/datasets:/usr/local/data/nexus/
+        environment:
+            - MYSQL_PORT_3306_TCP_ADDR=mysqldb
+            - MYSQL_PORT_3306_TCP_PORT=3306
+            - MYSQL_USER=xd
+            - MYSQL_PASSWORD=admin
+            - REDIS_ADDR=redis
+            - REDIS_PORT=6379
+            - ZOOKEEPER_CONNECT=zk1:2181,zk2:2181,zk3:2181
+            - ZOOKEEPER_XD_CHROOT=springxd
+            - KAFKA_BROKERS=kafka1:9092,kafka2:9092,kafka3:9092
+            - KAFKA_ZKADDRESS=zk1:2181,zk2:2181,zk3:2181/kafka
+        deploy:
+            mode: global
+            restart_policy:
+                condition: any
+                delay: 5s
+                max_attempts: 5
+                window: 120s
+            placement:
+                constraints:
+                    - node.labels.nexus.ingest == true
