@@ -176,29 +176,57 @@ class CCMPWind:
 
         return v
 
-class SMAP_L3M_SSS:
-    ExpectedRunTime = "28m"
-    UrlsPath = "/data/share/datasets/SMAP_L3_SSS/monthly/RSS_smap_SSS_monthly_*.nc"
-    ExampleFileName = 'RSS_smap_SSS_monthly_2015_04_v02.0.nc'
-    GetKeysRegex = r'RSS_smap_SSS_monthly_(....)_(..)_v02'
-
-    Variable = 'sss_smap'
+class MonthlyClimDataset:
+    ExpectedRunTime = "2m"
+    UrlsPath = ''
+    ExampleFileName = ''
+    GetKeysRegex = r'(YYYY)(MM)(DD)' # Regex to extract year, month, day
+    Variable = 'var' # Variable name in granule
     Mask = None
     Coordinates = ['lat', 'lon']
-
     OutputClimTemplate = ''
 
     @staticmethod
-    def keysTransformer(s):
-        return (s[1],s[0])  # MONTH, YEAR
+    def keysTransformer(s): 
+        return (s[1],s[0]) # MONTH, YEAR
 
     @staticmethod
     def getKeys(url):
-        return extractKeys(url, SMAP_L3M_SSS.GetKeysRegex, SMAP_L3M_SSS.keysTransformer)
+        return extractKeys(url, MonthlyClimDataset.GetKeysRegex, 
+                           MonthlyClimDataset.keysTransformer)
 
     @staticmethod
     def split(seq, n):
-        return [u for u in splitByNDaysKeyed(seq, n, SMAP_L3M_SSS.GetKeysRegex, SMAP_L3M_SSS.keysTransformer)]
+        return [u for u in splitByNDaysKeyed(seq, n, 
+                                             MonthlyClimDataset.GetKeysRegex, 
+                                             MonthlyClimDataset.keysTransformer)]
+
+    @staticmethod
+    def genOutputName(month, variable, nEpochs, averagingConfig):
+        # Here we use the 15th of the month to get DOY and just use any
+        # non-leap year.
+        doy = datetime2doy(ymd2datetime(2017, month, 15))
+        return 'monthly_clim_%s_%03d_month%02d_nepochs%d_%s.nc' % (
+            variable, doy, month, nEpochs, 
+            averagingConfig['name'])  # mark each file with month
+
+
+class SMAP_L3M_SSS(MonthlyClimDataset):
+    UrlsPath = "/data/share/datasets/SMAP_L3_SSS/monthly/RSS_smap_SSS_monthly_*.nc"
+    ExampleFileName = 'RSS_smap_SSS_monthly_2015_04_v02.0.nc'
+    GetKeysRegex = r'RSS_smap_SSS_monthly_(....)_(..)_v02'
+    Variable = 'sss_smap'
+
+    @staticmethod
+    def getKeys(url):
+        return extractKeys(url, SMAP_L3M_SSS.GetKeysRegex, 
+                           SMAP_L3M_SSS.keysTransformer)
+
+    @staticmethod
+    def split(seq, n):
+        return [u for u in splitByNDaysKeyed(seq, n, 
+                                             SMAP_L3M_SSS.GetKeysRegex, 
+                                             SMAP_L3M_SSS.keysTransformer)]
 
     @staticmethod
     def genOutputName(month, variable, nEpochs, averagingConfig):
@@ -209,29 +237,20 @@ class SMAP_L3M_SSS:
             variable, doy, month, nEpochs, 
             averagingConfig['name'])  # mark each file with month
 
-class GRACE_Tellus:
-    ExpectedRunTime = "2m"
-    UrlsPath = ''
-    ExampleFileName = ''
+class GRACE_Tellus(MonthlyClimDataset):
     GetKeysRegex = r'GRCTellus.JPL.(....)(..)(..).GLO'
-
     Variable = 'lwe_thickness' # Liquid_Water_Equivalent_Thickness
-    Mask = None
-    Coordinates = ['lat', 'lon']
-
-    OutputClimTemplate = ''
-
-    @staticmethod
-    def keysTransformer(s): 
-        return (s[1],s[0]) # MONTH, YEAR
 
     @staticmethod
     def getKeys(url):
-        return extractKeys(url, GRACE_Tellus.GetKeysRegex, GRACE_Tellus.keysTransformer)
+        return extractKeys(url, GRACE_Tellus.GetKeysRegex, 
+                           GRACE_Tellus.keysTransformer)
 
     @staticmethod
     def split(seq, n):
-        return [u for u in splitByNDaysKeyed(seq, n, GRACE_Tellus.GetKeysRegex, GRACE_Tellus.keysTransformer)]
+        return [u for u in splitByNDaysKeyed(seq, n, 
+                                             GRACE_Tellus.GetKeysRegex, 
+                                             GRACE_Tellus.keysTransformer)]
 
     @staticmethod
     def genOutputName(month, variable, nEpochs, averagingConfig):
