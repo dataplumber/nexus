@@ -206,11 +206,74 @@ class SMAP_L3M_SSS:
         # non-leap year.
         doy = datetime2doy(ymd2datetime(2017, month, 15))
         return '%s_L3m_clim_doy%03d_month%02d_nepochs%d_%s.nc' % (
-            variable, doy, month, nEpochs, averagingConfig['name'])  # mark each file with month
+            variable, doy, month, nEpochs, 
+            averagingConfig['name'])  # mark each file with month
+
+class GRACE_Tellus:
+    ExpectedRunTime = "2m"
+    UrlsPath = ''
+    ExampleFileName = ''
+    GetKeysRegex = r'GRCTellus.JPL.(....)(..)(..).GLO'
+
+    Variable = 'lwe_thickness' # Liquid_Water_Equivalent_Thickness
+    Mask = None
+    Coordinates = ['lat', 'lon']
+
+    OutputClimTemplate = ''
+
+    @staticmethod
+    def keysTransformer(s): 
+        return (s[1],s[0]) # MONTH, YEAR
+
+    @staticmethod
+    def getKeys(url):
+        return extractKeys(url, GRACE_Tellus.GetKeysRegex, GRACE_Tellus.keysTransformer)
+
+    @staticmethod
+    def split(seq, n):
+        return [u for u in splitByNDaysKeyed(seq, n, GRACE_Tellus.GetKeysRegex, GRACE_Tellus.keysTransformer)]
+
+    @staticmethod
+    def genOutputName(month, variable, nEpochs, averagingConfig):
+        # Here we use the 15th of the month to get DOY and just use any
+        # non-leap year.
+        doy = datetime2doy(ymd2datetime(2017, month, 15))
+        return 'GRACE_Tellus_monthly_%s_%03d_month%02d_nepochs%d_%s.nc' % (
+            variable, doy, month, nEpochs, 
+            averagingConfig['name'])  # mark each file with month
+
+class GRACE_Tellus_monthly_land(GRACE_Tellus):
+    UrlsPath = "/data/share/datasets/GRACE_Tellus/monthly_land/GRCTellus.JPL.*.nc"
+    ExampleFileName = "GRCTellus.JPL.20150122.GLO.RL05M_1.MSCNv02CRIv02.land.nc"
+
+    @staticmethod
+    def genOutputName(month, variable, nEpochs, averagingConfig):
+        # Here we use the 15th of the month to get DOY and just use any
+        # non-leap year.
+        doy = datetime2doy(ymd2datetime(2017, month, 15))
+        return 'GRACE_Tellus_monthly_land_%s_%03d_month%02d_nepochs%d_%s.nc' % (
+            variable, doy, month, nEpochs, 
+            averagingConfig['name'])  # mark each file with month
+
+class GRACE_Tellus_monthly_ocean(GRACE_Tellus):
+    UrlsPath = "/data/share/datasets/GRACE_Tellus/monthly_ocean/GRCTellus.JPL.*.nc"
+    ExampleFileName = "GRCTellus.JPL.20150122.GLO.RL05M_1.MSCNv02CRIv02.ocean.nc"
+
+    @staticmethod
+    def genOutputName(month, variable, nEpochs, averagingConfig):
+        # Here we use the 15th of the month to get DOY and just use any
+        # non-leap year.
+        doy = datetime2doy(ymd2datetime(2017, month, 15))
+        return 'GRACE_Tellus_monthly_ocean_%s_%03d_month%02d_nepochs%d_%s.nc'%(
+            variable, doy, month, nEpochs, 
+            averagingConfig['name'])  # mark each file with month
+
 
 DatasetList = {'ModisSst': ModisSst, 'ModisChlor': ModisChlor,
                'MeasuresSsh': MeasuresSsh, 'CCMPWind': CCMPWind,
-               'SMAP_L3M_SSS': SMAP_L3M_SSS}
+               'SMAP_L3M_SSS': SMAP_L3M_SSS, 
+               'GRACE_Tellus_monthly_ocean': GRACE_Tellus_monthly_ocean,
+               'GRACE_Tellus_monthly_land': GRACE_Tellus_monthly_land}
 
 
 # Utils follow.
