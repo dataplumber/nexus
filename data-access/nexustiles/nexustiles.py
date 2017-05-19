@@ -46,10 +46,13 @@ class NexusTileServiceException(Exception):
 
 
 class NexusTileService(object):
-    def __init__(self, skipCassandra=False, skipSolr=False):
-        self._config = ConfigParser.RawConfigParser()
-
-        self._config.readfp(pkg_resources.resource_stream(__name__, "config/datastores.ini"), filename='datastores.ini')
+    def __init__(self, config=None, skipCassandra=False, skipSolr=False):
+        if config is None:
+            self._config = ConfigParser.RawConfigParser()
+            self._config.readfp(pkg_resources.resource_stream(__name__, "config/datastores.ini"),
+                                filename='datastores.ini')
+        else:
+            self._config = config
 
         if not skipCassandra:
             self._cass = CassandraProxy(self._config)
@@ -188,22 +191,24 @@ class NexusTileService(object):
             polys.append(box(tile.bbox.min_lon, tile.bbox.min_lat, tile.bbox.max_lon, tile.bbox.max_lat))
         return box(*MultiPolygon(polys).bounds)
 
-    def get_min_time(self, tile_ids):
+    def get_min_time(self, tile_ids, ds=None):
         """
         Get the minimum tile date from the list of tile ids
         :param tile_ids: List of tile ids
+        :param ds: Filter by a specific dataset. Defaults to None (queries all datasets)
         :return: long time in seconds since epoch
         """
-        min_time = self._solr.find_min_date_from_tiles(tile_ids)
+        min_time = self._solr.find_min_date_from_tiles(tile_ids, ds=ds)
         return long((min_time - EPOCH).total_seconds())
 
-    def get_max_time(self, tile_ids):
+    def get_max_time(self, tile_ids, ds=None):
         """
         Get the maximum tile date from the list of tile ids
         :param tile_ids: List of tile ids
+        :param ds: Filter by a specific dataset. Defaults to None (queries all datasets)
         :return: long time in seconds since epoch
         """
-        max_time = self._solr.find_max_date_from_tiles(tile_ids)
+        max_time = self._solr.find_max_date_from_tiles(tile_ids, ds=ds)
         return long((max_time - EPOCH).total_seconds())
 
     def get_distinct_bounding_boxes_in_polygon(self, bounding_polygon, ds, start_time, end_time):
@@ -342,4 +347,3 @@ class NexusTileService(object):
             return True
         else:
             return False
-

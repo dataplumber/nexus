@@ -1,4 +1,5 @@
 import uuid
+from ConfigParser import NoOptionError
 from multiprocessing.synchronize import Lock
 
 import nexusproto.NexusContent_pb2 as nexusproto
@@ -112,7 +113,12 @@ class CassandraProxy(object):
         self.__cass_url = config.get("cassandra", "host")
         self.__cass_keyspace = config.get("cassandra", "keyspace")
         self.__cass_local_DC = config.get("cassandra", "local_datacenter")
-        self.__cass_protocol_version = int(config.get("cassandra", "protocol_version"))
+        self.__cass_protocol_version = config.getint("cassandra", "protocol_version")
+        try:
+            self.__cass_port = config.getint("cassandra", "port")
+        except NoOptionError:
+            self.__cass_port = 9042
+
         with INIT_LOCK:
             try:
                 connection.get_cluster()
@@ -124,7 +130,8 @@ class CassandraProxy(object):
         dc_policy = DCAwareRoundRobinPolicy(self.__cass_local_DC)
         token_policy = TokenAwarePolicy(dc_policy)
         connection.setup([host for host in self.__cass_url.split(',')], self.__cass_keyspace,
-                         protocol_version=self.__cass_protocol_version, load_balancing_policy=token_policy)
+                         protocol_version=self.__cass_protocol_version, load_balancing_policy=token_policy,
+                         port=self.__cass_port)
 
     def fetch_nexus_tiles(self, *tile_ids):
         tile_ids = [uuid.UUID(str(tile_id)) for tile_id in tile_ids if

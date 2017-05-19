@@ -2,8 +2,10 @@
 Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
+import ConfigParser
 import time
 import unittest
+from StringIO import StringIO
 
 from nexustiles.nexustiles import NexusTileService
 from shapely.geometry import box
@@ -11,7 +13,20 @@ from shapely.geometry import box
 
 class TestService(unittest.TestCase):
     def setUp(self):
-        self.tile_service = NexusTileService()
+        config = StringIO("""[cassandra]
+host=127.0.0.1
+keyspace=nexustiles
+local_datacenter=datacenter1
+protocol_version=3
+port=32769
+
+[solr]
+host=localhost:8986
+core=nexustiles""")
+        cp = ConfigParser.RawConfigParser()
+        cp.readfp(config)
+
+        self.tile_service = NexusTileService(config=cp)
 
     def test_get_distinct_bounding_boxes_in_polygon(self):
         boxes = self.tile_service.get_distinct_bounding_boxes_in_polygon(box(-180, -90, 180, 90),
@@ -46,9 +61,9 @@ class TestService(unittest.TestCase):
 # from nexustiles.model.nexusmodel import get_approximate_value_for_lat_lon
 # import numpy as np
 #
-service = NexusTileService()
+# service = NexusTileService()
 
-assert service is not None
+# assert service is not None
 
 # tiles = service.find_tiles_in_box(-90, 90, -180, 180, ds='AVHRR_OI_L4_GHRSST_NCEI')
 #
