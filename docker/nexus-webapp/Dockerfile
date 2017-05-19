@@ -49,7 +49,7 @@ RUN git clone https://github.com/dataplumber/nexus.git
 RUN sed -i 's/,webservice.algorithms.doms//g' /nexus/analysis/webservice/config/web.ini && \
     sed -i 's/127.0.0.1/nexus-webapp/g' /nexus/analysis/webservice/config/web.ini && \
     sed -i 's/127.0.0.1/cassandra1,cassandra2,cassandra3,cassandra4,cassandra5,cassandra6/g' /nexus/data-access/nexustiles/config/datastores.ini && \
-    sed -i 's/localhost:8983/http:\/\/solr1:8983\/solr/g' /nexus/data-access/nexustiles/config/datastores.ini
+    sed -i 's/localhost:8983/solr1:8983/g' /nexus/data-access/nexustiles/config/datastores.ini
 
 WORKDIR /nexus/nexus-ingest/nexus-messages
 
