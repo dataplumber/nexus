@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Solr managed schema - automatically generated - DO NOT EDIT -->
 <schema name="example-data-driven-schema" version="1.5">
-  <uniqueKey>solr_id</uniqueKey>
+  <uniqueKey>solr_id_s</uniqueKey>
   <fieldType name="ancestor_path" class="solr.TextField">
     <analyzer type="index">
       <tokenizer class="solr.KeywordTokenizerFactory"/>
@@ -404,7 +404,6 @@
   <field name="_version_" type="long" indexed="true" stored="true"/>
   <field name="geo" type="geo"/>
   <field name="id" type="string" multiValued="false" indexed="true" required="true" stored="true"/>
-  <field name="solr_id" type="string" multiValued="false" indexed="true" required="true" stored="true"/>
   <field name="insert_timestamp" type="date" default="NOW" multiValued="false" indexed="true" stored="true"/>
   <field name="tile_max_lat" type="tdouble"/>
   <field name="tile_max_lon" type="tdouble"/>
