@@ -46,7 +46,7 @@ class NexusTileServiceException(Exception):
 
 
 class NexusTileService(object):
-    def __init__(self, config=None, skipCassandra=False, skipSolr=False):
+    def __init__(self, skipCassandra=False, skipSolr=False, config=None):
         if config is None:
             self._config = ConfigParser.RawConfigParser()
             self._config.readfp(pkg_resources.resource_stream(__name__, "config/datastores.ini"),
