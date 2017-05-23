@@ -78,6 +78,7 @@ class NexusService {
                 "table_s"         : tableName,
                 "geo"             : geo,
                 "id"              : "$summary.tileId".toString(),
+                "solr_id_s"       : "${summary.datasetName}!${summary.tileId}".toString(),
                 "dataset_id_s"    : "$summary.datasetUuid".toString(),
                 "sectionSpec_s"   : "$summary.sectionSpec".toString(),
                 "dataset_s"       : "$summary.datasetName".toString(),

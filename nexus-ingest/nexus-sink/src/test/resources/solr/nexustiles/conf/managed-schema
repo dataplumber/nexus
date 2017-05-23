@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Solr managed schema - automatically generated - DO NOT EDIT -->
 <schema name="example-data-driven-schema" version="1.5">
-  <uniqueKey>id</uniqueKey>
+  <uniqueKey>solr_id_s</uniqueKey>
   <fieldType name="ancestor_path" class="solr.TextField">
     <analyzer type="index">
       <tokenizer class="solr.KeywordTokenizerFactory"/>
@@ -28,7 +28,7 @@
   <fieldType name="doubles" class="solr.TrieDoubleField" positionIncrementGap="0" multiValued="true" precisionStep="0"/>
   <fieldType name="float" class="solr.TrieFloatField" positionIncrementGap="0" precisionStep="0"/>
   <fieldType name="floats" class="solr.TrieFloatField" positionIncrementGap="0" multiValued="true" precisionStep="0"/>
-  <fieldType name="geo" class="solr.SpatialRecursivePrefixTreeFieldType" geo="true" precisionModel="fixed" maxDistErr="0.000009" spatialContextFactory="com.spatial4j.core.context.jts.JtsSpatialContextFactory" precisionScale="1000" distErrPct="0.025" units="degrees"/>
+  <fieldType name="geo" class="solr.SpatialRecursivePrefixTreeFieldType" geo="true" precisionModel="fixed" maxDistErr="0.000009" spatialContextFactory="com.spatial4j.core.context.jts.JtsSpatialContextFactory" precisionScale="1000" distErrPct="0.025" distanceUnits="degrees"/>
   <fieldType name="ignored" class="solr.StrField" indexed="false" stored="false" multiValued="true"/>
   <fieldType name="int" class="solr.TrieIntField" positionIncrementGap="0" precisionStep="0"/>
   <fieldType name="ints" class="solr.TrieIntField" positionIncrementGap="0" multiValued="true" precisionStep="0"/>
@@ -404,12 +404,14 @@
   <field name="_version_" type="long" indexed="true" stored="true"/>
   <field name="geo" type="geo"/>
   <field name="id" type="string" multiValued="false" indexed="true" required="true" stored="true"/>
+  <field name="solr_id_s" type="string" multiValued="false" indexed="true" required="true" stored="true"/>
   <field name="insert_timestamp" type="date" default="NOW" multiValued="false" indexed="true" stored="true"/>
   <field name="tile_max_lat" type="tdouble"/>
   <field name="tile_max_lon" type="tdouble"/>
   <field name="tile_min_lat" type="tdouble"/>
   <field name="tile_min_lon" type="tdouble"/>
   <field name="title" type="string"/>
+  <copyField source="geo" dest="geo_s"/>
   <dynamicField name="*_txt_en_split_tight" type="text_en_splitting_tight" indexed="true" stored="true"/>
   <dynamicField name="*_descendent_path" type="descendent_path" indexed="true" stored="true"/>
   <dynamicField name="*_ancestor_path" type="ancestor_path" indexed="true" stored="true"/>

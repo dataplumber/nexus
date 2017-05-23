@@ -116,7 +116,7 @@ apply plugin: 'spring-xd-module'
 apply plugin: 'maven-publish'
 
 group = 'org.nasa.jpl.nexus.ingest'
-version = '1.3-SNAPSHOT'
+version = '1.4-SNAPSHOT'
 mainClassName = ''
 
 sourceCompatibility = 1.8

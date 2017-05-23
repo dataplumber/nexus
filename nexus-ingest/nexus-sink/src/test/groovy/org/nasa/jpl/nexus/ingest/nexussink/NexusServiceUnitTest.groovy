@@ -43,7 +43,23 @@ class NexusServiceUnitTest {
         def doc = sink.getSolrDocFromTileSummary(tileSummary)
 
         assertEquals("2015-04-15T23:59:59Z", doc.get("tile_min_time_dt").value)
-
-        println doc
+        assertEquals("2015-04-15T23:59:59Z", doc.get("tile_max_time_dt").value)
+        assertEquals("sea_surface_temp", doc.get('table_s').value)
+        assertEquals("POLYGON((22.0 51.0, 30.0 51.0, 30.0 55.0, 22.0 55.0, 22.0 51.0))", doc.get('geo').value)
+        assertEquals("1", doc.get('id').value)
+        assertEquals("4", doc.get('dataset_id_s').value)
+        assertEquals("0:1,0:1", doc.get('sectionSpec_s').value)
+        assertEquals("test", doc.get('dataset_s').value)
+        assertEquals("test.nc", doc.get('granule_s').value)
+        assertEquals("sst", doc.get('tile_var_name_s').value)
+        assertEquals(22.0f, (Float) doc.get('tile_min_lon').value, 0.01f)
+        assertEquals(30.0f, (Float) doc.get('tile_max_lon').value, 0.01f)
+        assertEquals(51.0f, (Float) doc.get('tile_min_lat').value, 0.01f)
+        assertEquals(55.0f, (Float) doc.get('tile_max_lat').value, 0.01f)
+        assertEquals(50.0f, (Float) doc.get('tile_min_val_d').value, 0.01f)
+        assertEquals(50.0f, (Float) doc.get('tile_max_val_d').value, 0.01f)
+        assertEquals(50.0f, (Float) doc.get('tile_avg_val_d').value, 0.01f)
+        assertEquals(10, doc.get('tile_count_i').value)
+        assertEquals("test!1", doc.get('solr_id_s').value)
     }
 }
