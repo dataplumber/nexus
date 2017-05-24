@@ -447,6 +447,12 @@ class SolrProxy(object):
         else:
             s = args[4]
 
+        # If dataset_s is specified as the search term,
+        # add the _route_ parameter to limit the search to the correct shard
+        if 'dataset_s:' in args[0]:
+            ds = args[0].split(':')[-1]
+            params['shard_keys'] = ds
+
         args = (args[0],) + (fl,) + (args[2:4]) + (s,)
 
         with SOLR_CON_LOCK:
@@ -487,6 +493,11 @@ class SolrProxy(object):
         # And the special 'limit'
         try:
             additionalparams['limit'] = kwargs['limit']
+        except KeyError:
+            pass
+
+        try:
+            additionalparams['_route_'] = kwargs['_route_']
         except KeyError:
             pass
 

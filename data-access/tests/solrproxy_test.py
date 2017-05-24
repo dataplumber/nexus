@@ -33,9 +33,14 @@ class TestQuery(unittest.TestCase):
 
     def find_all_tiles_in_polygon_with_spec_test(self):
         result = self.proxy.find_all_tiles_in_polygon(box(-180, -90, 180, 90),
-                                                      "JPL-L4_GHRSST-SSTfnd-MUR-GLOB-v02.0-fv04.1",
-                                                      fq={'sectionSpec_s:\"time:0:1,lat:10209:10458,lon:0:500\"'},
+                                                      "AVHRR_OI_L4_GHRSST_NCEI",
+                                                      fq={'sectionSpec_s:\"time:0:1,lat:100:120,lon:0:40\"'},
                                                       rows=1, limit=1)
+
+        print result
+
+    def find_tiles_by_id_test(self):
+        result = self.proxy.find_tiles_by_id(['0cc95db3-293b-3553-b7a3-42920c3ffe4d'], ds="AVHRR_OI_L4_GHRSST_NCEI")
 
         print result
 
