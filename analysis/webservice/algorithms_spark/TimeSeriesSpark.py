@@ -319,8 +319,7 @@ class TimeSeriesCalculator(SparkHandler):
                                                   min_lon, max_lon,
                                                   dataset,
                                                   timestamps[0],
-                                                  timestamps[-1],
-                                                  rows=5000)
+                                                  timestamps[-1])
         # ds1_nexus_tiles = TimeSeriesCalculator.query_by_parts(tile_service,
         #                                                      min_lat, 
         #                                                      max_lat, 
