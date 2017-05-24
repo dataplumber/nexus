@@ -43,7 +43,7 @@ rm -f ${MESOS_PACKAGE}
 cd ${MESOS_HOME}
 mkdir build
 cd build
-../configure
+../configure LDFLAGS="-L${CONDA_HOME}/lib"
 make
 make check
 make install
