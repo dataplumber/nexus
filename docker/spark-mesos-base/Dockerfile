@@ -4,8 +4,6 @@ MAINTAINER Joseph Jacob "Joseph.Jacob@jpl.nasa.gov"
 
 # Install packages needed for builds
 
-WORKDIR /
-
 RUN yum install -y gcc python-devel
 
 # Set environment variables.  For Mesos, I used MESOS_VER because MESOS_VERSION
@@ -78,6 +76,8 @@ RUN cd ${CONDA_HOME}/lib && \
 
 # Retrieve NEXUS code and build it.
 
+WORkDIR /
+
 RUN git clone https://github.com/dataplumber/nexus.git
 
 RUN sed -i 's/,webservice.algorithms.doms//g' /nexus/analysis/webservice/config/web.ini && \
@@ -100,5 +100,7 @@ RUN python setup.py install
 WORKDIR /nexus/analysis
 
 RUN python setup.py install
+
+WORKDIR /tmp
 
 CMD ["/bin/bash"]
