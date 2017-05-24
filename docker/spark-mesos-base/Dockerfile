@@ -29,7 +29,12 @@ ENV CONDA_HOME=${INSTALL_LOC}/anaconda2 \
 
 ENV HADOOP_HOME=${INSTALL_LOC}/hadoop-${HADOOP_VERSION} \
     SPARK_HOME=${INSTALL_LOC}/${SPARK_DIR} \
-    MESOS_HOME=${INSTALL_LOC}/mesos-${MESOS_VER}
+    MESOS_HOME=${INSTALL_LOC}/mesos-${MESOS_VER} \
+    PATH=${CONDA_HOME}/bin:${PATH}:${HADOOP_HOME}/bin:${SPARK_HOME}/bin \
+    PYTHONPATH=${PYTHONPATH}:${SPARK_HOME}/python:${SPARK_HOME}/python/lib/py4j-0.10.1-src.zip \
+    PYSPARK_DRIVER_PYTHON=${CONDA_HOME}/bin/python \
+    PYSPARK_PYTHON=${CONDA_HOME}/bin/python \
+    PYSPARK_SUBMIT_ARGS="--driver-memory=4g pyspark-shell"
     
 ENV SPARK_CLASSPATH="${HADOOP_HOME}/etc/hadoop:${HADOOP_HOME}/share/hadoop/common/lib/*:${HADOOP_HOME}/share/hadoop/common/*:${HADOOP_HOME}/share/hadoop/hdfs:${HADOOP_HOME}/share/hadoop/hdfs/lib/*:${HADOOP_HOME}/share/hadoop/hdfs/*:${HADOOP_HOME}/share/hadoop/yarn/lib/*:${HADOOP_HOME}/share/hadoop/yarn/*:${HADOOP_HOME}/share/hadoop/mapreduce/lib/*:${HADOOP_HOME}/share/hadoop/mapreduce/*:${HADOOP_HOME}/contrib/capacity-scheduler/*.jar" \
     MESOS_NATIVE_JAVA_LIBRARY=${INSTALL_LOC}/lib/libmesos.so \

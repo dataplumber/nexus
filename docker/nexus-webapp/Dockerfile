@@ -8,11 +8,6 @@ MAINTAINER Joseph Jacob "Joseph.Jacob@jpl.nasa.gov"
 
 ENV MASTER=local[1] \
     PORT_NUM=8083 \
-    PATH=${CONDA_HOME}/bin:${PATH}:${HADOOP_HOME}/bin:${SPARK_HOME}/bin \
-    PYTHONPATH=${PYTHONPATH}:${SPARK_HOME}/python:${SPARK_HOME}/python/lib/py4j-0.10.1-src.zip \
-    PYSPARK_DRIVER_PYTHON=${CONDA_HOME}/bin/python \
-    PYSPARK_PYTHON=${CONDA_HOME}/bin/python \
-    PYSPARK_SUBMIT_ARGS="--driver-memory=4g pyspark-shell" \
     SPARK_LOCAL_IP=nexus-webapp
 
 # Run NEXUS webapp.
