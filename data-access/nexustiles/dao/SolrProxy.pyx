@@ -451,7 +451,7 @@ class SolrProxy(object):
         # add the _route_ parameter to limit the search to the correct shard
         if 'dataset_s:' in args[0]:
             ds = args[0].split(':')[-1]
-            params['shard_keys'] = ds
+            params['shard_keys'] = ds + '!'
 
         args = (args[0],) + (fl,) + (args[2:4]) + (s,)
 
