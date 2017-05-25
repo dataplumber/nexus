@@ -30,7 +30,6 @@ ENV CONDA_HOME=${INSTALL_LOC}/anaconda2 \
 ENV HADOOP_HOME=${INSTALL_LOC}/hadoop-${HADOOP_VERSION} \
     SPARK_HOME=${INSTALL_LOC}/${SPARK_DIR} \
     MESOS_HOME=${INSTALL_LOC}/mesos-${MESOS_VER} \
-    PATH=${CONDA_HOME}/bin:${PATH}:${HADOOP_HOME}/bin:${SPARK_HOME}/bin \
     PYTHONPATH=${PYTHONPATH}:${SPARK_HOME}/python:${SPARK_HOME}/python/lib/py4j-0.10.1-src.zip \
     PYSPARK_DRIVER_PYTHON=${CONDA_HOME}/bin/python \
     PYSPARK_PYTHON=${CONDA_HOME}/bin/python \
@@ -65,6 +64,8 @@ RUN source ./install_mesos.sh && \
 
 # Set up Anaconda environment
     
+ENV PATH=${CONDA_HOME}/bin:${PATH}:${HADOOP_HOME}/bin:${SPARK_HOME}/bin
+
 RUN conda install -y numpy cython mpld3 scipy netCDF4 basemap gdal libnetcdf hdf4 matplotlib && \
     pip install shapely cython py4j
 
