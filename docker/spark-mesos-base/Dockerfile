@@ -18,7 +18,8 @@ ENV INSTALL_LOC=/usr/local \
     MESOS_AGENT_PORT=5051 \
     MESOS_WORKDIR=/var/lib/mesos \
     MESOS_IP=0.0.0.0 \
-    MESOS_MASTER_NAME=mesos-master
+    MESOS_MASTER_NAME=mesos-master \
+    PYTHON_EGG_CACHE=/tmp
 
 ENV CONDA_HOME=${INSTALL_LOC}/anaconda2 \
     HADOOP_HOME=${INSTALL_LOC}/hadoop-${HADOOP_VERSION} \
