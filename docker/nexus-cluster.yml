@@ -1,8 +1,16 @@
 version: '3'
 
 networks:
-  nexus:
-      external: true
+    nexus:
+        external: true
+      
+volumes:
+    kafka1-logs:
+        driver: local
+    kafka2-logs:
+        driver: local
+    kafka3-logs:
+        driver: local
 
 services:
 
@@ -49,10 +57,13 @@ services:
     xd-admin:
         image: nexusjpl/ingest-admin
         hostname: xd-admin
+        depends_on:
+            - "mysqldb"
+            - "redis"
         networks:
             - nexus
         ports:
-            - "9393"
+          - "9393:9393"
         environment:
             - MYSQL_PORT_3306_TCP_ADDR=mysqldb
             - MYSQL_PORT_3306_TCP_PORT=3306
@@ -76,6 +87,8 @@ services:
   
     xd-container:
         image: nexusjpl/ingest-container
+        depends_on:
+            - "xd-admin"
         networks:
             - nexus
         volumes:
@@ -101,3 +114,138 @@ services:
             placement:
                 constraints:
                     - node.labels.nexus.ingest == true
+
+    zk1:
+        image: zookeeper
+        hostname: zk1
+        networks:
+            - nexus
+        volumes:
+            - /data/zk1/data:/data
+            - /data/zk1/datalog:/datalog
+        environment:
+            - ZOO_MY_ID=1
+            - "ZOO_SERVERS=server.1=zk1:2888:3888 server.2=zk2:2888:3888 server.3=zk3:2888:3888"
+        deploy:
+            restart_policy:
+                condition: any
+                delay: 5s
+                max_attempts: 3
+                window: 120s
+            placement:
+                constraints:
+                    - node.labels.nexus.ingest-msg == true
+                    - node.labels.nexus.zoo.id == 1
+    zk2:
+        image: zookeeper
+        hostname: zk2
+        networks:
+            - nexus
+        volumes:
+            - /data/zk2/data:/data
+            - /data/zk2/datalog:/datalog
+        environment:
+            - ZOO_MY_ID=2
+            - "ZOO_SERVERS=server.1=zk1:2888:3888 server.2=zk2:2888:3888 server.3=zk3:2888:3888"
+        deploy:
+            restart_policy:
+                condition: any
+                delay: 5s
+                max_attempts: 3
+                window: 120s
+            placement:
+                constraints:
+                    - node.labels.nexus.ingest-msg == true
+                    - node.labels.nexus.zoo.id == 2
+                    
+    zk3:
+        image: zookeeper
+        hostname: zk3
+        networks:
+            - nexus
+        volumes:
+            - /data/zk3/data:/data
+            - /data/zk3/datalog:/datalog
+        environment:
+            - ZOO_MY_ID=3
+            - "ZOO_SERVERS=server.1=zk1:2888:3888 server.2=zk2:2888:3888 server.3=zk3:2888:3888"
+        deploy:
+            restart_policy:
+                condition: any
+                delay: 5s
+                max_attempts: 3
+                window: 120s
+            placement:
+                constraints:
+                    - node.labels.nexus.ingest-msg == true
+                    - node.labels.nexus.zoo.id == 3
+                    
+    kafka1:
+        image: nexusjpl/kafka
+        command: ["/usr/local/kafka/current/config/kafka.properties", "--override", "zookeeper.connect=zk1:2181,zk2:2181,zk3:2181/kafka", "--override", "broker.id=1"]
+        hostname: kafka1
+        depends_on:
+            - "zk1"
+            - "zk2"
+            - "zk3"
+        networks:
+            - nexus
+        volumes:
+            - kafka1-logs:/tmp/kafka-logs
+        deploy:
+            restart_policy:
+                condition: any
+                delay: 5s
+                max_attempts: 3
+                window: 120s
+            placement:
+                constraints:
+                    - node.labels.nexus.ingest-msg == true
+                    - node.labels.nexus.kafka.id == 1
+                    
+    kafka2:
+        image: nexusjpl/kafka
+        command: ["/usr/local/kafka/current/config/kafka.properties", "--override", "zookeeper.connect=zk1:2181,zk2:2181,zk3:2181/kafka", "--override", "broker.id=2"]
+        hostname: kafka2
+        depends_on:
+            - "zk1"
+            - "zk2"
+            - "zk3"
+        networks:
+            - nexus
+        volumes:
+            - kafka2-logs:/tmp/kafka-logs
+        deploy:
+            restart_policy:
+                condition: any
+                delay: 5s
+                max_attempts: 3
+                window: 120s
+            placement:
+                constraints:
+                    - node.labels.nexus.ingest-msg == true
+                    - node.labels.nexus.kafka.id == 2
+                    
+    kafka3:
+        image: nexusjpl/kafka
+        command: ["/usr/local/kafka/current/config/kafka.properties", "--override", "zookeeper.connect=zk1:2181,zk2:2181,zk3:2181/kafka", "--override", "broker.id=3"]
+        hostname: kafka3
+        depends_on:
+            - "zk1"
+            - "zk2"
+            - "zk3"
+        networks:
+            - nexus
+        volumes:
+            - kafka3-logs:/tmp/kafka-logs
+        deploy:
+            restart_policy:
+                condition: any
+                delay: 5s
+                max_attempts: 3
+                window: 120s
+            placement:
+                constraints:
+                    - node.labels.nexus.ingest-msg == true
+                    - node.labels.nexus.kafka.id == 3
+        

@@ -48,6 +48,7 @@ RUN mkdir -p /usr/local/repositories/.m2 && mkdir -p /usr/local/repositories/.gr
 # # nexus-ingest code   #
 # ########################
 WORKDIR /tmp
+RUN pwd
 COPY install-custom-software.sh /tmp/install-custom-software.sh
 RUN /bin/bash install-custom-software.sh
 RUN chown -R springxd:springxd /usr/local/spring-xd/spring-xd-1.3.1.RELEASE && \
