@@ -1,4 +1,4 @@
-FROM solr:6.4.1
+FROM solr:6.4.2
 MAINTAINER Nga Quach "Nga.T.Chung@jpl.nasa.gov"
 
 USER root
