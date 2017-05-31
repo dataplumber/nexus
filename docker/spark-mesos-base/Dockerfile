@@ -68,7 +68,7 @@ RUN source ./install_mesos.sh && \
 ENV PATH=${CONDA_HOME}/bin:${PATH}:${HADOOP_HOME}/bin:${SPARK_HOME}/bin
 
 RUN conda install -y numpy cython mpld3 scipy netCDF4 basemap gdal libnetcdf hdf4 matplotlib && \
-    pip install shapely cython py4j
+    pip install shapely cython py4j cassandra-driver
 
 # Workaround missing libcom_err.so (needed for gdal)
 
