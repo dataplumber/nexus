@@ -22,11 +22,9 @@ ENV INSTALL_LOC=/usr/local \
     PYTHON_EGG_CACHE=/tmp
 
 ENV CONDA_HOME=${INSTALL_LOC}/anaconda2 \
-    HADOOP_HOME=${INSTALL_LOC}/hadoop-${HADOOP_VERSION} \
     MESOS_HOME=${INSTALL_LOC}/mesos-${MESOS_VER} \
-    HADOOP_PACKAGE=hadoop-${HADOOP_VERSION}.tar.gz \
     SPARK_DIR=spark-${SPARK_VERSION} \
-    SPARK_PACKAGE=spark-${SPARK_VERSION}-bin-without-hadoop \
+    SPARK_PACKAGE=spark-${SPARK_VERSION}-bin-hadoop2.7 \
     MESOS_MASTER=mesos://${MESOS_IP}:${MESOS_PORT} \
     MESOS_PACKAGE=mesos-${MESOS_VER}.tar.gz
 
@@ -35,19 +33,11 @@ ENV SPARK_HOME=${INSTALL_LOC}/${SPARK_DIR} \
     PYSPARK_PYTHON=${CONDA_HOME}/bin/python \
     PYSPARK_SUBMIT_ARGS="--driver-memory=4g pyspark-shell"
     
-ENV PYTHONPATH=${PYTHONPATH}:${SPARK_HOME}/python:${SPARK_HOME}/python/lib/py4j-0.10.1-src.zip \
-    SPARK_CLASSPATH="${HADOOP_HOME}/etc/hadoop:${HADOOP_HOME}/share/hadoop/common/lib/*:${HADOOP_HOME}/share/hadoop/common/*:${HADOOP_HOME}/share/hadoop/hdfs:${HADOOP_HOME}/share/hadoop/hdfs/lib/*:${HADOOP_HOME}/share/hadoop/hdfs/*:${HADOOP_HOME}/share/hadoop/yarn/lib/*:${HADOOP_HOME}/share/hadoop/yarn/*:${HADOOP_HOME}/share/hadoop/mapreduce/lib/*:${HADOOP_HOME}/share/hadoop/mapreduce/*:${HADOOP_HOME}/contrib/capacity-scheduler/*.jar" \
+ENV PYTHONPATH=${PYTHONPATH}:${SPARK_HOME}/python:${SPARK_HOME}/python/lib/py4j-0.10.4-src.zip:${SPARK_HOME}/python/lib/pyspark.zip \
     MESOS_NATIVE_JAVA_LIBRARY=${INSTALL_LOC}/lib/libmesos.so \
-    SPARK_EXECUTOR_URI=${INSTALL_LOC}/spark-2.1.0-bin-without-hadoop.tgz \
-    HADOOP_CONF_DIR=${HADOOP_HOME}/etc/hadoop
-
+    SPARK_EXECUTOR_URI=${INSTALL_LOC}/${SPARK_PACKAGE}
+    
 WORKDIR ${INSTALL_LOC}
-
-# Set up Hadoop
-
-RUN wget --quiet http://archive.apache.org/dist/hadoop/common/hadoop-${HADOOP_VERSION}/${HADOOP_PACKAGE} && \
-        tar -xzf ${HADOOP_PACKAGE} -C ${INSTALL_LOC} && \
-	rm -f ${HADOOP_PACKAGE}
 
 # Set up Spark
 
@@ -67,8 +57,9 @@ RUN source ./install_mesos.sh && \
     
 ENV PATH=${CONDA_HOME}/bin:${PATH}:${HADOOP_HOME}/bin:${SPARK_HOME}/bin
 
-RUN conda install -y numpy cython mpld3 scipy netCDF4 basemap gdal libnetcdf hdf4 matplotlib && \
-    pip install shapely cython py4j cassandra-driver
+RUN conda install -c conda-forge -y netCDF4 && \
+    conda install -y numpy cython mpld3 scipy basemap gdal matplotlib && \
+    pip install shapely cassandra-driver==3.5.0
 
 # Workaround missing libcom_err.so (needed for gdal)
 
@@ -79,11 +70,12 @@ RUN cd /usr/lib64 && ln -s libcom_err.so.2 libcom_err.so.3
 RUN cd ${CONDA_HOME}/lib && \
     ln -s libnetcdf.so.11 libnetcdf.so.7 && \
     ln -s libkea.so.1.4.6 libkea.so.1.4.5 && \
-    ln -s libhdf5_cpp.so.12 libhdf5_cpp.so.10
+    ln -s libhdf5_cpp.so.12 libhdf5_cpp.so.10 && \
+    ln -s libjpeg.so.9 libjpeg.so.8
 
 # Retrieve NEXUS code and build it.
 
-WORkDIR /
+WORKDIR /
 
 RUN git clone https://github.com/dataplumber/nexus.git
 
