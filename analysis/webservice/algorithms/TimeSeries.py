@@ -100,7 +100,7 @@ class TimeSeriesHandlerImpl(NexusHandler):
             calculator = TimeSeriesCalculator()
             for dayinseconds in daysinrange:
                 result = calculator.calc_average_on_day(min_lat, max_lat, min_lon, max_lon, ds, dayinseconds)
-                results += [result] if result is not {} else []
+                results += [result] if result else []
         else:
             # Create a task to calc average difference for each day
             manager = Manager()
@@ -126,7 +126,7 @@ class TimeSeriesHandlerImpl(NexusHandler):
                 except KeyError:
                     pass
 
-                results += [result] if result is not {} else []
+                results += [result] if result else []
 
             pool.terminate()
             manager.shutdown()
