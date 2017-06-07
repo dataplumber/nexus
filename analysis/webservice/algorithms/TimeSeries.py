@@ -100,7 +100,7 @@ class TimeSeriesHandlerImpl(NexusHandler):
             calculator = TimeSeriesCalculator()
             for dayinseconds in daysinrange:
                 result = calculator.calc_average_on_day(min_lat, max_lat, min_lon, max_lon, ds, dayinseconds)
-                results.append(result)
+                results += [result] if result is not {} else []
         else:
             # Create a task to calc average difference for each day
             manager = Manager()
@@ -126,7 +126,7 @@ class TimeSeriesHandlerImpl(NexusHandler):
                 except KeyError:
                     pass
 
-                results.append(result)
+                results += [result] if result is not {} else []
 
             pool.terminate()
             manager.shutdown()
@@ -216,9 +216,6 @@ class TimeSeriesResults(NexusResults):
         yl = [slope * xx + intercept for xx in xl]
         plt.plot(xl, yl, '-r')
 
-        # r = self.stats()["r"]
-        # plt.text(0.5, 0.5, "r = foo")
-
         ax.grid(True)
         fig.tight_layout()
 
@@ -289,6 +286,10 @@ class TimeSeriesCalculator(object):
         ds1_nexus_tiles = self.__tile_service.get_tiles_bounded_by_box_at_time(min_lat, max_lat, min_lon, max_lon,
                                                                                dataset,
                                                                                timeinseconds)
+
+        # If all data ends up getting masked, ds1_nexus_tiles will be empty
+        if len(ds1_nexus_tiles) == 0:
+            return {}
 
         tile_data_agg = np.ma.array([tile.data for tile in ds1_nexus_tiles])
         data_min = np.ma.min(tile_data_agg)
