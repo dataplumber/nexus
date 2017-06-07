@@ -235,13 +235,10 @@ class NexusHandler(CalcHandler):
     def _mergeResults(self, resultsRaw):
         resultsMap = {}
 
-        # for resultsSeries in resultsRaw:
         for i in range(0, len(resultsRaw)):
             resultsSeries = resultsRaw[i]
             resultsData = resultsSeries[0]
             self._mergeDataSeries(resultsData, i, resultsMap)
-            # for entry in resultsData:
-            #    if
 
         resultsList = self._resultsMapToList(resultsMap)
         return resultsList
