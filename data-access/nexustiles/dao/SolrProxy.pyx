@@ -352,10 +352,10 @@ class SolrProxy(object):
             *(search, None, None, False, None),
             **additionalparams)
 
-    def find_all_tiles_in_box_at_time(self, min_lat, max_lat, min_lon, max_lon, ds, time, **kwargs):
+    def find_all_tiles_in_box_at_time(self, min_lat, max_lat, min_lon, max_lon, ds, search_time, **kwargs):
         search = 'dataset_s:%s' % ds
 
-        the_time = datetime.utcfromtimestamp(time).strftime('%Y-%m-%dT%H:%M:%SZ')
+        the_time = datetime.utcfromtimestamp(search_time).strftime('%Y-%m-%dT%H:%M:%SZ')
         time_clause = "(" \
                       "tile_min_time_dt:[* TO %s] " \
                       "AND tile_max_time_dt:[%s TO *] " \
@@ -366,6 +366,29 @@ class SolrProxy(object):
         additionalparams = {
             'fq': [
                 "geo:[%s,%s TO %s,%s]" % (min_lat, min_lon, max_lat, max_lon),
+                "tile_count_i:[1 TO *]",
+                time_clause
+            ]
+        }
+
+        self._merge_kwargs(additionalparams, **kwargs)
+
+        return self.do_query_all(*(search, None, None, False, None), **additionalparams)
+
+    def find_all_tiles_in_polygon_at_time(self, bounding_polygon, ds, search_time, **kwargs):
+        search = 'dataset_s:%s' % ds
+
+        the_time = datetime.utcfromtimestamp(search_time).strftime('%Y-%m-%dT%H:%M:%SZ')
+        time_clause = "(" \
+                      "tile_min_time_dt:[* TO %s] " \
+                      "AND tile_max_time_dt:[%s TO *] " \
+                      ")" % (
+                          the_time, the_time
+                      )
+
+        additionalparams = {
+            'fq': [
+                "{!field f=geo}Intersects(%s)" % bounding_polygon.wkt,
                 "tile_count_i:[1 TO *]",
                 time_clause
             ]

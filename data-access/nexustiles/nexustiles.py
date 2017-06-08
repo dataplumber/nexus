@@ -115,6 +115,11 @@ class NexusTileService(object):
                                                         **kwargs)
 
     @tile_data()
+    def find_all_tiles_in_polygon_at_time(self, bounding_polygon, dataset, time, **kwargs):
+        return self._solr.find_all_tiles_in_polygon_at_time(bounding_polygon, dataset, time, rows=5000,
+                                                            **kwargs)
+
+    @tile_data()
     def find_tiles_in_box(self, min_lat, max_lat, min_lon, max_lon, ds=None, start_time=0, end_time=-1, **kwargs):
         # Find tiles that fall in the given box in the Solr index
         return self._solr.find_all_tiles_in_box_sorttimeasc(min_lat, max_lat, min_lon, max_lon, ds, start_time,
