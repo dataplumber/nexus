@@ -59,13 +59,21 @@ class TimeSeriesHandlerImpl(SparkHandler):
             "name": "Compute Seasonal Cycle Filter",
             "type": "boolean",
             "description": "Flag used to specify if the seasonal averages should be computed during "
-                           "Time Series computation. Optional"
+                           "Time Series computation. Optional (Default: True)"
         },
         "lowPassFilter": {
             "name": "Compute Low Pass Filter",
             "type": "boolean",
-            "description": "Flag used to specify if a low pass filter should be computed during "
-                           "Time Series computation. Optional"
+            "description": "Currently not implemented."
+            # "Flag used to specify if a low pass filter should be computed during "
+            # "Time Series computation. Optional"
+        },
+        "spark": {
+            "name": "Spark Configuration",
+            "type": "comma-delimited value",
+            "description": "Configuration used to launch in the Spark cluster. Value should be 3 elements separated by "
+                           "commas. 1) Spark Master 2) Number of Spark Executors 3) Number of Spark Partitions. Only "
+                           "Number of Spark Partitions is used by this function. Optional (Default: local,1,1)"
         }
     }
     singleton = True
