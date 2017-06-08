@@ -20,7 +20,6 @@ from pytz import timezone
 from scipy import stats
 from shapely.geometry import Polygon
 
-from webservice import Filtering as filt
 from webservice.NexusHandler import nexus_handler, SparkHandler
 from webservice.webmodel import NexusResults, NoDataException, NexusProcessingException
 
