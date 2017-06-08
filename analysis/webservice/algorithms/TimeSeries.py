@@ -2,9 +2,9 @@
 Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
-import sys
-import traceback
+import calendar
 import logging
+import traceback
 from cStringIO import StringIO
 from datetime import datetime
 from multiprocessing.dummy import Pool, Manager
@@ -12,15 +12,15 @@ from multiprocessing.dummy import Pool, Manager
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
+import pytz
 import shapely.wkt
+from backports.functools_lru_cache import lru_cache
+from nexustiles.nexustiles import NexusTileService
 from pytz import timezone
+from scipy import stats
 from shapely.geometry import Polygon
 
-from webservice.NexusHandler import NexusHandler, nexus_handler, DEFAULT_PARAMETERS_SPEC
-from nexustiles.nexustiles import NexusTileService
-from scipy import stats
-
-from webservice import Filtering as filt
+from webservice.NexusHandler import NexusHandler, nexus_handler
 from webservice.webmodel import NexusResults, NexusProcessingException, NoDataException
 
 SENTINEL = 'STOP'
@@ -157,7 +157,9 @@ class TimeSeriesHandlerImpl(NexusHandler):
             results, meta = self.getTimeSeriesStatsForBoxSingleDataSet(bounding_polygon,
                                                                        shortName,
                                                                        start_seconds_from_epoch,
-                                                                       end_seconds_from_epoch)
+                                                                       end_seconds_from_epoch,
+                                                                       apply_seasonal_cycle_filter=apply_seasonal_cycle_filter,
+                                                                       apply_low_pass_filter=apply_low_pass_filter)
             resultsRaw.append([results, meta])
 
         results = self._mergeResults(resultsRaw)
@@ -185,7 +187,7 @@ class TimeSeriesHandlerImpl(NexusHandler):
 
     def getTimeSeriesStatsForBoxSingleDataSet(self, bounding_polygon, ds, start_seconds_from_epoch,
                                               end_seconds_from_epoch,
-                                              applySeasonalFilter=True, applyLowPass=True):
+                                              apply_seasonal_cycle_filter=True, apply_low_pass_filter=True):
 
         daysinrange = self._tile_service.find_days_in_range_asc(bounding_polygon.bounds[1],
                                                                 bounding_polygon.bounds[3],
@@ -238,11 +240,52 @@ class TimeSeriesHandlerImpl(NexusHandler):
 
         results = sorted(results, key=lambda entry: entry["time"])
 
-        filt.applyAllFiltersOnField(results, 'mean', applySeasonal=applySeasonalFilter, applyLowPass=applyLowPass)
-        filt.applyAllFiltersOnField(results, 'max', applySeasonal=applySeasonalFilter, applyLowPass=applyLowPass)
-        filt.applyAllFiltersOnField(results, 'min', applySeasonal=applySeasonalFilter, applyLowPass=applyLowPass)
+        if apply_seasonal_cycle_filter:
+            for result in results:
+                month = datetime.utcfromtimestamp(result['time']).month
+                month_mean = self.calculate_monthly_average(month, bounding_polygon.wkt, ds)
+                seasonal_mean = result['mean'] - month_mean
+                result['meanSeasonal'] = seasonal_mean
 
         return results, {}
+
+    @lru_cache()
+    def calculate_monthly_average(self, month=None, bounding_polygon_wkt=None, ds=None):
+
+        min_date, max_date = self.get_min_max_date(ds=ds)
+
+        monthly_averages, monthly_counts = [], []
+        bounding_polygon = shapely.wkt.loads(bounding_polygon_wkt)
+        for year in range(min_date.year, max_date.year + 1):
+            beginning_of_month = datetime(year, month, 1)
+            end_of_month = datetime(year, month, calendar.monthrange(year, month)[1], 23, 59, 59)
+            start = (pytz.UTC.localize(beginning_of_month) - EPOCH).total_seconds()
+            end = (pytz.UTC.localize(end_of_month) - EPOCH).total_seconds()
+            tile_stats = self._tile_service.find_tiles_in_polygon(bounding_polygon, ds, start, end,
+                                                                  fl=(
+                                                                      'tile_avg_val_d,tile_count_i,tile_min_val_d,tile_max_val_d'),
+                                                                  fetch_data=False)
+            if len(tile_stats) == 0:
+                continue
+            tile_means = np.array([tile.tile_stats.mean for tile in tile_stats])
+            tile_counts = np.array([tile.tile_stats.count for tile in tile_stats])
+            sum_tile_counts = np.sum(tile_counts) * 1.0
+
+            monthly_averages += [np.average(tile_means, None, tile_counts / sum_tile_counts).item()]
+            monthly_counts += [sum_tile_counts]
+
+        count_sum = np.sum(monthly_counts) * 1.0
+
+        return np.average(monthly_averages, None, [count / count_sum for count in monthly_counts]).item()
+
+    @lru_cache()
+    def get_min_max_date(self, ds=None):
+        min_date = pytz.timezone('UTC').localize(
+            datetime.utcfromtimestamp(self._tile_service.get_min_time([], ds=ds)))
+        max_date = pytz.timezone('UTC').localize(
+            datetime.utcfromtimestamp(self._tile_service.get_max_time([], ds=ds)))
+
+        return min_date.date(), max_date.date()
 
     @staticmethod
     def calculate_comparison_stats(results):
