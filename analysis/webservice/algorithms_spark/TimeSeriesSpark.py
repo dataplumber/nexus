@@ -2,6 +2,7 @@
 Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
+import calendar
 import itertools
 import logging
 import traceback
@@ -11,6 +12,9 @@ from datetime import datetime
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
+import pytz
+import shapely.wkt
+from backports.functools_lru_cache import lru_cache
 from nexustiles.nexustiles import NexusTileService
 from pytz import timezone
 from scipy import stats
@@ -173,12 +177,12 @@ class TimeSeriesHandlerImpl(SparkHandler):
             results, meta = spark_driver(daysinrange, bounding_polygon, shortName,
                                          spark_nparts_needed=spark_nparts_needed, sc=self._sc)
 
-            filt.applyAllFiltersOnField(results, 'mean', applySeasonal=apply_seasonal_cycle_filter,
-                                        applyLowPass=apply_low_pass_filter)
-            filt.applyAllFiltersOnField(results, 'max', applySeasonal=apply_seasonal_cycle_filter,
-                                        applyLowPass=apply_low_pass_filter)
-            filt.applyAllFiltersOnField(results, 'min', applySeasonal=apply_seasonal_cycle_filter,
-                                        applyLowPass=apply_low_pass_filter)
+            if apply_seasonal_cycle_filter:
+                for result in results:
+                    month = datetime.utcfromtimestamp(result['time']).month
+                    month_mean = self.calculate_monthly_average(month, bounding_polygon.wkt, shortName)
+                    seasonal_mean = result['mean'] - month_mean
+                    result['meanSeasonal'] = seasonal_mean
 
             resultsRaw.append([results, meta])
 
@@ -207,6 +211,44 @@ class TimeSeriesHandlerImpl(SparkHandler):
                                 maxLon=bounding_polygon.bounds[2], ds=ds, startTime=start_seconds_from_epoch,
                                 endTime=end_seconds_from_epoch)
         return res
+
+    @lru_cache()
+    def calculate_monthly_average(self, month=None, bounding_polygon_wkt=None, ds=None):
+
+        min_date, max_date = self.get_min_max_date(ds=ds)
+
+        monthly_averages, monthly_counts = [], []
+        bounding_polygon = shapely.wkt.loads(bounding_polygon_wkt)
+        for year in range(min_date.year, max_date.year + 1):
+            beginning_of_month = datetime(year, month, 1)
+            end_of_month = datetime(year, month, calendar.monthrange(year, month)[1], 23, 59, 59)
+            start = (pytz.UTC.localize(beginning_of_month) - EPOCH).total_seconds()
+            end = (pytz.UTC.localize(end_of_month) - EPOCH).total_seconds()
+            tile_stats = self._tile_service.find_tiles_in_polygon(bounding_polygon, ds, start, end,
+                                                                  fl=(
+                                                                      'tile_avg_val_d,tile_count_i,tile_min_val_d,tile_max_val_d'),
+                                                                  fetch_data=False)
+            if len(tile_stats) == 0:
+                continue
+            tile_means = np.array([tile.tile_stats.mean for tile in tile_stats])
+            tile_counts = np.array([tile.tile_stats.count for tile in tile_stats])
+            sum_tile_counts = np.sum(tile_counts) * 1.0
+
+            monthly_averages += [np.average(tile_means, None, tile_counts / sum_tile_counts).item()]
+            monthly_counts += [sum_tile_counts]
+
+        count_sum = np.sum(monthly_counts) * 1.0
+
+        return np.average(monthly_averages, None, [count / count_sum for count in monthly_counts]).item()
+
+    @lru_cache()
+    def get_min_max_date(self, ds=None):
+        min_date = pytz.timezone('UTC').localize(
+            datetime.utcfromtimestamp(self._tile_service.get_min_time([], ds=ds)))
+        max_date = pytz.timezone('UTC').localize(
+            datetime.utcfromtimestamp(self._tile_service.get_max_time([], ds=ds)))
+
+        return min_date.date(), max_date.date()
 
     @staticmethod
     def calculate_comparison_stats(results):
@@ -336,7 +378,8 @@ class TimeSeriesResults(NexusResults):
             else:
                 ax = ax.twinx()
 
-            plots += ax.plot(x, means[n], color=self.__SERIES_COLORS[n], zorder=10, linewidth=3, label=meta[n]['title'])
+            plots += ax.plot(x, means[n], color=self.__SERIES_COLORS[n], zorder=10, linewidth=3,
+                             label=meta[n]['title'])
             ax.set_ylabel(meta[n]['units'])
 
         labs = [l.get_label() for l in plots]
@@ -408,14 +451,13 @@ def calc_average_on_day(tile_in_spark):
         else:
             data_min = np.ma.min(tile_data_agg)
             data_max = np.ma.max(tile_data_agg)
-            # daily_mean = np.ma.mean(tile_data_agg).item()
             daily_mean = \
                 np.ma.average(tile_data_agg,
                               weights=np.cos(np.radians(lats_agg))).item()
             data_count = np.ma.count(tile_data_agg)
             data_std = np.ma.std(tile_data_agg)
 
-            # Return Stats by day
+        # Return Stats by day
         stat = {
             'min': data_min,
             'max': data_max,
