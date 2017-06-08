@@ -20,6 +20,7 @@ from pytz import timezone
 from scipy import stats
 from shapely.geometry import Polygon
 
+from webservice import Filtering as filtering
 from webservice.NexusHandler import nexus_handler, SparkHandler
 from webservice.webmodel import NexusResults, NoDataException, NexusProcessingException
 
@@ -63,9 +64,8 @@ class TimeSeriesHandlerImpl(SparkHandler):
         "lowPassFilter": {
             "name": "Compute Low Pass Filter",
             "type": "boolean",
-            "description": "Currently not implemented."
-            # "Flag used to specify if a low pass filter should be computed during "
-            # "Time Series computation. Optional"
+            "description": "Flag used to specify if a low pass filter should be computed during "
+                           "Time Series computation. Optional (Default: True)"
         },
         "spark": {
             "name": "Spark Configuration",
@@ -187,9 +187,30 @@ class TimeSeriesHandlerImpl(SparkHandler):
             if apply_seasonal_cycle_filter:
                 for result in results:
                     month = datetime.utcfromtimestamp(result['time']).month
-                    month_mean = self.calculate_monthly_average(month, bounding_polygon.wkt, shortName)
+                    month_mean, month_max, month_min = self.calculate_monthly_average(month, bounding_polygon.wkt, shortName)
                     seasonal_mean = result['mean'] - month_mean
+                    seasonal_min = result['min'] - month_min
+                    seasonal_max = result['max'] - month_max
                     result['meanSeasonal'] = seasonal_mean
+                    result['minSeasonal'] = seasonal_min
+                    result['maxSeasonal'] = seasonal_max
+
+            filtering.applyAllFiltersOnField(results, 'mean', applySeasonal=False, applyLowPass=apply_low_pass_filter)
+            filtering.applyAllFiltersOnField(results, 'max', applySeasonal=False, applyLowPass=apply_low_pass_filter)
+            filtering.applyAllFiltersOnField(results, 'min', applySeasonal=False, applyLowPass=apply_low_pass_filter)
+
+            if apply_seasonal_cycle_filter and apply_low_pass_filter:
+                try:
+                    filtering.applyFiltersOnField(results, 'meanSeasonal', applySeasonal=False, applyLowPass=True,
+                                                  append="LowPass")
+                    filtering.applyFiltersOnField(results, 'minSeasonal', applySeasonal=False, applyLowPass=True,
+                                                  append="LowPass")
+                    filtering.applyFiltersOnField(results, 'maxSeasonal', applySeasonal=False, applyLowPass=True,
+                                                  append="LowPass")
+                except Exception as e:
+                    # If it doesn't work log the error but ignore it
+                    tb = traceback.format_exc()
+                    self.log.warn("Error calculating SeasonalLowPass filter:\n%s" % tb)
 
             resultsRaw.append([results, meta])
 
@@ -225,6 +246,7 @@ class TimeSeriesHandlerImpl(SparkHandler):
         min_date, max_date = self.get_min_max_date(ds=ds)
 
         monthly_averages, monthly_counts = [], []
+        monthly_mins, monthly_maxes = [], []
         bounding_polygon = shapely.wkt.loads(bounding_polygon_wkt)
         for year in range(min_date.year, max_date.year + 1):
             beginning_of_month = datetime(year, month, 1)
@@ -238,15 +260,22 @@ class TimeSeriesHandlerImpl(SparkHandler):
             if len(tile_stats) == 0:
                 continue
             tile_means = np.array([tile.tile_stats.mean for tile in tile_stats])
+            tile_mins = np.array([tile.tile_stats.min for tile in tile_stats])
+            tile_maxes = np.array([tile.tile_stats.max for tile in tile_stats])
             tile_counts = np.array([tile.tile_stats.count for tile in tile_stats])
             sum_tile_counts = np.sum(tile_counts) * 1.0
 
             monthly_averages += [np.average(tile_means, None, tile_counts / sum_tile_counts).item()]
+            monthly_mins += [np.average(tile_mins, None, tile_counts / sum_tile_counts).item()]
+            monthly_maxes += [np.average(tile_maxes, None, tile_counts / sum_tile_counts).item()]
             monthly_counts += [sum_tile_counts]
 
         count_sum = np.sum(monthly_counts) * 1.0
+        weights = np.array(monthly_counts) / count_sum
 
-        return np.average(monthly_averages, None, [count / count_sum for count in monthly_counts]).item()
+        return np.average(monthly_averages, None, weights).item(), \
+               np.average(monthly_averages, None, weights).item(), \
+               np.average(monthly_averages, None, weights).item()
 
     @lru_cache()
     def get_min_max_date(self, ds=None):
