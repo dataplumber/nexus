@@ -33,7 +33,8 @@ setuptools.setup(
         'requests',
         'utm',
         'shapely',
-        'mock'
+        'mock',
+        'backports.functools-lru-cache==1.3'
     ],
 
     classifiers=[
