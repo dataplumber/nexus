@@ -160,6 +160,12 @@ class NexusTileService(object):
 
         return tiles
 
+    def get_tiles_bounded_by_polygon(self, polygon, ds=None, start_time=0, end_time=-1, **kwargs):
+        tiles = self.find_tiles_in_polygon(polygon, ds, start_time, end_time, **kwargs)
+        tiles = self.mask_tiles_to_polygon(polygon, tiles)
+
+        return tiles
+
     def get_tiles_bounded_by_box_at_time(self, min_lat, max_lat, min_lon, max_lon, dataset, time, **kwargs):
         tiles = self.find_all_tiles_in_box_at_time(min_lat, max_lat, min_lon, max_lon, dataset, time, **kwargs)
         tiles = self.mask_tiles_to_bbox(min_lat, max_lat, min_lon, max_lon, tiles)
