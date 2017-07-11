@@ -75,6 +75,8 @@ RUN cd ${CONDA_HOME}/lib && \
     ln -s libhdf5_cpp.so.12 libhdf5_cpp.so.10 && \
     ln -s libjpeg.so.9 libjpeg.so.8
 
+RUN yum install -y mesa-libGL.x86_64
+
 # Retrieve NEXUS code and build it.
 
 WORKDIR /

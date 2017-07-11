@@ -7,12 +7,11 @@ MAINTAINER Joseph Jacob "Joseph.Jacob@jpl.nasa.gov"
 # Set environment variables.
 
 ENV MASTER=local[1] \
-    PORT_NUM=8083 \
     SPARK_LOCAL_IP=nexus-webapp
 
 # Run NEXUS webapp.
 
-EXPOSE ${PORT_NUM}
+EXPOSE 8083
 
 WORKDIR /tmp
 

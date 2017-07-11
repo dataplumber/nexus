@@ -10,4 +10,4 @@ python setup.py install --force
 cd /nexus/analysis
 python setup.py install --force
 
-python -m webservice.webapp
+${MESOS_HOME}/build/bin/mesos-agent.sh --master=${MESOS_MASTER_NAME}:${MESOS_MASTER_PORT} --port=${MESOS_AGENT_PORT} --work_dir=${MESOS_WORKDIR} --no-systemd_enable_support --launcher=posix --no-switch_user --executor_environment_variables='{ "PYTHON_EGG_CACHE": "/tmp" }'
