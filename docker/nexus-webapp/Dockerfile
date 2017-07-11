@@ -16,4 +16,6 @@ EXPOSE ${PORT_NUM}
 
 WORKDIR /tmp
 
-CMD python -m webservice.webapp
+COPY docker-entrypoint.sh /tmp/docker-entrypoint.sh
+
+ENTRYPOINT ["/tmp/docker-entrypoint.sh"]

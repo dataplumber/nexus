@@ -60,7 +60,8 @@ ENV PATH=${CONDA_HOME}/bin:${PATH}:${HADOOP_HOME}/bin:${SPARK_HOME}/bin
 
 RUN conda install -c conda-forge -y netCDF4 && \
     conda install -y numpy cython mpld3 scipy basemap gdal matplotlib && \
-    pip install shapely cassandra-driver==3.5.0
+    pip install shapely cassandra-driver==3.5.0 && \
+    conda install -c conda-forge backports.functools_lru_cache=1.3
 
 # Workaround missing libcom_err.so (needed for gdal)
 

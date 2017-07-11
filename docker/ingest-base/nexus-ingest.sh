@@ -61,6 +61,13 @@ elif [ "$CONTAINER"  = true ]; then
     
     export JAVA_OPTS="-Dgrape.root=/usr/local/repositories/.groovy/grapes -Dgroovy.root=/usr/local/repositories/.groovy/ -Dgrape.config=/usr/local/repositories/.groovy/grapeConfig.xml"
     
+    until nc --send-only -v -w30 $MYSQL_PORT_3306_TCP_ADDR $MYSQL_PORT_3306_TCP_PORT </dev/null
+    do
+      echo "Waiting for database connection..."
+      # wait for 5 seconds before check again
+      sleep 5
+    done
+    
     xd-container --hadoopDistro none
 elif [ "$ADMIN"  = true ]; then
     source activate nexus-xd-python-modules
@@ -90,6 +97,15 @@ elif [ "$ADMIN"  = true ]; then
     export XD_MESSAGEBUS_KAFKA_DEFAULT_FETCHSIZE=2048576
     
     export JAVA_OPTS="-Dgrape.root=/usr/local/repositories/.groovy/grapes -Dgroovy.root=/usr/local/repositories/.groovy/ -Dgrape.config=/usr/local/repositories/.groovy/grapeConfig.xml"
+    
+    until nc --send-only -v -w30 $MYSQL_PORT_3306_TCP_ADDR $MYSQL_PORT_3306_TCP_PORT </dev/null
+    do
+      echo "Waiting for database connection..."
+      # wait for 5 seconds before check again
+      sleep 5
+    done
+    
+    zookeeper-client -server $ZK_CLIENT_CONNECT -cmd create /$ZOOKEEPER_XD_CHROOT ""
     
     xd-admin --hadoopDistro none
 else

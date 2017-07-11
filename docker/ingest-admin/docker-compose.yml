@@ -39,7 +39,7 @@ services:
                     - nexus.ingest-admin == true
             
     xd-admin:
-        image: nexusjpl/ingest-admin:2
+        image: nexusjpl/ingest-admin
         container_name: xd-admin
         command: [-a]
         environment:

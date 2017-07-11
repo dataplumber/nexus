@@ -2,7 +2,7 @@ FROM nexusjpl/nexusbase
 
 WORKDIR /tmp
 
-RUN yum -y install unzip
+RUN yum -y install unzip nc
 
 # Create conda environment and install dependencies
 RUN conda create -y --name nexus-xd-python-modules python && \
@@ -28,7 +28,7 @@ RUN wget -q "https://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-jav
     chown -R springxd:springxd spring-xd-1.3.1.RELEASE
 
 USER springxd
-ENV PATH $PATH:/usr/local/spring-xd/current/xd/bin:/usr/local/spring-xd/current/shell/bin
+ENV PATH $PATH:/usr/local/spring-xd/current/xd/bin:/usr/local/spring-xd/current/shell/bin:/usr/local/spring-xd/current/zookeeper/bin
 COPY xd-container-logback.groovy /usr/local/spring-xd/current/xd/config/xd-container-logback.groovy
 COPY xd-singlenode-logback.groovy /usr/local/spring-xd/current/xd/config/xd-singlenode-logback.groovy
 VOLUME ["/usr/local/spring-xd/current/xd/config"]
