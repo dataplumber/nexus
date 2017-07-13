@@ -5,7 +5,7 @@ California Institute of Technology.  All rights reserved
 import requests
 import numpy as np
 from datetime import datetime
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 from pytz import UTC
 
 TimeSeries = namedtuple('TimeSeries', ('dataset', 'time', 'mean', 'standard_deviation', 'count', 'minimum', 'maximum'))
@@ -37,11 +37,19 @@ def dataset_list():
     """
     response = session.get("{}/list".format(target))
     data = response.json()
+
+    list_response = []
     for dataset in data:
         dataset['start'] = datetime.utcfromtimestamp(dataset['start'] / 1000).strftime(ISO_FORMAT)
         dataset['end'] = datetime.utcfromtimestamp(dataset['end'] / 1000).strftime(ISO_FORMAT)
 
-    return data
+        ordered_dict = OrderedDict()
+        ordered_dict['shortName'] = dataset['shortName']
+        ordered_dict['start'] = dataset['start']
+        ordered_dict['end'] = dataset['end']
+        list_response.append(ordered_dict)
+
+    return list_response
 
 
 def daily_difference_average(dataset, bounding_box, start_datetime, end_datetime, spark=False):
