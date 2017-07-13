@@ -16,3 +16,10 @@ class TestCli(unittest.TestCase):
                                   datetime(2017, 1, 1), datetime(2017, 12, 31), spark=True)
 
         self.assertEqual(2, len(ts))
+
+    def test_list(self):
+
+        ds_list = nexuscli.dataset_list()
+
+        print(ds_list)
+        self.assertTrue(len(ds_list) > 0)

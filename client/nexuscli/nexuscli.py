@@ -18,8 +18,30 @@ session = requests.session()
 
 
 def set_target(url):
+    """
+    Set the URL for the NEXUS webapp endpoint.
+    
+    :param url: URL for NEXUS webapp endpoint 
+    :return: None
+    """
     global target
     target = url
+
+
+def dataset_list():
+    """
+    Get a list of datasets and the start and end time for each.
+    
+    :return: list of datasets
+    :rtype: list
+    """
+    response = session.get("{}/list".format(target))
+    data = response.json()
+    for dataset in data:
+        dataset['start'] = datetime.utcfromtimestamp(dataset['start'] / 1000).strftime(ISO_FORMAT)
+        dataset['end'] = datetime.utcfromtimestamp(dataset['end'] / 1000).strftime(ISO_FORMAT)
+
+    return data
 
 
 def daily_difference_average(dataset, bounding_box, start_datetime, end_datetime, spark=False):
@@ -39,6 +61,7 @@ def daily_difference_average(dataset, bounding_box, start_datetime, end_datetime
     response = session.get(url, params=params)
     response.raise_for_status()
     response = response.json()
+    return response
 
 
 def time_series(datasets, bounding_box, start_datetime, end_datetime, seasonal_filter=False, lowpass_filter=False,
@@ -46,14 +69,23 @@ def time_series(datasets, bounding_box, start_datetime, end_datetime, seasonal_f
     """
     Send a request to NEXUS to calculate a time series.
     
-    :param datasets: Sequence (max length 2) of the name of the dataset(s) 
+    :param datasets: Sequence (max length 2) of the name of the dataset(s)
+    :type datasets: iterable
     :param bounding_box: Bounding box for area of interest
+    :type bounding_box: shapely.geometry.polygon.Polygon
     :param start_datetime: Start time
+    :type start_datetime: datetime
     :param end_datetime: End time
-    :param seasonal_filter: Optionally calculate seasonal values to produce de-seasoned results
-    :param lowpass_filter: Optionally apply a lowpass filter
-    :param spark: Optionally use spark
-    :return: List of nexuscli.TimeSeries namedtuples.
+    :type end_datetime: datetime
+    :param seasonal_filter: Optionally calculate seasonal values to produce de-seasoned results. Default: false
+    :type seasonal_filter: bool
+    :param lowpass_filter: Optionally apply a lowpass filter. Default: false
+    :type lowpass_filter: bool
+    :param spark: Optionally use spark. Default: false
+    :type spark: bool
+    
+    :return: List of nexuscli.TimeSeries namedtuples
+    :rtype: list
     """
 
     assert 0 < len(datasets) <= 2, "datasets must be a sequence of 1 or 2 items"
