@@ -115,25 +115,34 @@ def time_series(datasets, bounding_box, start_datetime, end_datetime, seasonal_f
     response.raise_for_status()
     response = response.json()
 
-    data = np.array(response['data']).T
+    data = np.array(response['data']).flatten()
+
+    assert len(data) > 0, "No data found in {} between {} and {} for Datasets {}.".format(bounding_box.wkt,
+                                                                                          start_datetime.strftime(
+                                                                                              ISO_FORMAT),
+                                                                                          end_datetime.strftime(
+                                                                                              ISO_FORMAT),
+                                                                                          datasets)
 
     time_series_result = []
 
     for i in range(0, len(response['meta'])):
-        key_to_index = {k: x for x, k in enumerate(data[i][0].keys())}
-        time_series_data = np.array([tuple(each.values()) for each in data[i]])
+        key_to_index = {k: x for x, k in enumerate(data[0].keys())}
 
-        time_series_result.append(
-            TimeSeries(
-                dataset=response['meta'][i]['shortName'],
-                time=np.array([datetime.utcfromtimestamp(t).replace(tzinfo=UTC) for t in
-                               time_series_data[:, key_to_index['time']]]),
-                mean=time_series_data[:, key_to_index['mean']],
-                standard_deviation=time_series_data[:, key_to_index['std']],
-                count=time_series_data[:, key_to_index['cnt']],
-                minimum=time_series_data[:, key_to_index['min']],
-                maximum=time_series_data[:, key_to_index['max']],
+        time_series_data = np.array([tuple(each.values()) for each in [entry for entry in data if entry['ds'] == i]])
+
+        if len(time_series_data) > 0:
+            time_series_result.append(
+                TimeSeries(
+                    dataset=response['meta'][i]['shortName'],
+                    time=np.array([datetime.utcfromtimestamp(t).replace(tzinfo=UTC) for t in
+                                   time_series_data[:, key_to_index['time']]]),
+                    mean=time_series_data[:, key_to_index['mean']],
+                    standard_deviation=time_series_data[:, key_to_index['std']],
+                    count=time_series_data[:, key_to_index['cnt']],
+                    minimum=time_series_data[:, key_to_index['min']],
+                    maximum=time_series_data[:, key_to_index['max']],
+                )
             )
-        )
 
     return time_series_result

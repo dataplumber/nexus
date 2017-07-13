@@ -12,13 +12,12 @@ import nexuscli
 
 class TestCli(unittest.TestCase):
     def test_time_series(self):
-        ts = nexuscli.time_series(("AVHRR_OI_L4_GHRSST_NCEI", "AVHRR_OI_L4_GHRSST_NCEI"), box(-150, -5, -90, 5),
-                                  datetime(2017, 1, 1), datetime(2017, 12, 31), spark=True)
+        ts = nexuscli.time_series(("AVHRR_OI_L4_GHRSST_NCEI", "MEASURES_SLA_JPL_1603"), box(-150, 45, -120, 60),
+                                  datetime(2016, 1, 1), datetime(2016, 12, 31))
 
         self.assertEqual(2, len(ts))
 
     def test_list(self):
-
         ds_list = nexuscli.dataset_list()
 
         print(ds_list)
