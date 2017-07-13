@@ -5,6 +5,7 @@
 package org.nasa.jpl.nexus.ingest.nexussink
 
 import com.datastax.driver.core.Cluster
+import io.findify.s3mock.S3Mock
 import org.apache.solr.client.solrj.SolrClient
 import org.apache.solr.common.params.ModifiableSolrParams
 import org.cassandraunit.utils.EmbeddedCassandraServerHelper
@@ -60,6 +61,8 @@ public class NexusSinkIntegrationTest {
 
     @BeforeClass
     public static void setUpXd() {
+
+        S3Mock api = new S3Mock.Builder().withPort(8001).withInMemoryBackend().build();
 
         initCassandra()
 

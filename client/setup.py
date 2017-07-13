@@ -3,13 +3,14 @@ Copyright (c) 2017 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 
-import setuptools
+from setuptools import setup, find_packages
 
 __version__ = '1.0'
 
-setuptools.setup(
+setup(
     name="nexuscli",
     version=__version__,
+    packages=find_packages(),
     url="https://github.jpl.nasa.gov/thuang/nexus",
 
     author="Team Nexus",

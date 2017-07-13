@@ -157,7 +157,7 @@ dependencies {
     compile 'org.codehaus.groovy:groovy'
 
 
-
+    testCompile group: 'io.findify', name: 's3mock_2.12', version: '0.2.3'
     testCompile('org.springframework.boot:spring-boot-starter-test')
     testCompile("org.apache.cassandra:cassandra-all")
     testCompile("org.apache.solr:solr-core:${testversions.solrCoreVersion}"){
