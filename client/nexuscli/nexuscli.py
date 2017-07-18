@@ -154,8 +154,6 @@ def time_series(datasets, bounding_box, start_datetime, end_datetime, spark=Fals
         'b': ','.join(str(b) for b in bounding_box.bounds),
         'startTime': start_datetime.strftime(ISO_FORMAT),
         'endTime': end_datetime.strftime(ISO_FORMAT),
-        'seasonalFilter': seasonal_filter,
-        'lowPassFilter': lowpass_filter
     }
 
     response = session.get(url, params=params)

@@ -25,6 +25,6 @@ class TestCli(unittest.TestCase):
 
     def test_daily_difference_average(self):
         ts = nexuscli.daily_difference_average("AVHRR_OI_L4_GHRSST_NCEI", box(-150, 45, -120, 60),
-                                               datetime(2013, 1, 1), datetime(2014, 12, 31), spark=True)
+                                               datetime(2013, 1, 1), datetime(2014, 12, 31))
 
         self.assertEqual(1, len(ts))
