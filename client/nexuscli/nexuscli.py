@@ -143,7 +143,11 @@ def time_series(datasets, bounding_box, start_datetime, end_datetime, spark=Fals
     __return__ List of `nexuscli.nexuscli.TimeSeries` namedtuples
     """
 
+    if isinstance(datasets, str):
+        datasets = [datasets]
+
     assert 0 < len(datasets) <= 2, "datasets must be a sequence of 1 or 2 items"
+
     if spark:
         url = "{}/timeSeriesSpark?".format(target)
     else:
