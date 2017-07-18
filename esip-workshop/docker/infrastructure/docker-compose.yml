@@ -164,6 +164,7 @@ services:
             - nexus
         depends_on:
             - cassandra1
+            - cassandra2
         logging:
             driver: "json-file"
             options:
