@@ -1,6 +1,18 @@
 """
 Copyright (c) 2017 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
+
+This module provides a native python client interface to the NEXUS (https://github.com/dataplumber/nexus) 
+webservice API.
+
+Usage:
+
+    
+    ``import nexuscli``
+    
+    ``nexuscli.set_target("http://nexus-webapp:8083")``
+    ``nexuscli.dataset_list()``
+    
 """
 import requests
 import numpy as np
@@ -9,6 +21,16 @@ from collections import namedtuple, OrderedDict
 from pytz import UTC
 
 TimeSeries = namedtuple('TimeSeries', ('dataset', 'time', 'mean', 'standard_deviation', 'count', 'minimum', 'maximum'))
+TimeSeries.__doc__ = '''\
+A Time Series
+
+dataset - Name of the Dataset
+time - numpy array containing times
+mean - numpy array containing means
+standard_deviation - numpy array containing standard deviations
+count - numpy array containing counts
+minimum - numpy array containing minimums
+maximum - numpy array containing maximums'''
 
 ISO_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -53,6 +75,23 @@ def dataset_list():
 
 
 def daily_difference_average(dataset, bounding_box, start_datetime, end_datetime, spark=False):
+    """
+    Generate an anomaly Time series for a given dataset, bounding box, and timeframe.
+    
+    :param dataset: Name of the dataset
+    :type dataset: str
+    :param bounding_box: Bounding box for area of interest
+    :type bounding_box: shapely.geometry.polygon.Polygon
+    :param start_datetime: Start time
+    :type start_datetime: datetime
+    :param end_datetime: End time
+    :type end_datetime: datetime
+    :param spark: Optionally use spark. Default: false
+    :type spark: bool
+    
+    :return: List of nexuscli.TimeSeries namedtuples
+    :rtype: list
+    """
     if spark:
         url = "{}/dailydifferenceaverage_spark?".format(target)
     else:
@@ -69,7 +108,37 @@ def daily_difference_average(dataset, bounding_box, start_datetime, end_datetime
     response = session.get(url, params=params)
     response.raise_for_status()
     response = response.json()
-    return response
+
+    data = np.array(response['data']).flatten()
+
+    assert len(data) > 0, "No data found in {} between {} and {} for Datasets {}.".format(bounding_box.wkt,
+                                                                                          start_datetime.strftime(
+                                                                                              ISO_FORMAT),
+                                                                                          end_datetime.strftime(
+                                                                                              ISO_FORMAT),
+                                                                                          dataset)
+
+    time_series_result = []
+
+    key_to_index = {k: x for x, k in enumerate(data[0].keys())}
+
+    time_series_data = np.array([tuple(each.values()) for each in [entry for entry in data]])
+
+    if len(time_series_data) > 0:
+        time_series_result.append(
+            TimeSeries(
+                dataset=dataset,
+                time=np.array([datetime.utcfromtimestamp(t).replace(tzinfo=UTC) for t in
+                               time_series_data[:, key_to_index['time']]]),
+                mean=time_series_data[:, key_to_index['mean']],
+                standard_deviation=time_series_data[:, key_to_index['std']],
+                count=None,
+                minimum=None,
+                maximum=None,
+            )
+        )
+
+    return time_series_result
 
 
 def time_series(datasets, bounding_box, start_datetime, end_datetime, seasonal_filter=False, lowpass_filter=False,
