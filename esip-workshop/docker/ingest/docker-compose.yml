@@ -20,6 +20,11 @@ services:
         networks:
             - ingestnetwork
             - nexus
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
     
     redis:
         image: redis:3
@@ -27,6 +32,11 @@ services:
         networks:
             - ingestnetwork
             - nexus
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
             
     kafka1:
         image: nexusjpl/kafka
@@ -35,6 +45,11 @@ services:
         networks:
             - ingestnetwork
             - nexus
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
             
     kafka2:
         image: nexusjpl/kafka
@@ -43,6 +58,11 @@ services:
         networks:
             - ingestnetwork
             - nexus
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
             
     kafka3:
         image: nexusjpl/kafka
@@ -51,6 +71,11 @@ services:
         networks:
             - ingestnetwork
             - nexus
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
             
     xd-admin:
         image: nexusjpl/ingest-admin
@@ -76,6 +101,11 @@ services:
         networks:
             - ingestnetwork
             - nexus
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
             
     xd-container1:
         image: nexusjpl/ingest-container
@@ -99,6 +129,11 @@ services:
             - nexus
         volumes:
               - /home/ndeploy/ingest/data:/usr/local/data/nexus
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
               
     xd-container2:
         image: nexusjpl/ingest-container
@@ -122,6 +157,11 @@ services:
             - nexus
         volumes:
               - /home/ndeploy/ingest/data:/usr/local/data/nexus
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
               
     xd-container3:
         image: nexusjpl/ingest-container
@@ -145,3 +185,8 @@ services:
             - nexus
         volumes:
               - /home/ndeploy/ingest/data:/usr/local/data/nexus
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
