@@ -74,7 +74,7 @@ def dataset_list():
     return list_response
 
 
-def daily_difference_average(dataset, bounding_box, start_datetime, end_datetime, spark=False):
+def daily_difference_average(dataset, bounding_box, start_datetime, end_datetime):
     """
     Generate an anomaly Time series for a given dataset, bounding box, and timeframe.
     
@@ -86,16 +86,11 @@ def daily_difference_average(dataset, bounding_box, start_datetime, end_datetime
     :type start_datetime: datetime
     :param end_datetime: End time
     :type end_datetime: datetime
-    :param spark: Optionally use spark. Default: false
-    :type spark: bool
     
     :return: List of nexuscli.TimeSeries namedtuples
     :rtype: list
     """
-    if spark:
-        url = "{}/dailydifferenceaverage_spark?".format(target)
-    else:
-        url = "{}/dailydifferenceaverage?".format(target)
+    url = "{}/dailydifferenceaverage_spark?".format(target)
 
     params = {
         'dataset': dataset,
