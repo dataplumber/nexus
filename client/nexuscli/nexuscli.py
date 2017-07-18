@@ -1,6 +1,17 @@
 """
 Copyright (c) 2017 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
+
+This module provides a native python client interface to the NEXUS (https://github.com/dataplumber/nexus) 
+webservice API.
+
+Usage:
+
+    import nexuscli
+    
+    nexuscli.set_target("http://nexus-webapp:8083")
+    nexuscli.dataset_list()
+    
 """
 import requests
 import numpy as np
@@ -8,7 +19,18 @@ from datetime import datetime
 from collections import namedtuple, OrderedDict
 from pytz import UTC
 
+__pdoc__ = {}
 TimeSeries = namedtuple('TimeSeries', ('dataset', 'time', 'mean', 'standard_deviation', 'count', 'minimum', 'maximum'))
+TimeSeries.__doc__ = '''\
+An object containing Time Series arrays.
+'''
+__pdoc__['TimeSeries.dataset'] = "Name of the Dataset"
+__pdoc__['TimeSeries.time'] = "`numpy` array containing times as `datetime` objects"
+__pdoc__['TimeSeries.mean'] = "`numpy` array containing means"
+__pdoc__['TimeSeries.standard_deviation'] = "`numpy` array containing standard deviations"
+__pdoc__['TimeSeries.count'] = "`numpy` array containing counts"
+__pdoc__['TimeSeries.minimum'] = "`numpy` array containing minimums"
+__pdoc__['TimeSeries.maximum'] = "`numpy` array containing maximums"
 
 ISO_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -19,10 +41,10 @@ session = requests.session()
 
 def set_target(url):
     """
-    Set the URL for the NEXUS webapp endpoint.
+    Set the URL for the NEXUS webapp endpoint.  
     
-    :param url: URL for NEXUS webapp endpoint 
-    :return: None
+    __url__ URL for NEXUS webapp endpoint   
+    __return__ None
     """
     global target
     target = url
@@ -32,8 +54,7 @@ def dataset_list():
     """
     Get a list of datasets and the start and end time for each.
     
-    :return: list of datasets
-    :rtype: list
+    __return__ list of datasets. Each entry in the list contains `shortname`, `start`, and `end`
     """
     response = session.get("{}/list".format(target))
     data = response.json()
@@ -52,11 +73,18 @@ def dataset_list():
     return list_response
 
 
-def daily_difference_average(dataset, bounding_box, start_datetime, end_datetime, spark=False):
-    if spark:
-        url = "{}/dailydifferenceaverage_spark?".format(target)
-    else:
-        url = "{}/dailydifferenceaverage?".format(target)
+def daily_difference_average(dataset, bounding_box, start_datetime, end_datetime):
+    """
+    Generate an anomaly Time series for a given dataset, bounding box, and timeframe.
+    
+    __dataset__ Name of the dataset as a String  
+    __bounding_box__ Bounding box for area of interest as a `shapely.geometry.polygon.Polygon`  
+    __start_datetime__ Start time as a `datetime.datetime`  
+    __end_datetime__ End time as a `datetime.datetime`  
+    
+    __return__ List of `nexuscli.nexuscli.TimeSeries` namedtuples
+    """
+    url = "{}/dailydifferenceaverage_spark?".format(target)
 
     params = {
         'dataset': dataset,
@@ -69,31 +97,50 @@ def daily_difference_average(dataset, bounding_box, start_datetime, end_datetime
     response = session.get(url, params=params)
     response.raise_for_status()
     response = response.json()
-    return response
+
+    data = np.array(response['data']).flatten()
+
+    assert len(data) > 0, "No data found in {} between {} and {} for Datasets {}.".format(bounding_box.wkt,
+                                                                                          start_datetime.strftime(
+                                                                                              ISO_FORMAT),
+                                                                                          end_datetime.strftime(
+                                                                                              ISO_FORMAT),
+                                                                                          dataset)
+
+    time_series_result = []
+
+    key_to_index = {k: x for x, k in enumerate(data[0].keys())}
+
+    time_series_data = np.array([tuple(each.values()) for each in [entry for entry in data]])
+
+    if len(time_series_data) > 0:
+        time_series_result.append(
+            TimeSeries(
+                dataset=dataset,
+                time=np.array([datetime.utcfromtimestamp(t).replace(tzinfo=UTC) for t in
+                               time_series_data[:, key_to_index['time']]]),
+                mean=time_series_data[:, key_to_index['mean']],
+                standard_deviation=time_series_data[:, key_to_index['std']],
+                count=None,
+                minimum=None,
+                maximum=None,
+            )
+        )
+
+    return time_series_result
 
 
-def time_series(datasets, bounding_box, start_datetime, end_datetime, seasonal_filter=False, lowpass_filter=False,
-                spark=False):
+def time_series(datasets, bounding_box, start_datetime, end_datetime, spark=False):
     """
     Send a request to NEXUS to calculate a time series.
     
-    :param datasets: Sequence (max length 2) of the name of the dataset(s)
-    :type datasets: iterable
-    :param bounding_box: Bounding box for area of interest
-    :type bounding_box: shapely.geometry.polygon.Polygon
-    :param start_datetime: Start time
-    :type start_datetime: datetime
-    :param end_datetime: End time
-    :type end_datetime: datetime
-    :param seasonal_filter: Optionally calculate seasonal values to produce de-seasoned results. Default: false
-    :type seasonal_filter: bool
-    :param lowpass_filter: Optionally apply a lowpass filter. Default: false
-    :type lowpass_filter: bool
-    :param spark: Optionally use spark. Default: false
-    :type spark: bool
+    __datasets__ Sequence (max length 2) of the name of the dataset(s)  
+    __bounding_box__ Bounding box for area of interest as a `shapely.geometry.polygon.Polygon`  
+    __start_datetime__ Start time as a `datetime.datetime`  
+    __end_datetime__ End time as a `datetime.datetime`  
+    __spark__ Optionally use spark. Default: `False`
     
-    :return: List of nexuscli.TimeSeries namedtuples
-    :rtype: list
+    __return__ List of `nexuscli.nexuscli.TimeSeries` namedtuples
     """
 
     assert 0 < len(datasets) <= 2, "datasets must be a sequence of 1 or 2 items"

@@ -16,6 +16,11 @@ services:
             - ZOO_SERVERS=server.1=zk1:2888:3888 server.2=zk2:2888:3888 server.3=zk3:2888:3888
         networks:
             - nexus
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
 
     zk2:
         image: zookeeper
@@ -28,6 +33,11 @@ services:
             - ZOO_SERVERS=server.1=zk1:2888:3888 server.2=zk2:2888:3888 server.3=zk3:2888:3888
         networks:
             - nexus
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
 
     zk3:
         image: zookeeper
@@ -40,6 +50,11 @@ services:
             - ZOO_SERVERS=server.1=zk1:2888:3888 server.2=zk2:2888:3888 server.3=zk3:2888:3888
         networks:
             - nexus
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
 
     solr1:
         image: nexusjpl/nexus-solr
@@ -113,6 +128,11 @@ services:
             - CASSANDRA_BROADCAST_ADDRESS=cassandra1
         networks:
             - nexus
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
 
     cassandra2:
         image: cassandra:2.2.8
@@ -126,6 +146,11 @@ services:
             - nexus
         depends_on:
             - cassandra1
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
 
     cassandra3:
         image: cassandra:2.2.8
@@ -139,3 +164,8 @@ services:
             - nexus
         depends_on:
             - cassandra1
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"

@@ -9,7 +9,7 @@ COPY requirements.txt /tmp
 RUN pip install -r /tmp/requirements.txt && \
     conda install -y basemap
 
-ENV REBUILD_CODE=truee
+ENV REBUILD_CODE=true
 RUN mkdir -p /home/jovyan/nexuscli && \
     cd /home/jovyan/nexuscli && \
     git init && \
