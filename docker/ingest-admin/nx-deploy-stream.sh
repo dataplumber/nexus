@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. nx-env.sh
+. /usr/local/nx-env.sh
 
 if [ $# -gt 0 ]; then
   while true; do  
@@ -35,4 +35,4 @@ xd-shell --cmdfile /tmp/stream-create
 
 echo "stream deploy --name ${DATASET_NAME} --properties module.python-chain.count=3,module.nexus.count=3" > /tmp/stream-deploy
 
-xd-shell --cmdfile /tmp/stream-create
+xd-shell --cmdfile /tmp/stream-deploy
