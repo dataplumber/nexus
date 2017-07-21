@@ -12,7 +12,9 @@ sleep 30
 
 # Try warming up Solr cache
 source /home/ndeploy/nexus/esip-workshop/docker/infrastructure/.env
-find $HOST_DATA_DIR/data/ -type f -exec cat {} \; > /dev/null
+find $HOST_DATA_DIR/solr1/nexustiles_shard2_replica1/data/ -type f -exec cat {} \; > /dev/null
+find $HOST_DATA_DIR/solr2/nexustiles_shard1_replica1/data/ -type f -exec cat {} \; > /dev/null
+find $HOST_DATA_DIR/solr1/nexustiles_shard3_replica1/data/ -type f -exec cat {} \; > /dev/null
 
 docker exec -it solr1 curl -g 'http://localhost:8983/solr/nexustiles/select?q=dataset_s:AVHRR_OI_L4_GHRSST_NCEI&fq=geo:[40.0,-150.0+TO+55.0,-120.0]&fq={!frange+l%3D0+u%3D0}ms(tile_min_time_dt,tile_max_time_dt)&fq=tile_count_i:[1+TO+*]&fq=tile_min_time_dt:[2013-01-01T00:00:00Z+TO+2016-12-31T00:00:00Z]+&fl=solr_id_s&fl=score&facet=true&facet.field=tile_min_time_dt&facet.limit=-1&f.tile_min_time_dt.facet.mincount=1&f.tile_min_time_dt.facet.limit=-1&start=0&rows=0' > /dev/null
 docker exec -it solr1 curl -g 'http://localhost:8983/solr/nexustiles/select?q=dataset_s:TRMM_3B42_daily&fq=geo:[40.0,-150.0+TO+55.0,-120.0]&fq={!frange+l%3D0+u%3D0}ms(tile_min_time_dt,tile_max_time_dt)&fq=tile_count_i:[1+TO+*]&fq=tile_min_time_dt:[2013-01-01T00:00:00Z+TO+2016-12-31T00:00:00Z]+&fl=solr_id_s&fl=score&facet=true&facet.field=tile_min_time_dt&facet.limit=-1&f.tile_min_time_dt.facet.mincount=1&f.tile_min_time_dt.facet.limit=-1&start=0&rows=0' > /dev/null
