@@ -47,7 +47,9 @@ def summarize_nexustile(self, tiledata):
 
     tilesummary.stats.min = numpy.nanmin(data).item()
     tilesummary.stats.max = numpy.nanmax(data).item()
-    tilesummary.stats.mean = numpy.nanmean(data).item()
+    tilesummary.stats.mean = numpy.ma.average(numpy.ma.masked_invalid(data),
+                                              weights=numpy.cos(numpy.radians(latitudes)))
+
     tilesummary.stats.count = data.size - numpy.count_nonzero(numpy.isnan(data))
 
     try:
