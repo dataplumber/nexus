@@ -3,18 +3,20 @@ Copyright (c) 2016 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 import ConfigParser
+import sys
 from datetime import datetime
 from functools import wraps
 
 import numpy as np
 import numpy.ma as ma
 import pkg_resources
-import sys
+from dao.CassandraProxy import CassandraProxy
+from dao.S3Proxy import S3Proxy
+from dao.DynamoProxy import DynamoProxy
+from dao.SolrProxy import SolrProxy
 from pytz import timezone
 from shapely.geometry import MultiPolygon, box
 
-from dao.CassandraProxy import CassandraProxy
-from dao.SolrProxy import SolrProxy
 from model.nexusmodel import Tile, BBox, TileStats
 
 EPOCH = timezone('UTC').localize(datetime(1970, 1, 1))
@@ -47,6 +49,10 @@ class NexusTileServiceException(Exception):
 
 class NexusTileService(object):
     def __init__(self, skipCassandra=False, skipSolr=False, config=None):
+        self._cass = None
+        self._s3 = None
+        self._dynamo = None
+
         if config is None:
             self._config = ConfigParser.RawConfigParser()
             self._config.readfp(pkg_resources.resource_stream(__name__, "config/datastores.ini"),
@@ -55,7 +61,15 @@ class NexusTileService(object):
             self._config = config
 
         if not skipCassandra:
-            self._cass = CassandraProxy(self._config)
+            datastore = self._config.get("datastore", "store")
+            if datastore == "cassandra":
+                self._cass = CassandraProxy(self._config)
+            elif datastore == "s3":
+                self._s3 = S3Proxy(self._config)
+            elif datastore == "dynamo":
+                self._dynamo = DynamoProxy(self._config)
+            else:
+                print("Error reading datastore from config file")
 
         if not skipSolr:
             self._solr = SolrProxy(self._config)
@@ -279,7 +293,15 @@ class NexusTileService(object):
     def fetch_data_for_tiles(self, *tiles):
 
         nexus_tile_ids = set([tile.tile_id for tile in tiles])
-        matched_tile_data = self._cass.fetch_nexus_tiles(*nexus_tile_ids)
+
+        if self._cass is None:
+            if self._s3 is None:
+                matched_tile_data = self._dynamo.fetch_nexus_tiles(*nexus_tile_ids)
+            else:
+                matched_tile_data = self._s3.fetch_nexus_tiles(*nexus_tile_ids)
+        else:
+            matched_tile_data = self._cass.fetch_nexus_tiles(*nexus_tile_ids)
+
         tile_data_by_id = {str(a_tile_data.tile_id): a_tile_data for a_tile_data in matched_tile_data}
 
         missing_data = nexus_tile_ids.difference(tile_data_by_id.keys())
