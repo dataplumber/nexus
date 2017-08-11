@@ -71,6 +71,8 @@ public class NexusSinkIntegrationTest {
     @BeforeClass
     public static void setUpXd() {
 
+        S3Mock api = new S3Mock.Builder().withPort(8001).withInMemoryBackend().build();
+
         initCassandra()
         initS3()
 

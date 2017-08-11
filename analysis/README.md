@@ -1,7 +1,7 @@
 analysis
 =====
 
-Python module that exposes NEXUS analytical capabilities via a HTTP webservice.
+Python module that exposes NEXUS analytical capabilities via a HTTP webservice. Accessible endpoints are described on the [API](https://github.com/dataplumber/nexus/wiki/API) page of the wiki.
 
 # Developer Setup
 
