@@ -1,3 +1,7 @@
+"""
+Copyright (c) 2017 Jet Propulsion Laboratory,
+California Institute of Technology.  All rights reserved
+"""
 import json
 import logging
 import threading
@@ -124,11 +128,10 @@ class SolrProxy(object):
 
         response = self.do_query_raw(*(search, None, None, False, None), **params)
         l = []
-        for g, v in response.facet_counts["facet_fields"]["dataset_s"].items():
+        for g in response.facet_counts["facet_fields"]["dataset_s"]:
             l.append({
                 "shortName": g,
-                "title": g,
-                "tileCount": v
+                "title": g
             })
         l = sorted(l, key=lambda entry: entry["title"])
         return l

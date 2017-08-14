@@ -1,3 +1,7 @@
+/*****************************************************************************
+ * Copyright (c) 2017 Jet Propulsion Laboratory,
+ * California Institute of Technology.  All rights reserved
+ *****************************************************************************/
 package org.nasa.jpl.nexus.ingest.nexussink;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
@@ -5,6 +9,8 @@ import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import org.nasa.jpl.nexus.ingest.wiretypes.NexusContent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 
@@ -16,7 +22,7 @@ public class DynamoStore implements DataStore {
     private DynamoDB dynamoDB;
     private String tableName;
     private String primaryKey = "tile_id";
-    private int count = 0;
+    private Logger log = LoggerFactory.getLogger(NexusService.class);
 
     public DynamoStore(AmazonDynamoDB dynamoClient, String tableName) {
         dynamoDB = new DynamoDB(dynamoClient);
@@ -33,16 +39,11 @@ public class DynamoStore implements DataStore {
 
             try {
                 table.putItem(new Item().withPrimaryKey(primaryKey, tileId).withBinary("data", tileData));
-                count++;
             }
             catch (Exception e) {
-                System.err.println("Unable to add item: " + tileId);
-                System.err.println(e.getMessage());
+                log.error("Unable to add item: " + tileId);
+                throw new DataStoreException(e);
             }
-        }
-        if (count % 1053 == 0) {
-            System.out.println("\nCOUNT (files): " + count/1053);
-            System.out.println();
         }
     }
 

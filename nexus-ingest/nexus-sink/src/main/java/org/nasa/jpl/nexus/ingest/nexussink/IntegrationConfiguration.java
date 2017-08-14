@@ -99,24 +99,6 @@ public class IntegrationConfiguration {
         };
     }
 
-    /*
-    @Bean
-    @IntegrationConverter
-    public Converter byteObjectArrayToNexusTileConverter() {
-        return new Converter<Byte[], NexusContent.NexusTile>() {
-            @Override
-            public NexusContent.NexusTile convert(Byte[] source) {
-
-                try {
-                    return NexusContent.NexusTile.newBuilder().mergeFrom(ArrayUtils.toPrimitive(source)).build();
-                } catch (InvalidProtocolBufferException e) {
-                    throw new RuntimeException("Could not convert message.", e);
-                }
-            }
-        };
-    }
-    */
-
     @Bean
     public TaskScheduler taskScheduler(){
         ThreadPoolTaskScheduler tpts = new ThreadPoolTaskScheduler();

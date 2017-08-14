@@ -1,3 +1,7 @@
+/*****************************************************************************
+ * Copyright (c) 2017 Jet Propulsion Laboratory,
+ * California Institute of Technology.  All rights reserved
+ *****************************************************************************/
 package org.nasa.jpl.nexus.ingest.nexussink;
 
 import com.amazonaws.AmazonClientException;
@@ -6,6 +10,8 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.*;
 import org.nasa.jpl.nexus.ingest.wiretypes.NexusContent.NexusTile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -18,6 +24,7 @@ public class S3Store implements DataStore {
 
     private AmazonS3 s3;
     private String bucketName;
+    private Logger log = LoggerFactory.getLogger(NexusService.class);
 
     public S3Store(AmazonS3Client s3client, String bucketName) {
         s3 = s3client;
@@ -38,19 +45,15 @@ public class S3Store implements DataStore {
                 s3.putObject(new PutObjectRequest(bucketName, tileId, stream, meta));
             }
             catch (AmazonServiceException ase) {
-                System.out.println("Caught an AmazonServiceException, which means your request made it "
+                log.error("Caught an AmazonServiceException, which means your request made it "
                         + "to Amazon S3, but was rejected with an error response for some reason.");
-                System.out.println("Error Message:    " + ase.getMessage());
-                System.out.println("HTTP Status Code: " + ase.getStatusCode());
-                System.out.println("AWS Error Code:   " + ase.getErrorCode());
-                System.out.println("Error Type:       " + ase.getErrorType());
-                System.out.println("Request ID:       " + ase.getRequestId());
+                throw new DataStoreException(ase);
             }
             catch (AmazonClientException ace) {
-                System.out.println("Caught an AmazonClientException, which means the client encountered "
+                log.error("Caught an AmazonClientException, which means the client encountered "
                         + "a serious internal problem while trying to communicate with S3, "
                         + "such as not being able to access the network.");
-                System.out.println("Error Message: " + ace.getMessage());
+                throw new DataStoreException(ace);
             }
         }
     }
