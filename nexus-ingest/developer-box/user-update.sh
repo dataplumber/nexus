@@ -15,8 +15,7 @@ fi
 pushd $homedir
 
 pushd nexus
-git pull https://github.jpl.nasa.gov/nchung/nexus.git
-git checkout david
+git pull https://github.com/dataplumber/nexus.git
 popd
 
 source activate $condaenv

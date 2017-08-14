@@ -128,10 +128,11 @@ class SolrProxy(object):
 
         response = self.do_query_raw(*(search, None, None, False, None), **params)
         l = []
-        for g in response.facet_counts["facet_fields"]["dataset_s"]:
+        for g, v in response.facet_counts["facet_fields"]["dataset_s"].items():
             l.append({
                 "shortName": g,
-                "title": g
+                "title": g,
+                "tileCount": v
             })
         l = sorted(l, key=lambda entry: entry["title"])
         return l
