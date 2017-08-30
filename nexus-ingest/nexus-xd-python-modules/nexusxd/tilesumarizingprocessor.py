@@ -59,7 +59,8 @@ def summarize_nexustile(self, tiledata):
         # Grid tiles need to repeat the weight for every longitude
         # TODO This assumes data axis' are ordered as latitude x longitude
         tilesummary.stats.mean = numpy.ma.average(numpy.ma.masked_invalid(data).flatten(),
-                                                  weights=numpy.repeat(latitudes, len(longitudes)))
+                                                  weights=numpy.cos(
+                                                      numpy.radians(numpy.repeat(latitudes, len(longitudes)))))
     else:
         # Default to simple average with no weighting
         tilesummary.stats.mean = numpy.nanmean(data)
