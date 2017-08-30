@@ -324,7 +324,7 @@ class TimeSeriesHandlerImpl(NexusHandler):
             tile_counts = [tile.tile_stats.count for tile in inner_tiles]
 
             # Border tiles need have the data loaded, masked, and stats recalculated
-            border_tiles = self._tile_service.fetch_data_for_tiles(*border_tiles)
+            border_tiles = list(self._tile_service.fetch_data_for_tiles(*border_tiles))
             border_tiles = self._tile_service.mask_tiles_to_polygon(bounding_polygon,  border_tiles)
             for tile in border_tiles:
                 tile.update_stats()
