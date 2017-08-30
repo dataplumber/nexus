@@ -299,7 +299,8 @@ class TimeSeriesHandlerImpl(NexusHandler):
             start = (pytz.UTC.localize(beginning_of_month) - EPOCH).total_seconds()
             end = (pytz.UTC.localize(end_of_month) - EPOCH).total_seconds()
             tile_stats = self._tile_service.find_tiles_in_polygon(bounding_polygon, ds, start, end,
-                                                                  fl=('tile_avg_val_d,tile_count_i,'
+                                                                  fl=('id,'
+                                                                      'tile_avg_val_d,tile_count_i,'
                                                                       'tile_min_val_d,tile_max_val_d,'
                                                                       'tile_min_lat,tile_max_lat,'
                                                                       'tile_min_lon,tile_max_lon'),
