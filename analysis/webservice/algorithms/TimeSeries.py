@@ -72,7 +72,7 @@ class TimeSeriesHandlerImpl(NexusHandler):
     singleton = True
 
     def __init__(self):
-        NexusHandler.__init__(self, skipCassandra=True)
+        NexusHandler.__init__(self)
         self.log = logging.getLogger(__name__)
 
     def parse_arguments(self, request):

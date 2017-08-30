@@ -78,7 +78,7 @@ class TimeSeriesHandlerImpl(SparkHandler):
     singleton = True
 
     def __init__(self):
-        SparkHandler.__init__(self, skipCassandra=True)
+        SparkHandler.__init__(self)
         self.log = logging.getLogger(__name__)
 
     def parse_arguments(self, request):
