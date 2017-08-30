@@ -328,10 +328,10 @@ class TimeSeriesHandlerImpl(NexusHandler):
             border_tiles = self._tile_service.mask_tiles_to_polygon(bounding_polygon,  border_tiles)
             for tile in border_tiles:
                 tile.update_stats()
-                tile_means.extend(tile.tile_stats.mean)
-                tile_mins.extend(tile.tile_stats.min)
-                tile_maxes.extend(tile.tile_stats.max)
-                tile_counts.extend(tile.tile_stats.count)
+                tile_means.append(tile.tile_stats.mean)
+                tile_mins.append(tile.tile_stats.min)
+                tile_maxes.append(tile.tile_stats.max)
+                tile_counts.append(tile.tile_stats.count)
 
             tile_means = np.array(tile_means)
             tile_mins = np.array(tile_mins)
