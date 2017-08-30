@@ -13,12 +13,12 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import pytz
+import shapely.geometry
 import shapely.wkt
 from backports.functools_lru_cache import lru_cache
 from nexustiles.nexustiles import NexusTileService
 from pytz import timezone
 from scipy import stats
-from shapely.geometry import Polygon
 
 from webservice import Filtering as filtering
 from webservice.NexusHandler import nexus_handler, SparkHandler
@@ -108,7 +108,8 @@ class TimeSeriesHandlerImpl(SparkHandler):
             try:
                 west, south, east, north = request.get_min_lon(), request.get_min_lat(), \
                                            request.get_max_lon(), request.get_max_lat()
-                bounding_polygon = Polygon([(west, south), (east, south), (east, north), (west, north), (west, south)])
+                bounding_polygon = shapely.geometry.Polygon(
+                    [(west, south), (east, south), (east, north), (west, north), (west, south)])
             except:
                 raise NexusProcessingException(
                     reason="'b' argument is required. Must be comma-delimited float formatted as "
@@ -164,6 +165,7 @@ class TimeSeriesHandlerImpl(SparkHandler):
 
         for shortName in ds:
 
+            the_time = datetime.now()
             daysinrange = self._tile_service.find_days_in_range_asc(bounding_polygon.bounds[1],
                                                                     bounding_polygon.bounds[3],
                                                                     bounding_polygon.bounds[0],
@@ -171,6 +173,7 @@ class TimeSeriesHandlerImpl(SparkHandler):
                                                                     shortName,
                                                                     start_seconds_from_epoch,
                                                                     end_seconds_from_epoch)
+            self.log.info("Finding days in range took %s for dataset %s" % (str(datetime.now() - the_time), shortName))
 
             ndays = len(daysinrange)
             if ndays == 0:
@@ -181,20 +184,27 @@ class TimeSeriesHandlerImpl(SparkHandler):
                 self.log.debug('{0}, {1}'.format(i, datetime.utcfromtimestamp(d)))
             spark_nparts_needed = min(spark_nparts, ndays)
 
+            the_time = datetime.now()
             results, meta = spark_driver(daysinrange, bounding_polygon, shortName,
                                          spark_nparts_needed=spark_nparts_needed, sc=self._sc)
+            self.log.info("Spark job took %s for dataset %s" % (str(datetime.now() - the_time), shortName))
 
             if apply_seasonal_cycle_filter:
+                the_time = datetime.now()
                 for result in results:
                     month = datetime.utcfromtimestamp(result['time']).month
-                    month_mean, month_max, month_min = self.calculate_monthly_average(month, bounding_polygon.wkt, shortName)
+                    month_mean, month_max, month_min = self.calculate_monthly_average(month, bounding_polygon.wkt,
+                                                                                      shortName)
                     seasonal_mean = result['mean'] - month_mean
                     seasonal_min = result['min'] - month_min
                     seasonal_max = result['max'] - month_max
                     result['meanSeasonal'] = seasonal_mean
                     result['minSeasonal'] = seasonal_min
                     result['maxSeasonal'] = seasonal_max
+                self.log.info(
+                    "Seasonal calculation took %s for dataset %s" % (str(datetime.now() - the_time), shortName))
 
+            the_time = datetime.now()
             filtering.applyAllFiltersOnField(results, 'mean', applySeasonal=False, applyLowPass=apply_low_pass_filter)
             filtering.applyAllFiltersOnField(results, 'max', applySeasonal=False, applyLowPass=apply_low_pass_filter)
             filtering.applyAllFiltersOnField(results, 'min', applySeasonal=False, applyLowPass=apply_low_pass_filter)
@@ -213,10 +223,16 @@ class TimeSeriesHandlerImpl(SparkHandler):
                     self.log.warn("Error calculating SeasonalLowPass filter:\n%s" % tb)
 
             resultsRaw.append([results, meta])
+            self.log.info(
+                "LowPass filter calculation took %s for dataset %s" % (str(datetime.now() - the_time), shortName))
 
+            the_time = datetime.now()
             self._create_nc_file_time1d(np.array(results), 'ts.nc', 'mean',
                                         fill=-9999.)
+            self.log.info(
+                "NetCDF generation took %s for dataset %s" % (str(datetime.now() - the_time), shortName))
 
+        the_time = datetime.now()
         results = self._mergeResults(resultsRaw)
 
         if len(ds) == 2:
@@ -238,6 +254,8 @@ class TimeSeriesHandlerImpl(SparkHandler):
                                 maxLat=bounding_polygon.bounds[3], minLon=bounding_polygon.bounds[0],
                                 maxLon=bounding_polygon.bounds[2], ds=ds, startTime=start_seconds_from_epoch,
                                 endTime=end_seconds_from_epoch)
+
+        self.log.info("Merging results and calculating comparisons took %s" % (str(datetime.now() - the_time)))
         return res
 
     @lru_cache()
@@ -259,10 +277,37 @@ class TimeSeriesHandlerImpl(SparkHandler):
                                                                   fetch_data=False)
             if len(tile_stats) == 0:
                 continue
-            tile_means = np.array([tile.tile_stats.mean for tile in tile_stats])
-            tile_mins = np.array([tile.tile_stats.min for tile in tile_stats])
-            tile_maxes = np.array([tile.tile_stats.max for tile in tile_stats])
-            tile_counts = np.array([tile.tile_stats.count for tile in tile_stats])
+
+            # Split list into tiles on the border of the bounding box and tiles completely inside the bounding box.
+            border_tiles, inner_tiles = [], []
+            for tile in tile_stats:
+                inner_tiles.append(tile) if bounding_polygon.contains(shapely.geometry.box(tile.bbox.min_lon,
+                                                                                           tile.bbox.min_lat,
+                                                                                           tile.bbox.max_lon,
+                                                                                           tile.bbox.max_lat)) else border_tiles.append(
+                    tile)
+
+            # We can use the stats of the inner tiles directly
+            tile_means = [tile.tile_stats.mean for tile in inner_tiles]
+            tile_mins = [tile.tile_stats.min for tile in inner_tiles]
+            tile_maxes = [tile.tile_stats.max for tile in inner_tiles]
+            tile_counts = [tile.tile_stats.count for tile in inner_tiles]
+
+            # Border tiles need have the data loaded, masked, and stats recalculated
+            border_tiles = self._tile_service.fetch_data_for_tiles(border_tiles)
+            border_tiles = self._tile_service.mask_tiles_to_polygon(bounding_polygon)
+            for tile in border_tiles:
+                tile.update_stats()
+                tile_means.extend(tile.tile_stats.mean)
+                tile_mins.extend(tile.tile_stats.min)
+                tile_maxes.extend(tile.tile_stats.max)
+                tile_counts.extend(tile.tile_stats.count)
+
+            tile_means = np.array(tile_means)
+            tile_mins = np.array(tile_mins)
+            tile_maxes = np.array(tile_maxes)
+            tile_counts = np.array(tile_counts)
+
             sum_tile_counts = np.sum(tile_counts) * 1.0
 
             monthly_averages += [np.average(tile_means, None, tile_counts / sum_tile_counts).item()]
