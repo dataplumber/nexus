@@ -54,16 +54,16 @@ def summarize_nexustile(self, tiledata):
         # For Swath tiles, len(data) == len(latitudes) == len(longitudes). So we can simply weight each element in the
         # data array
         tilesummary.stats.mean = numpy.ma.average(numpy.ma.masked_invalid(data),
-                                                  weights=numpy.cos(numpy.radians(latitudes)))
+                                                  weights=numpy.cos(numpy.radians(latitudes))).item()
     elif the_tile_type == 'grid_tile':
         # Grid tiles need to repeat the weight for every longitude
         # TODO This assumes data axis' are ordered as latitude x longitude
         tilesummary.stats.mean = numpy.ma.average(numpy.ma.masked_invalid(data).flatten(),
                                                   weights=numpy.cos(
-                                                      numpy.radians(numpy.repeat(latitudes, len(longitudes)))))
+                                                      numpy.radians(numpy.repeat(latitudes, len(longitudes))))).item()
     else:
         # Default to simple average with no weighting
-        tilesummary.stats.mean = numpy.nanmean(data)
+        tilesummary.stats.mean = numpy.nanmean(data).item()
 
     tilesummary.stats.count = data.size - numpy.count_nonzero(numpy.isnan(data))
 
