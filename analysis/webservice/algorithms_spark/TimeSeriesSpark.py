@@ -59,7 +59,7 @@ class TimeSeriesHandlerImpl(SparkHandler):
             "name": "Compute Seasonal Cycle Filter",
             "type": "boolean",
             "description": "Flag used to specify if the seasonal averages should be computed during "
-                           "Time Series computation. Optional (Default: True)"
+                           "Time Series computation. Optional (Default: False)"
         },
         "lowPassFilter": {
             "name": "Compute Low Pass Filter",
@@ -138,7 +138,7 @@ class TimeSeriesHandlerImpl(SparkHandler):
                     request.get_start_datetime().strftime(ISO_8601), request.get_end_datetime().strftime(ISO_8601)),
                 code=400)
 
-        apply_seasonal_cycle_filter = request.get_apply_seasonal_cycle_filter()
+        apply_seasonal_cycle_filter = request.get_apply_seasonal_cycle_filter(default=False)
         apply_low_pass_filter = request.get_apply_low_pass_filter()
 
         spark_master, spark_nexecs, spark_nparts = request.get_spark_cfg()
