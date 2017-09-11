@@ -18,7 +18,6 @@ buildscript {
         jcenter()
         mavenCentral()
     }
-    //noinspection GroovyAssignabilityCheck
     dependencies {
         classpath("org.springframework.xd:spring-xd-module-plugin:1.3.1.RELEASE")
     }
@@ -35,6 +34,7 @@ apply plugin: 'groovy'
 apply plugin: 'idea'
 apply plugin: 'maven'
 apply plugin: 'spring-xd-module'
+apply plugin: 'project-report'
 
 group = 'org.nasa.jpl.nexus.ingest'
 version = '1.0.0.BUILD-SNAPSHOT'
@@ -60,9 +60,7 @@ repositories {
     }
 }
 
-//noinspection GroovyAssignabilityCheck
 sourceSets {
-    //noinspection GroovyAssignabilityCheck
     main {
         groovy {
             // override the default locations, rather than adding additional ones
@@ -74,7 +72,6 @@ sourceSets {
     }
 }
 
-//noinspection GroovyAssignabilityCheck
 dependencies {
     compile("org.springframework.integration:spring-integration-java-dsl:${springIntegrationDslVersion}")
     compile "edu.ucar:cdm:${netcdfJavaVersion}"
@@ -85,30 +82,6 @@ dependencies {
 
     testCompile("org.springframework.boot:spring-boot-starter-test")
 }
-
-
-task buildScriptDependencies(type: org.gradle.api.tasks.diagnostics.DependencyReportTask) {
-    configurations = project.buildscript.configurations
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 task wrapper(type: Wrapper) {
