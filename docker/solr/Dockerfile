@@ -9,7 +9,11 @@ RUN apt-get update && apt-get -y install git && rm -rf /var/lib/apt/lists/*
 
 RUN cd / && git clone https://github.com/dataplumber/nexus.git && cp -r /nexus/data-access/config/schemas/solr/nexustiles /tmp/nexustiles && rm -rf /nexus
 
-USER $SOLR_USER
+RUN mkdir /solr-home
+
+RUN chown -R $SOLR_USER:$SOLR_USER /solr-home
+
+VOLUME /solr-home
 
 RUN cp /jts-1.14/lib/jts-1.14.jar /opt/solr/server/lib/jts-1.14.jar
 
