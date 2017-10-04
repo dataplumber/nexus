@@ -135,7 +135,7 @@
     <copyField source="geo" dest="geo_s"/>
     <!-- Only enabled in the "schemaless" data-driven example (assuming the client
          does not know what fields may be searched) because it's very expensive to index everything twice. -->
-    <copyField source="*" dest="_text_"/>
+    <!-- <copyField source="*" dest="_text_"/> -->
 
     <!-- Dynamic field definitions allow using convention over configuration
        for fields via the specification of patterns to match field names. 
