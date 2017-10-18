@@ -148,17 +148,18 @@ def time_series(datasets, bounding_box, start_datetime, end_datetime, spark=Fals
 
     assert 0 < len(datasets) <= 2, "datasets must be a sequence of 1 or 2 items"
 
-    if spark:
-        url = "{}/timeSeriesSpark?".format(target)
-    else:
-        url = "{}/stats?".format(target)
-
     params = {
         'ds': ','.join(datasets),
         'b': ','.join(str(b) for b in bounding_box.bounds),
         'startTime': start_datetime.strftime(ISO_FORMAT),
         'endTime': end_datetime.strftime(ISO_FORMAT),
     }
+
+    if spark:
+        url = "{}/timeSeriesSpark?".format(target)
+        params['spark'] = "mesos,16,32"
+    else:
+        url = "{}/stats?".format(target)
 
     response = session.get(url, params=params)
     response.raise_for_status()
