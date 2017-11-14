@@ -456,30 +456,30 @@ class TestReadWSWMData(unittest.TestCase):
 
         self.assertEquals(2, len(results))
 
-        # results = [nexusproto.NexusTile.FromString(nexus_tile_data) for nexus_tile_data in results]
-        #
-        # for nexus_tile in results:
-        #     self.assertTrue(nexus_tile.HasField('tile'))
-        #     self.assertTrue(nexus_tile.tile.HasField('grid_tile'))
-        #
-        #     tile = nexus_tile.tile.grid_tile
-        #     self.assertEquals(10, from_shaped_array(tile.latitude).size)
-        #     self.assertEquals(10, from_shaped_array(tile.longitude).size)
-        #     self.assertEquals((1, 10, 10), from_shaped_array(tile.variable_data).shape)
-        #
-        # tile1_data = np.ma.masked_invalid(from_shaped_array(results[0].tile.grid_tile.variable_data))
-        # self.assertEquals(100, np.ma.count(tile1_data))
-        # self.assertAlmostEquals(-39.875,
-        #                         np.ma.min(np.ma.masked_invalid(from_shaped_array(results[0].tile.grid_tile.latitude))),
-        #                         places=3)
-        # self.assertAlmostEquals(-37.625,
-        #                         np.ma.max(np.ma.masked_invalid(from_shaped_array(results[0].tile.grid_tile.latitude))),
-        #                         places=3)
-        #
-        # self.assertEquals(1462060800, results[0].tile.grid_tile.time)
-        # self.assertAlmostEquals(289.71,
-        #                         np.ma.masked_invalid(from_shaped_array(results[0].tile.grid_tile.variable_data))[0, 0, 0],
-        #                         places=3)
+        results = [nexusproto.NexusTile.FromString(nexus_tile_data) for nexus_tile_data in results]
+
+        for nexus_tile in results:
+            self.assertTrue(nexus_tile.HasField('tile'))
+            self.assertTrue(nexus_tile.tile.HasField('time_series_tile'))
+
+            tile = nexus_tile.tile.time_series_tile
+            self.assertEquals(500, from_shaped_array(tile.latitude).size)
+            self.assertEquals(500, from_shaped_array(tile.longitude).size)
+            self.assertEquals((1, 500), from_shaped_array(tile.variable_data).shape)
+
+        tile1_data = np.ma.masked_invalid(from_shaped_array(results[0].tile.time_series_tile.variable_data))
+        self.assertEquals(500, np.ma.count(tile1_data))
+        self.assertAlmostEquals(41.390,
+                                np.ma.min(np.ma.masked_invalid(from_shaped_array(results[0].tile.time_series_tile.latitude))),
+                                places=3)
+        self.assertAlmostEquals(42.071,
+                                np.ma.max(np.ma.masked_invalid(from_shaped_array(results[0].tile.time_series_tile.latitude))),
+                                places=3)
+
+        self.assertEquals(852098400L, results[0].tile.time_series_tile.time)
+        self.assertAlmostEquals(0.009,
+                                np.ma.masked_invalid(from_shaped_array(results[0].tile.time_series_tile.variable_data))[0, 0],
+                                places=3)
 
 
 if __name__ == '__main__':

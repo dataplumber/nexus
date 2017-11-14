@@ -233,7 +233,7 @@ def read_time_series_data(self, section_spec_dataset):
         for section_spec, dimtoslice in tile_specifications:
             tile = nexusproto.TimeSeriesTile()
 
-            instance_dimension = next(iter([dim for dim in ds[variable_to_read].dimensions if dim is not time]))
+            instance_dimension = next(iter([dim for dim in ds[variable_to_read].dimensions if dim != time]))
 
             tile.latitude.CopyFrom(to_shaped_array(numpy.ma.filled(ds[latitude][dimtoslice[instance_dimension]], numpy.NaN)))
 
