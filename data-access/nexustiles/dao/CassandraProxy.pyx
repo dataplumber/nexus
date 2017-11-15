@@ -109,7 +109,6 @@ class NexusTileData(Model):
         if desired_shape[0] == 1:
             reshaped_array = np.ma.masked_all((desired_shape[1], desired_shape[2]))
             row, col = np.indices(data_array.shape)
-            np.reshape()
 
             reshaped_array[np.diag_indices(desired_shape[1], len(reshaped_array.shape))] = data_array[
                 row.flat, col.flat]
