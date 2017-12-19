@@ -34,7 +34,9 @@ setuptools.setup(
         'utm',
         'shapely',
         'mock',
-        'backports.functools-lru-cache==1.3'
+        'backports.functools-lru-cache==1.3',
+        'netcdf4',
+        'boto3'
     ],
 
     classifiers=[
