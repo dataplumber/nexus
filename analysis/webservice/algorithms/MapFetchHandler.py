@@ -323,24 +323,23 @@ class MapFetchHandler(BaseHandler):
                 break
 
             start_time = one_interval_later
-            print(fulldate)
 
         tar_file = ds + '.tar.gz'
         retcode = call(["tar", "-zcvf", tar_file, ds])
-        # if retcode == 0:
-        #     # Delete temporary files/folders if tar.gz is created successfully
-        #     call(["rm", "-rf", ds])
-        #     call(["rm", "-rf", temp_dir])
-        # else:
-        #     print("Error creating tar.gz")
-        #
-        # # Upload the tar.gz file to the sea-level-mrf S3 bucket
-        # s3bucket = 'sea-level-mrf'
-        # s3client = boto3.client('s3')
-        # try:
-        #     with open(tar_file, 'rb') as data:
-        #         s3client.upload_fileobj(data, s3bucket, tar_file)
-        # except Exception as e:
-        #     print("Unable to add tar.gz to S3: \n" + str(e))
-        #
-        # call(["rm", "-rf", tar_file])  # Delete the tar.gz from local storage
+        if retcode == 0:
+            # Delete temporary files/folders if tar.gz is created successfully
+            call(["rm", "-rf", ds])
+            call(["rm", "-rf", temp_dir])
+        else:
+            print("Error creating tar.gz")
+
+        # Upload the tar.gz file to the sea-level-mrf S3 bucket
+        s3bucket = 'sea-level-mrf'
+        s3client = boto3.client('s3')
+        try:
+            with open(tar_file, 'rb') as data:
+                s3client.upload_fileobj(data, s3bucket, tar_file)
+        except Exception as e:
+            print("Unable to add tar.gz to S3: \n" + str(e))
+
+        call(["rm", "-rf", tar_file])  # Delete the tar.gz from local storage

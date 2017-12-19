@@ -8,7 +8,7 @@ from shutil import copyfile
 from subprocess import call
 
 tmpdir = '/tmp/tmp/'
-gdal_dir = '/Users/djsilvan/anaconda2/envs/nexus-messages/bin/'  # '/usr/local/anaconda2/envs/nexus/bin/'
+gdal_dir = '/usr/local/anaconda2/envs/nexus/bin/'
 gdal_translate = 'gdal_translate'
 gdaladdo = 'gdaladdo'
 gdalwarp = 'gdalwarp'
