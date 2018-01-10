@@ -1,12 +1,17 @@
 .gradle/
 .idea/
-build/
 gradlew.bat
 
 distrobution/
 
 gen/
 
+build/*
+!build/reports
+
+build/reports/*
+!build/reports/license
+!build/reports/project
 
 nexusproto.egg-info/
 
@@ -14,14 +19,9 @@ nexusproto.egg-info/
 *.log
 
 #Idea files
-.idea
 *.iml
 *.ipr
 *.iws
-
-.gradle
-
-build
 
 *.class
 

@@ -231,6 +231,30 @@ class TestTileContainsMethod(unittest.TestCase):
         self.assertFalse(tile.contains_point(35, -50))
 
 
+class TestTileUpdateStats(unittest.TestCase):
+    def test_update_tile_stats(self):
+        tile = Tile()
+        tile.bbox = BBox(-1.0, 1.0, -2.0, 2.0)
+        tile.latitudes = np.ma.array([-1.0, -0.5, 0, .5, 1.0])
+        tile.longitudes = np.ma.array([-2.0, -1.0, 0, 1.0, 2.0])
+        tile.times = np.ma.array([0L])
+        tile.data = np.ma.arange(25.0).reshape((1, 5, 5))
+
+        #         -2   -1   0    1    2
+        # -1.0 [[[0.   1.   2.   3.   4. ]
+        # -0.5   [5.   6.   7.   8.   9. ]
+        #  0.    [10.  11.  12.  13.  14.]
+        #  0.5   [15.  16.  17.  18.  19.]
+        #  1.0   [20.  21.  22.  23.  24.]]]
+
+        tile.update_stats()
+
+        self.assertAlmostEqual(0.0, tile.tile_stats.min)
+        self.assertAlmostEqual(24.0, tile.tile_stats.max)
+        self.assertAlmostEqual(12.0, tile.tile_stats.mean)
+        self.assertEqual(25, tile.tile_stats.count)
+
+
 class TestMergeTilesMethod(unittest.TestCase):
     def test_merge_tiles(self):
         tile1 = Tile()
@@ -321,9 +345,9 @@ class TestMergeTilesMethod(unittest.TestCase):
         self.assertTrue(np.ma.allequal(times, np.array([0L])))
         self.assertTrue(np.ma.allequal(lats, np.array([0.0, 1.0, 2.0, 3.0])))
         self.assertTrue(np.ma.allequal(longs, np.array([-5.0, -4.0, -3.0, -2.0, -1.0, 0.0])))
-        expected = np.ma.array([[[14, 13, 12, 2,   1, 0],
-                                 [17, 16, 15, 5,   4, 3],
-                                 [20, 19, 18, 8,   7, 6],
+        expected = np.ma.array([[[14, 13, 12, 2, 1, 0],
+                                 [17, 16, 15, 5, 4, 3],
+                                 [20, 19, 18, 8, 7, 6],
                                  [23, 22, 21, 11, 10, 9]]], mask=False)
         self.assertTrue(np.ma.allequal(np.ma.getmaskarray(data), np.ma.getmaskarray(expected)))
         self.assertTrue(np.ma.allequal(data, expected))

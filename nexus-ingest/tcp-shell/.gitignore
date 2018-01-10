@@ -1,20 +1,22 @@
 .gradle/
 .idea/
-build/
 gradlew.bat
 
 .DS_Store
 *.log
 
+
+build/*
+!build/reports
+
+build/reports/*
+!build/reports/license
+!build/reports/project
+
 #Idea files
-.idea
 *.iml
 *.ipr
 *.iws
-
-.gradle
-
-build
 
 *.class
 

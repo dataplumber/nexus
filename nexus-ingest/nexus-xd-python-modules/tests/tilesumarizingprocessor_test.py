@@ -79,7 +79,7 @@ class TestSummarizeTile(unittest.TestCase):
 
         self.assertAlmostEquals(288.5099, tile_summary.stats.min, places=3)
         self.assertAlmostEquals(290.4, tile_summary.stats.max, places=3)
-        self.assertAlmostEquals(289.4338, tile_summary.stats.mean, places=3)
+        self.assertAlmostEquals(289.4443, tile_summary.stats.mean, places=3)
         self.assertEquals(100, tile_summary.stats.count)
 
         self.assertEquals(1462838400, tile_summary.stats.min_time)

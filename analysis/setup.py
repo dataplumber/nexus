@@ -34,7 +34,8 @@ setuptools.setup(
         'utm',
         'shapely',
         'mock',
-        'backports.functools-lru-cache==1.3'
+        'backports.functools-lru-cache==1.3',
+        'pyproj==1.9.5.1'
     ],
 
     classifiers=[

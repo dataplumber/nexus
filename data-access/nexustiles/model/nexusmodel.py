@@ -95,6 +95,15 @@ class Tile(object):
 
         return contains_point(self.latitudes, self.longitudes, lat, lon)
 
+    def update_stats(self):
+
+        t_min = np.nanmin(self.data).item()
+        t_max = np.nanmax(self.data).item()
+        t_mean = np.ma.average(np.ma.masked_invalid(self.data).flatten(),
+                               weights=np.cos(np.radians(np.repeat(self.latitudes, len(self.longitudes)))))
+        t_count = self.data.size - np.count_nonzero(np.isnan(self.data))
+        self.tile_stats = TileStats(t_min, t_max, t_mean, t_count)
+
 
 def contains_point(latitudes, longitudes, lat, lon):
     minx, miny, maxx, maxy = np.ma.min(longitudes), np.ma.min(latitudes), np.ma.max(

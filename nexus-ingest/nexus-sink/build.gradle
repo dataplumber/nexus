@@ -115,6 +115,7 @@ apply plugin: 'idea'
 apply plugin: 'spring-xd-module'
 apply plugin: 'maven-publish'
 apply plugin: "io.spring.dependency-management"
+apply plugin: 'project-report'
 
 group = 'org.nasa.jpl.nexus.ingest'
 version = '1.4-SNAPSHOT'
@@ -179,11 +180,9 @@ dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.11'
 }
 
-
 task buildScriptDependencies(type: org.gradle.api.tasks.diagnostics.DependencyReportTask) {
     configurations = project.buildscript.configurations
 }
-
 
 task wrapper(type: Wrapper) {
     gradleVersion = '2.12'
