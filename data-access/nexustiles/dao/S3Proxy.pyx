@@ -3,29 +3,25 @@ Copyright (c) 2017 Jet Propulsion Laboratory,
 California Institute of Technology.  All rights reserved
 """
 import uuid
-from ConfigParser import NoOptionError
-from multiprocessing.synchronize import Lock
-
 import nexusproto.NexusContent_pb2 as nexusproto
-import numpy as np
-from cassandra.cqlengine import columns, connection, CQLEngineException
-from cassandra.cqlengine.models import Model
-from cassandra.policies import TokenAwarePolicy, DCAwareRoundRobinPolicy
 from nexusproto.serialization import from_shaped_array
+import numpy as np
+import boto3
 
-INIT_LOCK = Lock()
-
-
-class NexusTileData(Model):
-    __table_name__ = 'sea_surface_temp'
-    tile_id = columns.UUID(primary_key=True)
-    tile_blob = columns.Blob()
-
+class NexusTileData(object):
     __nexus_tile = None
+    __data = None
+    tile_id = None
+
+    def __init__(self, data, _tile_id):
+        if self.__data is None:
+            self.__data = data
+        if self.tile_id is None:
+            self.tile_id = _tile_id
 
     def _get_nexus_tile(self):
         if self.__nexus_tile is None:
-            self.__nexus_tile = nexusproto.TileData.FromString(self.tile_blob)
+            self.__nexus_tile = nexusproto.TileData.FromString(self.__data)
 
         return self.__nexus_tile
 
@@ -84,28 +80,8 @@ class NexusTileData(Model):
                 meta_data[name] = reshaped_meta_array
 
             return latitude_data, longitude_data, time_data, tile_data, meta_data
-        elif self._get_nexus_tile().HasField('time_series_tile'):
-            time_series_tile = self._get_nexus_tile().time_series_tile
-
-            time_series_tile_data = np.ma.masked_invalid(from_shaped_array(time_series_tile.variable_data))
-            time_data = np.array([time_series_tile.time])
-            latitude_data = np.ma.masked_invalid(from_shaped_array(time_series_tile.latitude))
-            longitude_data = np.ma.masked_invalid(from_shaped_array(time_series_tile.longitude))
-
-            tile_data = self._to_standard_index(time_series_tile_data,
-                                                (len(time_data), len(latitude_data), len(longitude_data)))
-
-            # Extract the meta data
-            meta_data = {}
-            for meta_data_obj in time_series_tile.meta_data:
-                name = meta_data_obj.name
-                meta_array = np.ma.masked_invalid(from_shaped_array(meta_data_obj.meta_data))
-                reshaped_meta_array = self._to_standard_index(meta_array, tile_data.shape)
-                meta_data[name] = reshaped_meta_array
-
-            return latitude_data, longitude_data, time_data, tile_data, meta_data
         else:
-            raise NotImplementedError("Only supports grid_tile, swath_tile, and time_series_tile")
+            raise NotImplementedError("Only supports grid_tile and swath_tile")
 
     @staticmethod
     def _to_standard_index(data_array, desired_shape):
@@ -131,40 +107,23 @@ class NexusTileData(Model):
         return reshaped_array
 
 
-class CassandraProxy(object):
+class S3Proxy(object):
     def __init__(self, config):
         self.config = config
-        self.__cass_url = config.get("cassandra", "host")
-        self.__cass_keyspace = config.get("cassandra", "keyspace")
-        self.__cass_local_DC = config.get("cassandra", "local_datacenter")
-        self.__cass_protocol_version = config.getint("cassandra", "protocol_version")
-        try:
-            self.__cass_port = config.getint("cassandra", "port")
-        except NoOptionError:
-            self.__cass_port = 9042
-
-        with INIT_LOCK:
-            try:
-                connection.get_cluster()
-            except CQLEngineException:
-                self.__open()
-
-    def __open(self):
-
-        dc_policy = DCAwareRoundRobinPolicy(self.__cass_local_DC)
-        token_policy = TokenAwarePolicy(dc_policy)
-        connection.setup([host for host in self.__cass_url.split(',')], self.__cass_keyspace,
-                         protocol_version=self.__cass_protocol_version, load_balancing_policy=token_policy,
-                         port=self.__cass_port)
+        self.__s3_bucketname = config.get("s3", "bucket")
+        self.__s3_region = config.get("s3", "region")
+        self.__s3 = boto3.resource('s3')
+        self.__nexus_tile = None
 
     def fetch_nexus_tiles(self, *tile_ids):
+
         tile_ids = [uuid.UUID(str(tile_id)) for tile_id in tile_ids if
                     (isinstance(tile_id, str) or isinstance(tile_id, unicode))]
-
         res = []
         for tile_id in tile_ids:
-            filterResults = NexusTileData.objects.filter(tile_id=tile_id)
-            if len(filterResults) > 0:
-                res.append(filterResults[0])
+            obj = self.__s3.Object(self.__s3_bucketname, str(tile_id))
+            data = obj.get()['Body'].read()
+            nexus_tile = NexusTileData(data, str(tile_id))
+            res.append(nexus_tile)
 
         return res
