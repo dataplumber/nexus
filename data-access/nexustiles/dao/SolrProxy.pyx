@@ -119,7 +119,8 @@ class SolrProxy(object):
             'rows': 0,
             "facet": "true",
             "facet.field": "dataset_s",
-            "facet.mincount": "1"
+            "facet.mincount": "1",
+            "facet.limit": "-1"
         }
 
         response = self.do_query_raw(*(search, None, None, False, None), **params)
