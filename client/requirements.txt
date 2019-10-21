@@ -11,4 +11,4 @@ Pygments==2.2.0
 pytz==2017.2
 requests==2.18.1
 Shapely==1.5.17.post1
-urllib3==1.21.1
+urllib3==1.24.2
