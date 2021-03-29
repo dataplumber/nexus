@@ -7,7 +7,7 @@ MarkupSafe==1.0
 nexuscli==1.0
 numpy==1.13.1
 pdoc==0.3.2
-Pygments==2.2.0
+Pygments==2.7.4
 pytz==2017.2
 requests==2.18.1
 Shapely==1.5.17.post1
